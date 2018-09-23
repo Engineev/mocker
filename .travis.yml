@@ -1,0 +1,29 @@
+sudo: true
+language: cpp
+dist: trusty
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-5
+      - build-essential
+      - libboost-all-dev
+
+install:
+  - export CC=gcc-5
+  - export CXX=g++-5
+
+matrix:
+  include:
+    - compiler: gcc
+      env: COMPILER=g++-5
+    - compiler: clang
+      env: COMPILER=clang++
+
+script:
+  - $COMPILER --version
+  - mkdir build
+  - cd build
+  - cmake -DCMAKE_CXX_COMPILER=$COMPILER .. && make
