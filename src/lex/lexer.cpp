@@ -1,6 +1,6 @@
 #include "lexer.h"
 
-#define ADD(NAME)                                                              \
+#define MOCKER_ADD(NAME)                                                              \
   add(NAME);                                                                   \
   break;
 
@@ -55,20 +55,25 @@ bool Lexer::transit(const std::string &curTok) {
   }
   // keywords / identifiers / boolLit
   if (curTok == "true" || curTok == "false") {
-    tokens.emplace_back(TokenID::BoolLit, curBeg, nxtBeg, curTok == "true");
+    curNode = [this](const std::string & curTok) {
+      tokens.emplace_back(TokenID::BoolLit, curBeg, nxtBeg, curTok == "true");
+    };
+    return true;
   }
-  keywordsOrIdentifier(curTok);
+  curNode = std::bind(&Lexer::keywordsOrIdentifier, this, ph::_1);
   return true;
 }
 
 std::string Lexer::getToken() {
   // skip
-  while (nxtBeg != srcEnd && !std::ispunct(*nxtBeg) &&
+  while (nxtBeg != srcEnd && (!std::ispunct(*nxtBeg) || *nxtBeg == '/') &&
       !std::isalnum(*nxtBeg) && *nxtBeg != '"') {
     if (srcEnd - nxtBeg >= 2 && *nxtBeg == '/' && *(nxtBeg + 1) == '/') {
       while (nxtBeg != srcEnd && *nxtBeg != '\n')
         ++nxtBeg;
     }
+    if (nxtBeg != srcEnd)
+      ++nxtBeg;
   }
   if (nxtBeg == srcEnd)
     return "";
@@ -95,21 +100,21 @@ void Lexer::punct(const std::string &curTok) {
   auto add = [this](TokenID id) { tokens.emplace_back(id, curBeg, nxtBeg); };
   switch (curTok[0]) {
   case '(':
-    ADD(TokenID::LeftParen);
+    MOCKER_ADD(TokenID::LeftParen);
   case ')':
-    ADD(TokenID::RightParen);
+    MOCKER_ADD(TokenID::RightParen);
   case '[':
-    ADD(TokenID::LeftBracket);
+    MOCKER_ADD(TokenID::LeftBracket);
   case ']':
-    ADD(TokenID::RightBracket);
+    MOCKER_ADD(TokenID::RightBracket);
   case '{':
-    ADD(TokenID::LeftBrace);
+    MOCKER_ADD(TokenID::LeftBrace);
   case '}':
-    ADD(TokenID::RightBrace);
+    MOCKER_ADD(TokenID::RightBrace);
   case ';':
-    ADD(TokenID::Semicolon);
+    MOCKER_ADD(TokenID::Semicolon);
   case ',':
-    ADD(TokenID::Comma);
+    MOCKER_ADD(TokenID::Comma);
   case '+':
     if (nextToken() == "+") {
       getToken();
@@ -125,11 +130,11 @@ void Lexer::punct(const std::string &curTok) {
       add(TokenID::Minus);
     break;
   case '*':
-    ADD(TokenID::Mult);
+    MOCKER_ADD(TokenID::Mult);
   case '/':
-    ADD(TokenID::Divide);
+    MOCKER_ADD(TokenID::Divide);
   case '%':
-    ADD(TokenID::Mod);
+    MOCKER_ADD(TokenID::Mod);
   case '>':
     if (nextToken() == "=") {
       getToken();
@@ -179,11 +184,11 @@ void Lexer::punct(const std::string &curTok) {
       add(TokenID::BitOr);
     break;
   case '~':
-    ADD(TokenID::BitNot);
+    MOCKER_ADD(TokenID::BitNot);
   case '^':
-    ADD(TokenID::BitXor);
+    MOCKER_ADD(TokenID::BitXor);
   case '.':
-    ADD(TokenID::Dot);
+    MOCKER_ADD(TokenID::Dot);
   default:
     throw LexError(srcBeg, srcEnd, curBeg, nxtBeg);
   }
@@ -194,7 +199,7 @@ void Lexer::stringLiteral(const std::string &curTok) {
   auto convert = [this](StrIter beg, StrIter end) -> std::string {
 //    const std::string escaped = "abfnrtv\\'\"";
     std::string res;
-    for (auto iter = beg + 1; iter < end - 1; ++iter) {
+    for (auto iter = beg + 1; iter < end; ++iter) {
       if (*iter == '\\') {
         if (iter + 1 == end - 1)
           throw LexError(srcBeg, srcEnd, beg, end);
@@ -237,11 +242,11 @@ void Lexer::stringLiteral(const std::string &curTok) {
     }
     return res;
   };
-
-  for (auto iter = curBeg; iter != srcEnd; ++iter) {
-    if (*iter == '"') {
+  // "12 3//\"abc"
+  for (auto iter = curBeg + 1; iter != srcEnd; ++iter) {
+    if (*iter == '"' && *(iter - 1) != '\\') {
       tokens.emplace_back(TokenID::StringLit, curBeg, iter + 1,
-          convert(curBeg, iter + 1));
+          convert(curBeg, iter));
       nxtBeg = iter + 1;
       return;
     }
@@ -285,7 +290,7 @@ void Lexer::keywordsOrIdentifier(const std::string &curTok) {
   for (auto ch : curTok)
     if (!std::isalnum(ch) && ch != '_')
       throw LexError(srcBeg, srcEnd, curBeg, nxtBeg);
-  tokens.emplace_back(iter->second, curBeg, nxtBeg, curTok);
+  tokens.emplace_back(TokenID::Identifier, curBeg, nxtBeg, curTok);
 }
 
 } // namespace mocker

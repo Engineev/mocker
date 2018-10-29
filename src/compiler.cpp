@@ -4,13 +4,14 @@
 
 namespace mocker {
 
-std::string readFromStream(std::istream & input) {
+std::string readFromStream(std::istream &input) {
   std::stringstream ss;
   ss << input.rdbuf();
   return ss.str();
 }
 
-Compiler::Compiler(std::istream &input) : sourceCode(readFromStream(input)) {}
-
+Compiler::Compiler(std::istream &input)
+    : sourceCode(readFromStream(input)),
+      lex(sourceCode.begin(), sourceCode.end()) {}
 
 } // namespace mocker

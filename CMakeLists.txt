@@ -10,3 +10,4 @@ endif ()
 add_definitions(-DCMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 add_subdirectory(src)
+add_subdirectory(test)

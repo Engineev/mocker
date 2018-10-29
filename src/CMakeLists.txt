@@ -7,7 +7,7 @@ set(HEADERS
 
   compiler.h
 )
-set(SOURCES main.cpp
+set(LIB_SOURCES
   lex/lexer.cpp
 
   compiler.cpp
@@ -15,4 +15,6 @@ set(SOURCES main.cpp
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 
-add_executable(mocker ${SOURCES} ${HEADERS})
+add_library(${PROJECT_NAME}_lib ${LIB_SOURCES} ${HEADERS})
+add_executable(${PROJECT_NAME} main.cpp ${HEADERS})
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_lib)

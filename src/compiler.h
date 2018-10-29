@@ -4,14 +4,19 @@
 #include <iostream>
 #include <string>
 
+#include "lex/lexer.h"
+
 namespace mocker {
 
 class Compiler {
 public:
   explicit Compiler(std::istream & input);
 
+  void compile();
+
 private:
   const std::string sourceCode;
+  Lexer lex;
 
 }; // class Compiler
 

@@ -12,7 +12,7 @@
 #include <unordered_map>
 
 #include "common/defs.h"
-#include "position.h"
+#include "common/position.h"
 #include "token.h"
 
 namespace mocker {
