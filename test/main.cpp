@@ -2,11 +2,13 @@
 #include <memory>
 #include "testcase.h"
 #include "test_lexer.h"
+#include "test_parser.h"
 
 int main() {
   using namespace mocker::test;
   std::vector<std::pair<std::string, std::shared_ptr<TestCase>>> tests = {
-      {"TestLexer", std::make_shared<TestLexer>()}
+      {"TestLexer", std::make_shared<TestLexer>()},
+      {"TestParser", std::make_shared<TestParser>()}
   };
 
   for (auto & test : tests) {

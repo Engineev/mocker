@@ -9,6 +9,7 @@ namespace mocker {
 
 struct Position {
   Position() = default;
+  Position(std::size_t line, std::size_t col) : line(line), col(col) {}
   Position(StrIter bufferBeg, StrIter bufferEnd, StrIter tok) {
     assert(bufferBeg <= tok && tok < bufferEnd);
     line = 1;
@@ -20,6 +21,15 @@ struct Position {
       }
     }
     col = tok - bol;
+  }
+  Position(const Position &) = default;
+  Position& operator=(const Position &) = default;
+
+  bool operator==(const Position & rhs) const {
+    return line == rhs.line && col == rhs.col;
+  }
+  bool operator!=(const Position & rhs) const {
+    return !(*this == rhs);
   }
 
   std::size_t line = 0, col = 0;

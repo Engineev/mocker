@@ -2,6 +2,7 @@ set(HEADERS
   testcase.h
 
   test_lexer.h
+  test_parser.h
   )
 set(SOURCE main.cpp)
 

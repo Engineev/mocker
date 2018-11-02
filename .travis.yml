@@ -9,7 +9,7 @@ addons:
     packages:
       - g++-5
       - build-essential
-      - libboost-all-dev
+#      - libboost-all-dev
 
 install:
   - export CC=gcc-5

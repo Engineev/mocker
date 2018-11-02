@@ -14,7 +14,7 @@ public:
   ~TestLexer() override = default;
 
   std::pair<bool, std::string> run() override {
-    StrIter dummy;
+    Position dummy;
     // clang-format off
     std::vector<Entry> tests = {
         {"int", false, Token(TokenID::Int, dummy, dummy)},

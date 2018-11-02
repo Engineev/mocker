@@ -12,37 +12,32 @@
 #include <unordered_map>
 
 #include "common/defs.h"
-#include "common/position.h"
+#include "common/error.h"
 #include "token.h"
 
 namespace mocker {
 
-class LexError : public std::exception {
+class LexError : public CompileError {
 public:
-  LexError(StrIter bufferBeg, StrIter bufferEnd, StrIter beg, StrIter end);
-
-  const char *what() const noexcept override;
-
-private:
-  StrIter bufferBeg, bufferEnd, beg, end;
-  mutable std::string msg;
+  LexError(Position beg, Position end) : CompileError(beg, end) {}
 }; // class LexError
 
 class Lexer {
 public:
-  Lexer(StrIter beg, StrIter end) : srcBeg(beg), srcEnd(end) {}
+  Lexer(StrIter beg, StrIter end);
 
   std::vector<Token> operator()();
 
 private:
-  StrIter srcBeg, srcEnd; // the begin and end of the entire source code
+  StrIter srcBeg, srcEnd;  // the begin and end of the entire source code
 
   // the state of the automata
-  StrIter curBeg, nxtBeg; // the begin the processing and next token
+  StrIter curBeg, nxtBeg;  // the begin the processing and next token
   // When getToken() is invoked, curBeg points to the begin of the returned
   // value and nxtBeg points to the begin of the next invoking result, which is
   // also the position next to the last character of this token.
-  std::vector<Token> tokens;                        // the tokens generated
+  Position curPos, nxtPos;    // the position of curBeg and nxtBeg
+  std::vector<Token> tokens;  // the tokens generated
   std::function<void(const std::string &)> curNode; // the current DFA node
 
   // return the next possible token. Comments and whitespaces are skipped. If
