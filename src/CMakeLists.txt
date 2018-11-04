@@ -13,6 +13,7 @@ set(HEADERS
   parse/token.h
 
   support/optional.h
+  support/small_map.h
 
   compiler.h
 )

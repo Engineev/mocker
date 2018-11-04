@@ -1,5 +1,16 @@
 #include "lexer.h"
 
+#include <type_traits>
+#include <bitset>
+#include <cctype>
+#include <exception>
+#include <functional>
+#include <cstdlib>
+#include <string>
+#include <utility>
+#include <vector>
+#include <unordered_map>
+
 #define MOCKER_ADD(NAME)                                                       \
   add(NAME);                                                                   \
   break;

@@ -4,7 +4,6 @@
 
 #include "parse/lexer.h"
 #include "ast/ast_node.h"
-#include "ast/printer.h"
 #include "parse/parser.h"
 
 int main() {

@@ -1,6 +1,7 @@
 #ifndef MOCKER_POSITION_H
 #define MOCKER_POSITION_H
 
+#include <cassert>
 #include <string>
 
 #include "common/defs.h"

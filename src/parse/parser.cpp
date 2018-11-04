@@ -2,9 +2,9 @@
 
 #include <cassert>
 #include <functional>
-#include <unordered_map>
 
 #include "ast/ast_node.h"
+#include "support/small_map.h"
 
 namespace mocker {
 
@@ -317,17 +317,18 @@ std::shared_ptr<ast::Expression> Parser::prefixUnary(TokIter &iter,
   return expr;
 }
 
+
 template <class OperandParser>
 std::shared_ptr<ast::Expression>
 auxBinaryExpr(TokIter &iter, TokIter end, OperandParser operand,
-              const std::unordered_map<TokenID, ast::BinaryExpr::OpType> &mp) {
+              const SmallMap<TokenID, ast::BinaryExpr::OpType> &mp) {
   auto begPos = iter->position().first;
   auto res = operand(iter, end);
   if (!res)
     return nullptr;
 
   auto id = GetTokenID(end);
-  while (mp.find(id(iter)) != mp.end()) {
+  while (mp.in(id(iter))) {
     ast::BinaryExpr::OpType op = mp.at(id(iter));
     ++iter;
     auto expr = operand(iter, end);

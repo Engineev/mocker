@@ -1,15 +1,7 @@
 #ifndef MOCKER_LEXER_H
 #define MOCKER_LEXER_H
 
-#include <bitset>
-#include <cctype>
-#include <exception>
-#include <functional>
-#include <cstdlib>
-#include <string>
-#include <utility>
 #include <vector>
-#include <unordered_map>
 
 #include "common/defs.h"
 #include "common/error.h"
