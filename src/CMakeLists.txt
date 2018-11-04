@@ -2,31 +2,26 @@ set(HEADERS
   ast/ast_node.h
   ast/visitor.h
   ast/fwd.h
-  ast/printer.h
+#  ast/printer.h
 
   common/defs.h
   common/position.h
   common/error.h
 
-  lex/lexer.h
-  lex/token.h
-
-  parse/common.h
-  parse/expression.h
+  parse/lexer.h
   parse/parser.h
+  parse/token.h
 
   support/optional.h
 
   compiler.h
 )
 set(LIB_SOURCES
-  ast/printer.cpp
+#  ast/printer.cpp
 
-  lex/lexer.cpp
-  lex/token.cpp
-
-  parse/expression.cpp
+  parse/lexer.cpp
   parse/parser.cpp
+  parse/token.cpp
 
   compiler.cpp
 )

@@ -219,6 +219,174 @@ struct NewExpr : Expression {
   std::vector<std::shared_ptr<Expression>> providedDims;
 };
 
+/*- statement ----------------------------------------------------------------*/
+
+struct Statement : ASTNode {
+  Statement(const Position &posBeg, const Position &posEnd)
+      : ASTNode(posBeg, posEnd) {}
+
+  MOCKER_PURE_ACCEPT
+};
+
+struct VarDeclStmt : Statement {
+  VarDeclStmt(const Position &posBeg, const Position &posEnd,
+              const std::shared_ptr<Type> &type, const std::string &Identifier,
+              const std::shared_ptr<Expression> &initExpr)
+      : Statement(posBeg, posEnd), type(type), Identifier(Identifier),
+        initExpr(initExpr) {}
+  MOCKER_ACCEPT
+
+  std::shared_ptr<Type> type;
+  std::string Identifier;
+  std::shared_ptr<Expression> initExpr;
+};
+
+struct ExprStmt : Statement {
+  ExprStmt(const Position &posBeg, const Position &posEnd,
+           const std::shared_ptr<Expression> &expr)
+      : Statement(posBeg, posEnd), expr(expr) {}
+
+  MOCKER_ACCEPT
+
+  std::shared_ptr<Expression> expr;
+};
+
+struct ReturnStmt : Statement {
+  ReturnStmt(const Position &posBeg, const Position &posEnd,
+             const std::shared_ptr<Expression> &expr)
+      : Statement(posBeg, posEnd), expr(expr) {}
+  MOCKER_ACCEPT
+  std::shared_ptr<Expression> expr;
+};
+
+struct ContinueStmt : Statement {
+  ContinueStmt(const Position &posBeg, const Position &posEnd)
+      : Statement(posBeg, posEnd) {}
+  MOCKER_ACCEPT
+};
+
+struct BreakStmt : Statement {
+  BreakStmt(const Position &posBeg, const Position &posEnd)
+      : Statement(posBeg, posEnd) {}
+  MOCKER_ACCEPT
+};
+
+struct CompoundStmt : Statement {
+  CompoundStmt(const Position &posBeg, const Position &posEnd,
+               std::vector<std::shared_ptr<Statement>> stmts)
+      : Statement(posBeg, posEnd), stmts(std::move(stmts)) {}
+
+  MOCKER_ACCEPT
+
+  std::vector<std::shared_ptr<Statement>> stmts;
+};
+
+struct IfStmt : Statement {
+  IfStmt(const Position &posBeg, const Position &posEnd,
+         const std::shared_ptr<Expression> &condition,
+         const std::shared_ptr<Statement> &then,
+         const std::shared_ptr<Statement> &else_)
+      : Statement(posBeg, posEnd), condition(condition), then(then),
+        else_(else_) {}
+
+  MOCKER_ACCEPT
+
+  std::shared_ptr<Expression> condition;
+  std::shared_ptr<Statement> then;
+  std::shared_ptr<Statement> else_;
+};
+
+struct WhileStmt : Statement {
+  WhileStmt(const Position &posBeg, const Position &posEnd,
+            const std::shared_ptr<Expression> &condition,
+            const std::shared_ptr<Statement> &body)
+      : Statement(posBeg, posEnd), condition(condition), body(body) {}
+
+  MOCKER_ACCEPT
+
+  std::shared_ptr<Expression> condition;
+  std::shared_ptr<Statement> body;
+};
+
+struct ForStmt : Statement {
+  ForStmt(const Position &posBeg, const Position &posEnd,
+          const std::shared_ptr<Expression> &init,
+          const std::shared_ptr<Expression> &condition,
+          const std::shared_ptr<Expression> &update,
+          const std::shared_ptr<Statement> &body)
+      : Statement(posBeg, posEnd), init(init), condition(condition),
+        update(update), body(body) {}
+
+  MOCKER_ACCEPT
+
+  std::shared_ptr<Expression> init, condition, update;
+  std::shared_ptr<Statement> body;
+};
+
+struct EmptyStmt : Statement {
+  EmptyStmt(const Position &posBeg, const Position &posEnd)
+      : Statement(posBeg, posEnd) {}
+  MOCKER_ACCEPT
+};
+
+/*- declaration --------------------------------------------------------------*/
+
+struct Declaration : ASTNode {
+  Declaration(const Position &posBeg, const Position &posEnd)
+      : ASTNode(posBeg, posEnd) {}
+
+  MOCKER_PURE_ACCEPT
+};
+
+struct VarDecl : Declaration {
+  VarDecl(const Position &posBeg, const Position &posEnd,
+          const std::shared_ptr<VarDeclStmt> &decl)
+      : Declaration(posBeg, posEnd), decl(decl) {}
+
+  MOCKER_ACCEPT
+
+  std::shared_ptr<VarDeclStmt> decl;
+};
+
+struct FuncDecl : Declaration {
+  FuncDecl(const Position &posBeg, const Position &posEnd,
+           const std::shared_ptr<Type> &retType, const std::string &identifier,
+           std::vector<std::pair<std::shared_ptr<Type>, std::string>>
+               formalParameters,
+           const std::shared_ptr<CompoundStmt> &body)
+      : Declaration(posBeg, posEnd), retType(retType), identifier(identifier),
+        formalParameters(std::move(formalParameters)), body(body) {}
+  MOCKER_ACCEPT
+
+  std::shared_ptr<Type> retType;
+  std::string identifier;
+  std::vector<std::pair<std::shared_ptr<Type>, std::string>> formalParameters;
+  std::shared_ptr<CompoundStmt> body;
+};
+
+struct ClassDecl : Declaration {
+  ClassDecl(const Position &posBeg, const Position &posEnd,
+            const std::string &identifier,
+            std::vector<std::shared_ptr<Declaration>> members)
+      : Declaration(posBeg, posEnd), identifier(identifier),
+        members(std::move(members)) {}
+
+  MOCKER_ACCEPT
+
+  std::string identifier;
+  std::vector<std::shared_ptr<Declaration>> members;
+};
+
+/*- root ---------------------------------------------------------------------*/
+struct ASTRoot : ASTNode {
+  ASTRoot(const Position &posBeg, const Position &posEnd,
+          std::vector<std::shared_ptr<Declaration>> decls)
+      : ASTNode(posBeg, posEnd), decls(std::move(decls)) {}
+
+  MOCKER_ACCEPT
+  std::vector<std::shared_ptr<Declaration>> decls;
+};
+
 } // namespace ast
 } // namespace mocker
 

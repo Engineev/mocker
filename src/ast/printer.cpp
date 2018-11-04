@@ -120,6 +120,47 @@ void Printer::operator()(const NewExpr &node) const {
   out << "\b\n]\b\n}";
 }
 
+// TODO
+void Printer::operator()(const VarDeclStmt &node) const {}
+void Printer::operator()(const ExprStmt &node) const {
+
+}
+void Printer::operator()(const ReturnStmt &node) const {
+
+}
+void Printer::operator()(const ContinueStmt &node) const {
+
+}
+void Printer::operator()(const BreakStmt &node) const {
+
+}
+void Printer::operator()(const CompoundStmt &node) const {
+
+}
+void Printer::operator()(const IfStmt &node) const {
+
+}
+void Printer::operator()(const WhileStmt &node) const {
+
+}
+void Printer::operator()(const ForStmt &node) const {
+
+}
+
+void Printer::operator()(const VarDecl &node) const {
+
+}
+void Printer::operator()(const FuncDecl &node) const {
+
+}
+void Printer::operator()(const ClassDecl &node) const {
+
+}
+
+void Printer::operator()(const ASTRoot &node) const {
+
+}
+
 void print(std::ostream &out, const ASTNode &node) {
   Printer printer(out);
   node.accept(printer);

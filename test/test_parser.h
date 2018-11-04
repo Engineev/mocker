@@ -1,7 +1,7 @@
 #ifndef MOCKER_TEST_PARSER_H
 #define MOCKER_TEST_PARSER_H
 
-#include "lex/lexer.h"
+#include "parse/lexer.h"
 #include "parse/parser.h"
 #include "testcase.h"
 #include <utility>

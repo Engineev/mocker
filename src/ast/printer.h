@@ -23,10 +23,26 @@ public:
   void operator()(const StringLitExpr &node) const override;
   void operator()(const NullLitExpr &node) const override;
   void operator()(const IdentifierExpr &node) const override;
-  void operator()(const UnaryExpr &disp) const override;
-  void operator()(const BinaryExpr &disp) const override;
-  void operator()(const FuncCallExpr &disp) const override;
-  void operator()(const NewExpr &disp) const override;
+  void operator()(const UnaryExpr &node) const override;
+  void operator()(const BinaryExpr &node) const override;
+  void operator()(const FuncCallExpr &node) const override;
+  void operator()(const NewExpr &node) const override;
+
+  void operator()(const VarDeclStmt &node) const override;
+  void operator()(const ExprStmt &node) const override;
+  void operator()(const ReturnStmt &node) const override;
+  void operator()(const ContinueStmt &node) const override;
+  void operator()(const BreakStmt &node) const override;
+  void operator()(const CompoundStmt &node) const override;
+  void operator()(const IfStmt &node) const override;
+  void operator()(const WhileStmt &node) const override;
+  void operator()(const ForStmt &node) const override;
+
+  void operator()(const VarDecl &node) const override;
+  void operator()(const FuncDecl &node) const override;
+  void operator()(const ClassDecl &node) const override;
+
+  void operator()(const ASTRoot &node) const override;
 private:
   // \t and \b are used to indicate the indention
   class IndentingBuf : public std::streambuf {

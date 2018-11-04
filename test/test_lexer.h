@@ -1,8 +1,8 @@
 #ifndef MOCKER_TEST_LEXER_H
 #define MOCKER_TEST_LEXER_H
 
-#include "lex/lexer.h"
-#include "lex/token.h"
+#include "parse/lexer.h"
+#include "parse/token.h"
 #include "testcase.h"
 #include <utility>
 

@@ -14,7 +14,7 @@ public:
     using std::to_string;
     msg = "An error occurs between line " + to_string(beg.line) + ", column " +
           to_string(beg.col) + " and line " + to_string(end.line) +
-          ", column " + to_string(end.line);
+          ", column " + to_string(end.col);
   }
 
   const char *what() const noexcept override { return msg.c_str(); }

@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 
-#include "lex/lexer.h"
+#include "parse/lexer.h"
 
 namespace mocker {
 

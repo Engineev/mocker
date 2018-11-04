@@ -38,6 +38,23 @@ public:
   virtual void operator()(disp<BinaryExpr>) const = 0;
   virtual void operator()(disp<FuncCallExpr>) const = 0;
   virtual void operator()(disp<NewExpr>) const = 0;
+
+  virtual void operator()(disp<VarDeclStmt>) const = 0;
+  virtual void operator()(disp<ExprStmt>) const = 0;
+  virtual void operator()(disp<ReturnStmt>) const = 0;
+  virtual void operator()(disp<ContinueStmt>) const = 0;
+  virtual void operator()(disp<BreakStmt>) const = 0;
+  virtual void operator()(disp<CompoundStmt>) const = 0;
+  virtual void operator()(disp<IfStmt>) const = 0;
+  virtual void operator()(disp<WhileStmt>) const = 0;
+  virtual void operator()(disp<ForStmt>) const = 0;
+  virtual void operator()(disp<EmptyStmt>) const = 0;
+
+  virtual void operator()(disp<VarDecl>) const = 0;
+  virtual void operator()(disp<FuncDecl>) const = 0;
+  virtual void operator()(disp<ClassDecl>) const = 0;
+
+  virtual void operator()(disp<ASTRoot>) const = 0;
 };
 
 } // namespace detail

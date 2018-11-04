@@ -27,6 +27,25 @@ struct BinaryExpr;
 struct FuncCallExpr;
 struct NewExpr;
 
+struct Statement;
+struct VarDeclStmt;
+struct ExprStmt;
+struct ReturnStmt;
+struct ContinueStmt;
+struct BreakStmt;
+struct CompoundStmt;
+struct IfStmt;
+struct WhileStmt;
+struct ForStmt;
+struct EmptyStmt;
+
+struct Declaration;
+struct VarDecl;
+struct FuncDecl;
+struct ClassDecl;
+
+struct ASTRoot;
+
 } // namespace ast
 } // namespace mocker
 

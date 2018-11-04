@@ -72,6 +72,8 @@ std::string Lexer::getToken() {
       return false;
     while (nxtBeg != srcEnd && *nxtBeg != '\n')
       ++nxtBeg;
+    if (*nxtBeg == '\n')
+      ++nxtBeg;
     ++nxtPos.line;
     nxtPos.col = 1;
     return true;
@@ -99,8 +101,11 @@ std::string Lexer::getToken() {
 std::string Lexer::nextToken() {
   auto tmpCurBeg = curBeg;
   auto tmpNxtBeg = nxtBeg;
+  auto tmpCurPos = curPos;
+  auto tmpNxtPos = nxtPos;
   auto res = getToken();
-  std::tie(curBeg, nxtBeg) = std::tie(tmpCurBeg, tmpNxtBeg);
+  std::tie(curBeg, nxtBeg, curPos, nxtPos) =
+      std::tie(tmpCurBeg, tmpNxtBeg, tmpCurPos, tmpNxtPos);
   return res;
 }
 
@@ -208,7 +213,7 @@ void Lexer::stringLiteral(const std::string &curTok) {
     std::string res;
     for (auto iter = beg + 1; iter < end; ++iter) {
       if (*iter == '\\') {
-        if (iter + 1 == end - 1)
+        if (iter + 1 == end)
           throw LexError(curPos, nxtPos);
         char nxt = *(iter + 1);
         switch (nxt) {
@@ -251,12 +256,16 @@ void Lexer::stringLiteral(const std::string &curTok) {
   };
 
   for (auto iter = curBeg + 1; iter != srcEnd; ++iter) {
-    if (*iter == '"' && *(iter - 1) != '\\') {
-      nxtPos.line += iter + 1 - nxtBeg;
+    if (*iter == '"') {
       nxtBeg = iter + 1;
       tokens.emplace_back(TokenID::StringLit, curPos, nxtPos,
                           convert(curBeg, iter));
       return;
+    }
+    if (*iter == '\\') {
+      ++iter;
+      if (iter == srcEnd)
+        throw LexError(curPos, nxtPos);
     }
     if (*iter == '\n')
       throw LexError(curPos, nxtPos);
