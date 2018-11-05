@@ -25,6 +25,7 @@ private:
   template <class T> using disp = typename Dispatch<T, AddConst>::type &;
 
 public:
+  virtual void operator()(disp<Identifier>) const = 0;
   virtual void operator()(disp<BuiltinType>) const = 0;
   virtual void operator()(disp<UserDefinedType>) const = 0;
   virtual void operator()(disp<ArrayType>) const = 0;

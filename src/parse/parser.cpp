@@ -39,7 +39,14 @@ std::shared_ptr<ast::ASTRoot> Parser::root() { return root(tokBeg, tokEnd); }
 
 bool Parser::exhausted() const { return tokBeg == tokEnd; }
 
-/*- type ---------------------------------------------------------------------*/
+/*- misc ---------------------------------------------------------------------*/
+
+std::shared_ptr<ast::Identifier> Parser::identifier(TokIter &iter, TokIter end) {
+  if (GetTokenID(end)(iter) != TokenID::Identifier)
+    return nullptr;
+  auto pos = iter->position();
+  return std::make_shared<ast::Identifier>(pos.first, pos.second, (iter++)->val<std::string>());
+}
 
 std::shared_ptr<ast::BuiltinType> Parser::builtinType(TokIter &iter,
                                                       TokIter end) {
@@ -72,13 +79,8 @@ std::shared_ptr<ast::NonarrayType> Parser::nonarrayType(TokIter &iter,
                                                         TokIter end) {
   if (auto res = builtinType(iter, end))
     return res;
-  auto id = GetTokenID(end)(iter);
-  if (id == TokenID::Identifier) {
-    auto pos = iter->position();
-    std::string name = iter->val<std::string>();
-    ++iter;
-    return std::make_shared<ast::UserDefinedType>(pos.first, pos.second, name);
-  }
+  if (auto id = identifier(iter, end))
+    return std::make_shared<ast::UserDefinedType>(id->posBeg, id->posEnd, id);
   return nullptr;
 }
 
@@ -134,12 +136,9 @@ std::shared_ptr<ast::LiteralExpr> Parser::literalExpr(TokIter &iter,
 
 std::shared_ptr<ast::IdentifierExpr> Parser::identifierExpr(TokIter &iter,
                                                             TokIter end) {
-  auto id = GetTokenID(end)(iter);
-  if (id != TokenID::Identifier)
-    return nullptr;
-  auto cur = iter++;
-  return std::make_shared<ast::IdentifierExpr>(
-      cur->position().first, cur->position().second, cur->val<std::string>());
+  if (auto res = identifier(iter, end))
+    return std::make_shared<ast::IdentifierExpr>(res->posBeg, res->posEnd, res);
+  return nullptr;
 }
 
 std::shared_ptr<ast::NewExpr> Parser::newExpr(TokIter &iter, TokIter end) {
@@ -468,7 +467,7 @@ std::shared_ptr<ast::VarDeclStmt> Parser::varDeclStmt(TokIter &iter,
 
   // look ahead
   auto beg = iter;
-  if (!type(iter, end) || id(iter++) != TokenID::Identifier ||
+  if (!type(iter, end) || !identifier(iter, end) ||
       id(iter++) == TokenID::LeftParen) {
     iter = beg;
     return nullptr;
@@ -477,12 +476,11 @@ std::shared_ptr<ast::VarDeclStmt> Parser::varDeclStmt(TokIter &iter,
 
   auto varType = type(iter, end);
   assert(varType);
-  assert(id(iter) == TokenID::Identifier);
-  auto identifier = iter->val<std::string>();
-  ++iter;
+  auto ident = identifier(iter, end);
+  assert(ident);
   if (id(iter) == TokenID::Semicolon)
     return std::make_shared<ast::VarDeclStmt>(
-        begPos, (iter++)->position().second, varType, identifier, nullptr);
+        begPos, (iter++)->position().second, varType, ident, nullptr);
 
   if (id(iter) != TokenID::Assign)
     throwError();
@@ -493,7 +491,7 @@ std::shared_ptr<ast::VarDeclStmt> Parser::varDeclStmt(TokIter &iter,
   if (id(iter) != TokenID::Semicolon)
     throwError();
   return std::make_shared<ast::VarDeclStmt>(begPos, (iter++)->position().second,
-                                            varType, identifier, expr);
+                                            varType, ident, expr);
 }
 
 std::shared_ptr<ast::ExprStmt> Parser::exprStmt(TokIter &iter, TokIter end) {
@@ -673,7 +671,7 @@ std::shared_ptr<ast::FuncDecl> Parser::funcDecl(TokIter &iter, TokIter end) {
   };
 
   if (!(type(iter, end) || id(iter++) == TokenID::Void) ||
-      id(iter++) != TokenID::Identifier || id(iter++) != TokenID::LeftParen) {
+      !identifier(iter, end) || id(iter++) != TokenID::LeftParen) {
     iter = beg;
     return nullptr;
   }
@@ -683,9 +681,9 @@ std::shared_ptr<ast::FuncDecl> Parser::funcDecl(TokIter &iter, TokIter end) {
     assert(id(iter) == TokenID::Void);
     iter++;
   }
-  std::string identifier = (iter++)->val<std::string>();
+  auto ident = identifier(iter, end);
 
-  std::vector<std::pair<std::shared_ptr<ast::Type>, std::string>> formalParam;
+  std::vector<std::pair<std::shared_ptr<ast::Type>, std::shared_ptr<ast::Identifier>>> formalParam;
   if (id(iter + 1) != TokenID::RightParen) {
     do {
       // Now [iter] points to a Comma or a LeftParen
@@ -693,9 +691,9 @@ std::shared_ptr<ast::FuncDecl> Parser::funcDecl(TokIter &iter, TokIter end) {
       auto ty = type(iter, end);
       if (!ty)
         throwError();
-      if (id(iter) != TokenID::Identifier)
+      auto paramName = identifier(iter, end);
+      if (!ident)
         throwError();
-      std::string paramName = (iter++)->val<std::string>();
       formalParam.emplace_back(std::move(ty), std::move(paramName));
     } while (id(iter) == TokenID::Comma);
   } else {
@@ -706,7 +704,7 @@ std::shared_ptr<ast::FuncDecl> Parser::funcDecl(TokIter &iter, TokIter end) {
   if (!body)
     throwError();
   return std::make_shared<ast::FuncDecl>(beg->position().first, body->posEnd,
-                                         retType, identifier,
+                                         retType, ident,
                                          std::move(formalParam), body);
 }
 
@@ -720,9 +718,9 @@ std::shared_ptr<ast::ClassDecl> Parser::classDecl(TokIter &iter, TokIter end) {
   if (id(iter) != TokenID::Class)
     return nullptr;
   ++iter;
-  if (id(iter) != TokenID::Identifier)
+  auto ident = identifier(iter, end);
+  if (!ident)
     throwError();
-  std::string identifier = (iter++)->val<std::string>();
   if (id(iter++) != TokenID::LeftBrace)
     throwError();
   std::vector<std::shared_ptr<ast::Declaration>> members;
@@ -734,7 +732,7 @@ std::shared_ptr<ast::ClassDecl> Parser::classDecl(TokIter &iter, TokIter end) {
     }
     // ctor
     if (id(iter) == TokenID::Identifier && id(iter + 1) == TokenID::LeftParen &&
-        iter->val<std::string>() == identifier) {
+        iter->val<std::string>() == ident->val) {
       if (iter + 3 >= end)
         throwError();
       auto ctorBegPos = iter->position().first;
@@ -744,8 +742,8 @@ std::shared_ptr<ast::ClassDecl> Parser::classDecl(TokIter &iter, TokIter end) {
         throwError();
       auto ctor = std::make_shared<ast::FuncDecl>(
           ctorBegPos, body->posEnd, std::shared_ptr<ast::Type>(nullptr),
-          std::string(""),
-          std::vector<std::pair<std::shared_ptr<ast::Type>, std::string>>(),
+          std::shared_ptr<ast::Identifier>(nullptr),
+          std::vector<std::pair<std::shared_ptr<ast::Type>, std::shared_ptr<ast::Identifier>>>(),
           body);
       members.emplace_back(ctor);
       continue;
@@ -755,7 +753,7 @@ std::shared_ptr<ast::ClassDecl> Parser::classDecl(TokIter &iter, TokIter end) {
   if (id(iter) != TokenID::RightBrace)
     throwError();
   return std::make_shared<ast::ClassDecl>(begPos, (iter++)->position().second,
-                                          identifier, std::move(members));
+                                          ident, std::move(members));
 }
 
 std::shared_ptr<ast::Declaration> Parser::declaration(TokIter &iter,

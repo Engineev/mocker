@@ -49,12 +49,15 @@ private: // components
   //    example, let P = LeftParen IntLiteral RightParen. Then it matches "(1)",
   //    partially matches "(1" and mismatched "[1]".
 
-   /*- type ------------------------------------------------------------------*/
+  /*- misc -------------------------------------------------------------------*/
+
+  // identifier = Identifier
+  std::shared_ptr<ast::Identifier> identifier(TokIter &iter, TokIter end);
 
   // builtinType = Int | Bool | String
   std::shared_ptr<ast::BuiltinType> builtinType(TokIter &iter, TokIter end);
 
-  // nonarrayType = builtinType | Identifier
+  // nonarrayType = builtinType | identifier
   std::shared_ptr<ast::NonarrayType> nonarrayType(TokIter &iter, TokIter end);
 
   // type = nonarrayType (LeftBracket RightBracket)*
