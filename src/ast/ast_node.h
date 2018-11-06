@@ -77,8 +77,8 @@ struct BuiltinType : NonarrayType {
 struct UserDefinedType : NonarrayType {
   UserDefinedType() = default;
   UserDefinedType(const Position &posBeg, const Position &posEnd,
-                  const std::shared_ptr<Identifier> &name)
-      : NonarrayType(posBeg, posEnd), name(name) {}
+                  std::shared_ptr<Identifier> name)
+      : NonarrayType(posBeg, posEnd), name(std::move(name)) {}
 
   MOCKER_ACCEPT
 
@@ -154,8 +154,8 @@ struct BoolLitExpr : LiteralExpr {
 
 struct IdentifierExpr : Expression {
   IdentifierExpr(const Position &posBeg, const Position &posEnd,
-                 const std::shared_ptr<Identifier> &identifier)
-      : Expression(posBeg, posEnd), identifier(identifier) {}
+                 std::shared_ptr<Identifier> identifier)
+      : Expression(posBeg, posEnd), identifier(std::move(identifier)) {}
 
   MOCKER_ACCEPT
 
@@ -193,9 +193,9 @@ struct BinaryExpr : Expression {
   // clang-format on
 
   BinaryExpr(const Position &posBeg, const Position &posEnd, OpType op,
-             const std::shared_ptr<Expression> &lhs,
-             const std::shared_ptr<Expression> &rhs)
-      : Expression(posBeg, posEnd), op(op), lhs(lhs), rhs(rhs) {}
+             std::shared_ptr<Expression> lhs, std::shared_ptr<Expression> rhs)
+      : Expression(posBeg, posEnd), op(op), lhs(std::move(lhs)),
+        rhs(std::move(rhs)) {}
 
   MOCKER_ACCEPT
 
@@ -205,9 +205,10 @@ struct BinaryExpr : Expression {
 
 struct FuncCallExpr : Expression {
   FuncCallExpr(const Position &posBeg, const Position &posEnd,
-               const std::shared_ptr<Expression> &callee,
-               const std::vector<std::shared_ptr<Expression>> &args)
-      : Expression(posBeg, posEnd), callee(callee), args(args) {}
+               std::shared_ptr<Expression> callee,
+               std::vector<std::shared_ptr<Expression>> args)
+      : Expression(posBeg, posEnd), callee(std::move(callee)),
+        args(std::move(args)) {}
 
   MOCKER_ACCEPT
 
@@ -217,9 +218,10 @@ struct FuncCallExpr : Expression {
 
 struct NewExpr : Expression {
   NewExpr(const Position &posBeg, const Position &posEnd,
-          const std::shared_ptr<Type> &type,
-          const std::vector<std::shared_ptr<Expression>> &providedDims)
-      : Expression(posBeg, posEnd), type(type), providedDims(providedDims) {}
+          std::shared_ptr<Type> type,
+          std::vector<std::shared_ptr<Expression>> providedDims)
+      : Expression(posBeg, posEnd), type(std::move(type)),
+        providedDims(std::move(providedDims)) {}
 
   MOCKER_ACCEPT
 
@@ -238,22 +240,22 @@ struct Statement : ASTNode {
 
 struct VarDeclStmt : Statement {
   VarDeclStmt(const Position &posBeg, const Position &posEnd,
-              const std::shared_ptr<Type> &type,
-              const std::shared_ptr<ast::Identifier> &Identifier,
-              const std::shared_ptr<Expression> &initExpr)
-      : Statement(posBeg, posEnd), type(type), Identifier(Identifier),
-        initExpr(initExpr) {}
+              std::shared_ptr<Type> type,
+              std::shared_ptr<ast::Identifier> identifier,
+              std::shared_ptr<Expression> initExpr)
+      : Statement(posBeg, posEnd), type(std::move(type)),
+        identifier(std::move(identifier)), initExpr(std::move(initExpr)) {}
   MOCKER_ACCEPT
 
   std::shared_ptr<Type> type;
-  std::shared_ptr<Identifier> Identifier;
+  std::shared_ptr<Identifier> identifier;
   std::shared_ptr<Expression> initExpr;
 };
 
 struct ExprStmt : Statement {
   ExprStmt(const Position &posBeg, const Position &posEnd,
-           const std::shared_ptr<Expression> &expr)
-      : Statement(posBeg, posEnd), expr(expr) {}
+           std::shared_ptr<Expression> expr)
+      : Statement(posBeg, posEnd), expr(std::move(expr)) {}
 
   MOCKER_ACCEPT
 
@@ -262,8 +264,8 @@ struct ExprStmt : Statement {
 
 struct ReturnStmt : Statement {
   ReturnStmt(const Position &posBeg, const Position &posEnd,
-             const std::shared_ptr<Expression> &expr)
-      : Statement(posBeg, posEnd), expr(expr) {}
+             std::shared_ptr<Expression> expr)
+      : Statement(posBeg, posEnd), expr(std::move(expr)) {}
   MOCKER_ACCEPT
   std::shared_ptr<Expression> expr;
 };
@@ -292,11 +294,10 @@ struct CompoundStmt : Statement {
 
 struct IfStmt : Statement {
   IfStmt(const Position &posBeg, const Position &posEnd,
-         const std::shared_ptr<Expression> &condition,
-         const std::shared_ptr<Statement> &then,
-         const std::shared_ptr<Statement> &else_)
-      : Statement(posBeg, posEnd), condition(condition), then(then),
-        else_(else_) {}
+         std::shared_ptr<Expression> condition, std::shared_ptr<Statement> then,
+         std::shared_ptr<Statement> else_)
+      : Statement(posBeg, posEnd), condition(std::move(condition)),
+        then(std::move(then)), else_(std::move(else_)) {}
 
   MOCKER_ACCEPT
 
@@ -307,9 +308,10 @@ struct IfStmt : Statement {
 
 struct WhileStmt : Statement {
   WhileStmt(const Position &posBeg, const Position &posEnd,
-            const std::shared_ptr<Expression> &condition,
-            const std::shared_ptr<Statement> &body)
-      : Statement(posBeg, posEnd), condition(condition), body(body) {}
+            std::shared_ptr<Expression> condition,
+            std::shared_ptr<Statement> body)
+      : Statement(posBeg, posEnd), condition(std::move(condition)),
+        body(std::move(body)) {}
 
   MOCKER_ACCEPT
 
@@ -319,12 +321,12 @@ struct WhileStmt : Statement {
 
 struct ForStmt : Statement {
   ForStmt(const Position &posBeg, const Position &posEnd,
-          const std::shared_ptr<Expression> &init,
-          const std::shared_ptr<Expression> &condition,
-          const std::shared_ptr<Expression> &update,
-          const std::shared_ptr<Statement> &body)
-      : Statement(posBeg, posEnd), init(init), condition(condition),
-        update(update), body(body) {}
+          std::shared_ptr<Expression> init,
+          std::shared_ptr<Expression> condition,
+          std::shared_ptr<Expression> update, std::shared_ptr<Statement> body)
+      : Statement(posBeg, posEnd), init(std::move(init)),
+        condition(std::move(condition)), update(std::move(update)),
+        body(std::move(body)) {}
 
   MOCKER_ACCEPT
 
@@ -349,8 +351,8 @@ struct Declaration : ASTNode {
 
 struct VarDecl : Declaration {
   VarDecl(const Position &posBeg, const Position &posEnd,
-          const std::shared_ptr<VarDeclStmt> &decl)
-      : Declaration(posBeg, posEnd), decl(decl) {}
+          std::shared_ptr<VarDeclStmt> decl)
+      : Declaration(posBeg, posEnd), decl(std::move(decl)) {}
 
   MOCKER_ACCEPT
 
@@ -360,13 +362,13 @@ struct VarDecl : Declaration {
 struct FuncDecl : Declaration {
   FuncDecl(
       const Position &posBeg, const Position &posEnd,
-      const std::shared_ptr<Type> &retType,
-      const std::shared_ptr<Identifier> &identifier,
+      std::shared_ptr<Type> retType, std::shared_ptr<Identifier> identifier,
       std::vector<std::pair<std::shared_ptr<Type>, std::shared_ptr<Identifier>>>
           formalParameters,
-      const std::shared_ptr<CompoundStmt> &body)
-      : Declaration(posBeg, posEnd), retType(retType), identifier(identifier),
-        formalParameters(std::move(formalParameters)), body(body) {}
+      std::shared_ptr<CompoundStmt> body)
+      : Declaration(posBeg, posEnd), retType(std::move(retType)),
+        identifier(std::move(identifier)),
+        formalParameters(std::move(formalParameters)), body(std::move(body)) {}
   MOCKER_ACCEPT
 
   std::shared_ptr<Type> retType;
@@ -378,9 +380,9 @@ struct FuncDecl : Declaration {
 
 struct ClassDecl : Declaration {
   ClassDecl(const Position &posBeg, const Position &posEnd,
-            const std::shared_ptr<Identifier> &identifier,
+            std::shared_ptr<Identifier> identifier,
             std::vector<std::shared_ptr<Declaration>> members)
-      : Declaration(posBeg, posEnd), identifier(identifier),
+      : Declaration(posBeg, posEnd), identifier(std::move(identifier)),
         members(std::move(members)) {}
 
   MOCKER_ACCEPT
