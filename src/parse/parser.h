@@ -8,8 +8,8 @@
 #include <memory>
 #include <vector>
 
-#include "common/position.h"
 #include "common/error.h"
+#include "common/position.h"
 #include "token.h"
 
 namespace mocker {
@@ -79,7 +79,8 @@ private: // components
   std::shared_ptr<ast::NewExpr> newExpr(TokIter &iter, TokIter end);
 
   // primaryExpr
-  //    = identifierExpr
+  //    = identifierExpr // some lookahead should be perform here
+  //    | identifier LeftParen (expr % ',') RightParen
   //    | literalExpr
   //    | newExpr
   //    | LeftParen expr RightParen
@@ -89,8 +90,8 @@ private: // components
   //   = primaryExpr
   //     (
   //     | LeftBracket expr RightBracket
-  //     | Dot IdentifierExpr
-  //     | LeftParen (expr % ',') RightParen
+  //     | Dot IdentifierExpr // some lookahead should be perform here
+  //     | Dot IdentifierExpr LeftParen (expr % ',') RightParen
   //     )*
   std::shared_ptr<ast::Expression> exprPrec2BinaryOrFuncCall(TokIter &iter,
                                                              TokIter end);
@@ -172,8 +173,12 @@ private: // components
 
   std::shared_ptr<ast::Declaration> declaration(TokIter &iter, TokIter end);
 
-  /*- root ------------------------------------------------------------*/
+  /*- root -------------------------------------------------------------------*/
   std::shared_ptr<ast::ASTRoot> root(TokIter &iter, TokIter end);
+
+  /*- helper -----------------------------------------------------------------*/
+  std::vector<std::shared_ptr<ast::Expression>> exprList(TokIter &iter,
+                                                         TokIter end);
 };
 
 } // namespace mocker

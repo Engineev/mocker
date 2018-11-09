@@ -10,6 +10,7 @@
 
 #include "common/position.h"
 #include "fwd.h"
+#include "scope_id.h"
 #include "visitor.h"
 
 #define MOCKER_PURE_ACCEPT                                                     \
@@ -23,7 +24,7 @@
 namespace mocker {
 namespace ast {
 
-struct ASTNode {
+struct ASTNode : public std::enable_shared_from_this<ASTNode> {
   ASTNode() = default;
   ASTNode(const Position &posBeg, const Position &posEnd)
       : posBeg(posBeg), posEnd(posEnd) {}
@@ -104,6 +105,8 @@ struct Expression : ASTNode {
       : ASTNode(posBeg, posEnd) {}
 
   MOCKER_PURE_ACCEPT
+
+  std::shared_ptr<Type> type;
 };
 
 struct LiteralExpr : Expression {
@@ -205,27 +208,32 @@ struct BinaryExpr : Expression {
 
 struct FuncCallExpr : Expression {
   FuncCallExpr(const Position &posBeg, const Position &posEnd,
-               std::shared_ptr<Expression> callee,
+               std::shared_ptr<Expression> instance,
+               std::shared_ptr<Identifier> identifier,
                std::vector<std::shared_ptr<Expression>> args)
-      : Expression(posBeg, posEnd), callee(std::move(callee)),
-        args(std::move(args)) {}
+      : Expression(posBeg, posEnd), instance(std::move(instance)),
+        identifier(std::move(identifier)), args(std::move(args)) {}
 
   MOCKER_ACCEPT
 
-  std::shared_ptr<Expression> callee;
+  // e.g. In a[0].foo(1, 2), [instance] is a[0], [identifier] is foo and [args]
+  // is 1, 2. If it is a free function call, then [instance] is empty.
+  std::shared_ptr<Expression> instance;
+  std::shared_ptr<Identifier> identifier;
   std::vector<std::shared_ptr<Expression>> args;
 };
 
 struct NewExpr : Expression {
   NewExpr(const Position &posBeg, const Position &posEnd,
-          std::shared_ptr<Type> type,
+          std::shared_ptr<Type> type_,
           std::vector<std::shared_ptr<Expression>> providedDims)
-      : Expression(posBeg, posEnd), type(std::move(type)),
-        providedDims(std::move(providedDims)) {}
+      : Expression(posBeg, posEnd), providedDims(std::move(providedDims)) {
+    type = std::move(type_);
+  }
 
   MOCKER_ACCEPT
 
-  std::shared_ptr<Type> type;
+  // std::shared_ptr<Type> type; inherit from Expression
   std::vector<std::shared_ptr<Expression>> providedDims;
 };
 
@@ -389,6 +397,9 @@ struct ClassDecl : Declaration {
 
   std::shared_ptr<Identifier> identifier;
   std::vector<std::shared_ptr<Declaration>> members;
+
+  // attributes
+  ScopeID scopeIntroduced;
 };
 
 /*- root ---------------------------------------------------------------------*/
