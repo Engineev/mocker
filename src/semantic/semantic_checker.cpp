@@ -73,7 +73,8 @@ public:
     } else if (!assignable(builtinInt, node.operand->type)) {
       throw IncompatibleTypes(node.posBeg, node.posEnd);
     }
-    if (ast::UnaryExpr::PreDec == node.op || ast::UnaryExpr::PreInc == node.op) {
+    if (ast::UnaryExpr::PreDec == node.op ||
+        ast::UnaryExpr::PreInc == node.op) {
       node.leftValue = true;
       if (!node.operand->leftValue)
         throw InvalidRightValueOperation(node.posBeg, node.posEnd);
@@ -141,8 +142,9 @@ public:
         return;
       if (std::dynamic_pointer_cast<ast::NullLitExpr>(node.lhs) ||
           std::dynamic_pointer_cast<ast::NullLitExpr>(node.rhs)) {
-        auto ty = (bool)std::dynamic_pointer_cast<ast::NullLitExpr>(node.lhs) ?
-            node.rhs->type : node.lhs->type;
+        auto ty = (bool)std::dynamic_pointer_cast<ast::NullLitExpr>(node.lhs)
+                      ? node.rhs->type
+                      : node.lhs->type;
         if (!std::dynamic_pointer_cast<ast::UserDefinedType>(ty) &&
             !std::dynamic_pointer_cast<ast::ArrayType>(ty) &&
             !assignable(builtinString, ty))

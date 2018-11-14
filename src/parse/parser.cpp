@@ -128,6 +128,8 @@ std::shared_ptr<ast::LiteralExpr> Parser::literalExpr(TokIter &iter,
   case TokenID::StringLit:
     return std::make_shared<ast::StringLitExpr>(posBeg, posEnd,
                                                 cur->val<std::string>());
+  default:
+    assert(false);
   }
   assert(false);
 }
