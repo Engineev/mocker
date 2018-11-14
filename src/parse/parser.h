@@ -8,8 +8,8 @@
 #include <memory>
 #include <vector>
 
-#include "common/position.h"
 #include "common/error.h"
+#include "common/position.h"
 #include "token.h"
 
 namespace mocker {
@@ -49,12 +49,15 @@ private: // components
   //    example, let P = LeftParen IntLiteral RightParen. Then it matches "(1)",
   //    partially matches "(1" and mismatched "[1]".
 
-   /*- type ------------------------------------------------------------------*/
+  /*- misc -------------------------------------------------------------------*/
+
+  // identifier = Identifier
+  std::shared_ptr<ast::Identifier> identifier(TokIter &iter, TokIter end);
 
   // builtinType = Int | Bool | String
   std::shared_ptr<ast::BuiltinType> builtinType(TokIter &iter, TokIter end);
 
-  // nonarrayType = builtinType | Identifier
+  // nonarrayType = builtinType | identifier
   std::shared_ptr<ast::NonarrayType> nonarrayType(TokIter &iter, TokIter end);
 
   // type = nonarrayType (LeftBracket RightBracket)*
@@ -72,11 +75,15 @@ private: // components
 
   // newExpr
   //   = New nonarrayType
-  //     (LeftBracket expr RightBracket)* (LeftBracket RightBracket)*
+  //     (
+  //       LeftParen RightParen
+  //     | (LeftBracket expr RightBracket)* (LeftBracket RightBracket)*
+  //     )
   std::shared_ptr<ast::NewExpr> newExpr(TokIter &iter, TokIter end);
 
   // primaryExpr
-  //    = identifierExpr
+  //    = identifierExpr // some lookahead should be perform here
+  //    | identifier LeftParen (expr % ',') RightParen
   //    | literalExpr
   //    | newExpr
   //    | LeftParen expr RightParen
@@ -86,8 +93,10 @@ private: // components
   //   = primaryExpr
   //     (
   //     | LeftBracket expr RightBracket
-  //     | Dot IdentifierExpr
-  //     | LeftParen (expr % ',') RightParen
+  //     | Dot LeftParen? IdentifierExpr RightParen?
+  //       // some lookahead should be perform here
+  //       // Actually I don't think a.(a) is valid in Mx*
+  //     | Dot IdentifierExpr LeftParen (expr % ',') RightParen
   //     )*
   std::shared_ptr<ast::Expression> exprPrec2BinaryOrFuncCall(TokIter &iter,
                                                              TokIter end);
@@ -96,7 +105,7 @@ private: // components
   //   = exprPrec2BinaryOrFuncCall incDecOp?
   std::shared_ptr<ast::Expression> suffixIncDec(TokIter &iter, TokIter end);
 
-  // prefixUnary = unaryOp? suffixIncDec
+  // prefixUnary = unaryOp* suffixIncDec
   std::shared_ptr<ast::Expression> prefixUnary(TokIter &iter, TokIter end);
 
   // OPERAND (OPERATION OPERAND)*
@@ -169,8 +178,12 @@ private: // components
 
   std::shared_ptr<ast::Declaration> declaration(TokIter &iter, TokIter end);
 
-  /*- root ------------------------------------------------------------*/
+  /*- root -------------------------------------------------------------------*/
   std::shared_ptr<ast::ASTRoot> root(TokIter &iter, TokIter end);
+
+  /*- helper -----------------------------------------------------------------*/
+  std::vector<std::shared_ptr<ast::Expression>> exprList(TokIter &iter,
+                                                         TokIter end);
 };
 
 } // namespace mocker

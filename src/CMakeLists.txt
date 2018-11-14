@@ -2,7 +2,9 @@ set(HEADERS
   ast/ast_node.h
   ast/visitor.h
   ast/fwd.h
-#  ast/printer.h
+  ast/helper.h
+  ast/scope_id.h
+  ast/sym_tbl.h
 
   common/defs.h
   common/position.h
@@ -12,17 +14,22 @@ set(HEADERS
   parse/parser.h
   parse/token.h
 
+  semantic/error.h
+  semantic/semantic_checker.h
+
   support/optional.h
   support/small_map.h
 
   compiler.h
 )
 set(LIB_SOURCES
-#  ast/printer.cpp
+  ast/sym_tbl.cpp
 
   parse/lexer.cpp
   parse/parser.cpp
   parse/token.cpp
+
+  semantic/semantic_checker.cpp
 
   compiler.cpp
 )

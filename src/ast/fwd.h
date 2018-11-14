@@ -9,6 +9,8 @@ class ConstVisitor;
 
 struct ASTNode;
 
+struct Identifier;
+
 struct Type;
 struct NonarrayType;
 struct BuiltinType;

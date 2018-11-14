@@ -1,0 +1,3 @@
+[submodule "compiler-offline-judge"]
+	path = compiler-offline-judge
+	url = https://github.com/Engineev/compiler-offline-judge.git

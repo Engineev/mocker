@@ -1,15 +1,15 @@
 #include "lexer.h"
 
-#include <type_traits>
 #include <bitset>
 #include <cctype>
+#include <cstdlib>
 #include <exception>
 #include <functional>
-#include <cstdlib>
 #include <string>
+#include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
-#include <unordered_map>
 
 #define MOCKER_ADD(NAME)                                                       \
   add(NAME);                                                                   \
@@ -44,7 +44,7 @@ bool Lexer::transit(const std::string &curTok) {
     return true;
   }
   if (std::ispunct(curTok[0])) {
-    assert(curTok.size() == 1);
+    assert(curTok.size() <= 2);
     curNode = std::bind(&Lexer::punct, this, ph::_1);
     return true;
   }
@@ -54,7 +54,7 @@ bool Lexer::transit(const std::string &curTok) {
   }
   // keywords / identifiers / boolLit
   if (curTok == "true" || curTok == "false") {
-    curNode = [this](const std::string & curTok) {
+    curNode = [this](const std::string &curTok) {
       tokens.emplace_back(TokenID::BoolLit, curPos, nxtPos, curTok == "true");
     };
     return true;
@@ -98,8 +98,24 @@ std::string Lexer::getToken() {
   curBeg = nxtBeg;
   curPos = nxtPos;
   if (std::ispunct(*nxtBeg)) {
+    auto now = *nxtBeg;
     ++nxtBeg;
     ++nxtPos.col;
+    if (nxtBeg == srcEnd)
+      return {curBeg, nxtBeg};
+
+    if (now == *nxtBeg &&
+        (now == '-' || now == '+' || now == '=' || now == '<' || now == '>' ||
+         now == '&' || now == '|')) {
+      ++nxtBeg;
+      ++nxtPos.col;
+    } else if (*nxtBeg == '=' && (now == '<' || now == '>')) {
+      ++nxtBeg;
+      ++nxtPos.col;
+    } else if (now == '!' && *nxtBeg == '=') {
+      ++nxtBeg;
+      ++nxtPos.col;
+    }
     return {curBeg, nxtBeg};
   }
   while (nxtBeg != srcEnd && (std::isalnum(*nxtBeg) || *nxtBeg == '_')) {
@@ -140,18 +156,10 @@ void Lexer::punct(const std::string &curTok) {
   case ',':
     MOCKER_ADD(TokenID::Comma);
   case '+':
-    if (nextToken() == "+") {
-      getToken();
-      add(TokenID::PlusPlus);
-    } else
-      add(TokenID::Plus);
+    add(curTok.size() == 2 ? TokenID::PlusPlus : TokenID::Plus);
     break;
   case '-':
-    if (nextToken() == "-") {
-      getToken();
-      add(TokenID::MinusMinus);
-    } else
-      add(TokenID::Minus);
+    add(curTok.size() == 2 ? TokenID::MinusMinus : TokenID::Minus);
     break;
   case '*':
     MOCKER_ADD(TokenID::Mult);
@@ -160,52 +168,30 @@ void Lexer::punct(const std::string &curTok) {
   case '%':
     MOCKER_ADD(TokenID::Mod);
   case '>':
-    if (nextToken() == "=") {
-      getToken();
-      add(TokenID::GreaterEqual);
-    } else if (nextToken() == ">") {
-      getToken();
-      add(TokenID::RightShift);
-    } else
+    if (curTok.size() == 1) {
       add(TokenID::GreaterThan);
+      break;
+    }
+    add(curTok[1] == '=' ? TokenID::GreaterEqual : TokenID::RightShift);
     break;
   case '<':
-    if (nextToken() == "=") {
-      getToken();
-      add(TokenID::LessEqual);
-    } else if (nextToken() == "<") {
-      getToken();
-      add(TokenID::LeftShift);
-    } else
+    if (curTok.size() == 1) {
       add(TokenID::LessThan);
+      break;
+    }
+    add(curTok[1] == '=' ? TokenID::LessEqual : TokenID::LeftShift);
     break;
   case '=':
-    if (nextToken() == "=") {
-      getToken();
-      add(TokenID::Equal);
-    } else
-      add(TokenID::Assign);
+    add(curTok.size() == 1 ? TokenID::Assign : TokenID::Equal);
     break;
   case '!':
-    if (nextToken() == "=") {
-      getToken();
-      add(TokenID::NotEqual);
-    } else
-      add(TokenID::LogicalNot);
+    add(curTok.size() == 1 ? TokenID::LogicalNot : TokenID::NotEqual);
     break;
   case '&':
-    if (nextToken() == "&") {
-      getToken();
-      add(TokenID::LogicalAnd);
-    } else
-      add(TokenID::BitAnd);
+    add(curTok.size() == 1 ? TokenID::BitAnd : TokenID::LogicalAnd);
     break;
   case '|':
-    if (nextToken() == "|") {
-      getToken();
-      add(TokenID::LogicalOr);
-    } else
-      add(TokenID::BitOr);
+    add(curTok.size() == 1 ? TokenID::BitOr : TokenID::LogicalOr);
     break;
   case '~':
     MOCKER_ADD(TokenID::BitNot);
@@ -289,26 +275,19 @@ void Lexer::intLiteral(const std::string &curTok) {
     if (!std::isdigit(ch))
       throw LexError(curPos, nxtPos);
   tokens.emplace_back(TokenID::IntLit, curPos, nxtPos,
-      (Integer)std::atoll(curTok.c_str()));
+                      (Integer)std::atoll(curTok.c_str()));
 }
 
 void Lexer::keywordsOrIdentifier(const std::string &curTok) {
   static const std::unordered_map<std::string, TokenID> kw = {
-      {"bool", TokenID::Bool},
-      {"int", TokenID::Int},
-      {"string", TokenID::String},
-      {"void", TokenID::Void},
-      {"null", TokenID::Null},
-      {"if", TokenID::If},
-      {"else", TokenID::Else},
-      {"for", TokenID::For},
-      {"while", TokenID::While},
-      {"break", TokenID::Break},
-      {"continue", TokenID::Continue},
-      {"return", TokenID::Return},
-      {"new", TokenID::New},
-      {"class", TokenID::Class},
-      {"this", TokenID::This}
+      {"bool", TokenID::Bool},         {"int", TokenID::Int},
+      {"string", TokenID::String},     {"void", TokenID::Void},
+      {"null", TokenID::Null},         {"if", TokenID::If},
+      {"else", TokenID::Else},         {"for", TokenID::For},
+      {"while", TokenID::While},       {"break", TokenID::Break},
+      {"continue", TokenID::Continue}, {"return", TokenID::Return},
+      {"new", TokenID::New},           {"class", TokenID::Class},
+      //      {"this", TokenID::This}
   };
   auto iter = kw.find(curTok);
   if (iter != kw.end()) {
@@ -320,6 +299,5 @@ void Lexer::keywordsOrIdentifier(const std::string &curTok) {
       throw LexError(curPos, nxtPos);
   tokens.emplace_back(TokenID::Identifier, curPos, nxtPos, curTok);
 }
-
 
 } // namespace mocker
