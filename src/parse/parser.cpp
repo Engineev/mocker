@@ -71,8 +71,6 @@ std::shared_ptr<ast::BuiltinType> Parser::builtinType(TokIter &iter,
     return mk(ast::BuiltinType::Int);
   case TokenID::String:
     return mk(ast::BuiltinType::String);
-  default:
-    assert(false);
   }
   assert(false);
 }
@@ -130,8 +128,6 @@ std::shared_ptr<ast::LiteralExpr> Parser::literalExpr(TokIter &iter,
   case TokenID::StringLit:
     return std::make_shared<ast::StringLitExpr>(posBeg, posEnd,
                                                 cur->val<std::string>());
-  default:
-    assert(false);
   }
   assert(false);
 }
@@ -155,6 +151,13 @@ std::shared_ptr<ast::NewExpr> Parser::newExpr(TokIter &iter, TokIter end) {
   baseType = nonarrayType(iter, end);
   if (!baseType)
     return nullptr;
+
+  if (id(iter) == TokenID::LeftParen) {
+    if (id(++iter) != TokenID::RightParen)
+      throw SyntaxError(begPos, iter->position().second);
+    return std::make_shared<ast::NewExpr>(begPos, (iter++)->position().second,
+                                          baseType, providedDims);
+  }
 
   bool noDimNum = false;
   while (id(iter) == TokenID::LeftBracket) {
@@ -181,12 +184,6 @@ std::shared_ptr<ast::NewExpr> Parser::newExpr(TokIter &iter, TokIter end) {
                                         baseType, std::move(providedDims));
 }
 
-// primaryExpr
-//    = identifierExpr // some lookahead should be perform here
-//    | identifier LeftParen (expr % ',') RightParen
-//    | literalExpr
-//    | newExpr
-//    | LeftParen expr RightParen
 std::shared_ptr<ast::Expression> Parser::primaryExpr(TokIter &iter,
                                                      TokIter end) {
   auto id = GetTokenID(end);
@@ -245,9 +242,17 @@ Parser::exprPrec2BinaryOrFuncCall(TokIter &iter, TokIter end) {
       ++iter;
     } else if (id(iter) == TokenID::Dot) {
       ++iter;
+      bool paren = id(iter) == TokenID::LeftParen;
+      if (paren)
+        ++iter;
       auto identExpr = identifierExpr(iter, end);
       if (!identExpr)
         throwError();
+      if (paren) {
+        if (id(iter) != TokenID::RightParen)
+          throwError();
+        ++iter;
+      }
       if (id(iter) != TokenID::LeftParen) {
         res = std::make_shared<ast::BinaryExpr>(
             begPos, identExpr->posEnd, ast::BinaryExpr::Member, res, identExpr);
@@ -277,11 +282,11 @@ std::shared_ptr<ast::Expression> Parser::suffixIncDec(TokIter &iter,
   auto id = GetTokenID(end)(iter);
   if (id == TokenID::PlusPlus) {
     res = std::make_shared<ast::UnaryExpr>(begPos, iter->position().second,
-                                           ast::UnaryExpr::Inc, res);
+                                           ast::UnaryExpr::PostInc, res);
     ++iter;
   } else if (id == TokenID::MinusMinus) {
     res = std::make_shared<ast::UnaryExpr>(begPos, iter->position().second,
-                                           ast::UnaryExpr::Dec, res);
+                                           ast::UnaryExpr::PostDec, res);
     ++iter;
   }
   return res;
@@ -293,33 +298,46 @@ std::shared_ptr<ast::Expression> Parser::prefixUnary(TokIter &iter,
   // prefix '+' will be ignored
   auto begPos = iter->position().first;
   auto id = GetTokenID(end);
-  auto matchOperand = [this, &iter, end, begPos](ast::UnaryExpr::OpType op) {
-    ++iter;
-    auto expr = suffixIncDec(iter, end);
-    if (!expr)
-      throw SyntaxError(begPos, iter->position().second);
-    return std::make_shared<ast::UnaryExpr>(begPos, expr->posEnd, op,
-                                            std::move(expr));
-  };
 
-  switch (id(iter)) {
-  case TokenID::PlusPlus:
-    return matchOperand(ast::UnaryExpr::Inc);
-  case TokenID::MinusMinus:
-    return matchOperand(ast::UnaryExpr::Dec);
-  case TokenID::Plus:
-    break;
-  case TokenID::Minus:
-    return matchOperand(ast::UnaryExpr::Neg);
-  case TokenID::LogicalNot:
-    return matchOperand(ast::UnaryExpr::LogicalNot);
-  case TokenID::BitNot:
-    return matchOperand(ast::UnaryExpr::BitNot);
-  default:
-    break;
+  std::vector<ast::UnaryExpr::OpType> prefix;
+  bool flag = true;
+  while (flag) {
+    switch (id(iter++)) {
+    case TokenID::PlusPlus:
+      prefix.emplace_back(ast::UnaryExpr::PreInc);
+      break;
+    case TokenID::MinusMinus:
+      prefix.emplace_back(ast::UnaryExpr::PreDec);
+      break;
+    case TokenID::Plus:
+      break;
+    case TokenID::Minus:
+      prefix.emplace_back(ast::UnaryExpr::Neg);
+      break;
+    case TokenID::LogicalNot:
+      prefix.emplace_back(ast::UnaryExpr::LogicalNot);
+      break;
+    case TokenID::BitNot:
+      prefix.emplace_back(ast::UnaryExpr::BitNot);
+      break;
+    default:
+      --iter;
+      flag = false;
+      break;
+    }
   }
-  auto expr = suffixIncDec(iter, end);
-  return expr;
+
+  auto res = suffixIncDec(iter, end);
+  if (!res) {
+    if (prefix.empty())
+      return nullptr;
+    throw SyntaxError(begPos, iter->position().second);
+  }
+
+  for (auto riter = prefix.rbegin(); riter != prefix.rend(); ++riter)
+    res = std::make_shared<ast::UnaryExpr>(begPos, res->posEnd, *riter, res);
+
+  return res;
 }
 
 template <class OperandParser>

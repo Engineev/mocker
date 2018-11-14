@@ -75,7 +75,10 @@ private: // components
 
   // newExpr
   //   = New nonarrayType
-  //     (LeftBracket expr RightBracket)* (LeftBracket RightBracket)*
+  //     (
+  //       LeftParen RightParen
+  //     | (LeftBracket expr RightBracket)* (LeftBracket RightBracket)*
+  //     )
   std::shared_ptr<ast::NewExpr> newExpr(TokIter &iter, TokIter end);
 
   // primaryExpr
@@ -90,7 +93,9 @@ private: // components
   //   = primaryExpr
   //     (
   //     | LeftBracket expr RightBracket
-  //     | Dot IdentifierExpr // some lookahead should be perform here
+  //     | Dot LeftParen? IdentifierExpr RightParen?
+  //       // some lookahead should be perform here
+  //       // Actually I don't think a.(a) is valid in Mx*
   //     | Dot IdentifierExpr LeftParen (expr % ',') RightParen
   //     )*
   std::shared_ptr<ast::Expression> exprPrec2BinaryOrFuncCall(TokIter &iter,
@@ -100,7 +105,7 @@ private: // components
   //   = exprPrec2BinaryOrFuncCall incDecOp?
   std::shared_ptr<ast::Expression> suffixIncDec(TokIter &iter, TokIter end);
 
-  // prefixUnary = unaryOp? suffixIncDec
+  // prefixUnary = unaryOp* suffixIncDec
   std::shared_ptr<ast::Expression> prefixUnary(TokIter &iter, TokIter end);
 
   // OPERAND (OPERATION OPERAND)*

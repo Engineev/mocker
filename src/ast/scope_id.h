@@ -17,6 +17,15 @@ public:
   ScopeID& operator=(ScopeID &&) noexcept = default;
   ~ScopeID() = default;
 
+  bool operator==(const ScopeID & rhs) const {
+    if (rhs.ids.size() != ids.size())
+      return false;
+    for (std::size_t i = 0; i < ids.size(); ++i)
+      if (ids[i] != rhs.ids[i])
+        return false;
+    return true;
+  }
+
 private:
   friend class SymTbl;
   ScopeID(std::vector<std::size_t> ids) : ids(std::move(ids)) {}

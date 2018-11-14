@@ -1,5 +1,3 @@
-#include <utility>
-
 #ifndef MOCKER_AST_H
 #define MOCKER_AST_H
 
@@ -107,6 +105,7 @@ struct Expression : ASTNode {
   MOCKER_PURE_ACCEPT
 
   std::shared_ptr<Type> type;
+  bool leftValue = false;
 };
 
 struct LiteralExpr : Expression {
@@ -166,7 +165,7 @@ struct IdentifierExpr : Expression {
 };
 
 struct UnaryExpr : Expression {
-  enum OpType { Inc, Dec, Neg, LogicalNot, BitNot };
+  enum OpType { PreInc, PostInc, PreDec, PostDec, Neg, LogicalNot, BitNot };
 
   UnaryExpr(const Position &posBeg, const Position &posEnd, OpType op,
             std::shared_ptr<Expression> operand)
@@ -174,7 +173,7 @@ struct UnaryExpr : Expression {
 
   MOCKER_ACCEPT
 
-  OpType op = Inc;
+  OpType op;
   std::shared_ptr<Expression> operand;
 };
 

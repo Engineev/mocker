@@ -29,7 +29,7 @@ enum class TokenID {
   Return,
   New,
   Class,
-  This,
+//  This,
   // literals
   BoolLit,
   StringLit,

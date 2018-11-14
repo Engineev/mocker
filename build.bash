@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-if [ ! -d "./build/" ]; then
+set -e
+cd "$(dirname "$0")"
+
+if [[ ! -d "./build/" ]]; then
   mkdir build;
 fi;
 cd build

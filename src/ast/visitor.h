@@ -3,6 +3,7 @@
 
 #include "fwd.h"
 
+#include <cassert>
 #include <type_traits>
 
 namespace mocker {
@@ -10,7 +11,7 @@ namespace ast {
 
 namespace detail {
 
-template <bool AddConst> class VisitorBase {
+template <bool AddConst, bool DefaultPass = false> class VisitorBase {
 private:
   template <class T, bool> struct Dispatch;
 
@@ -25,37 +26,38 @@ private:
   template <class T> using disp = typename Dispatch<T, AddConst>::type &;
 
 public:
-  virtual void operator()(disp<Identifier>) const = 0;
-  virtual void operator()(disp<BuiltinType>) const = 0;
-  virtual void operator()(disp<UserDefinedType>) const = 0;
-  virtual void operator()(disp<ArrayType>) const = 0;
+  virtual void operator()(disp<Identifier>) const { assert(DefaultPass); }
 
-  virtual void operator()(disp<IntLitExpr>) const = 0;
-  virtual void operator()(disp<BoolLitExpr>) const = 0;
-  virtual void operator()(disp<StringLitExpr>) const = 0;
-  virtual void operator()(disp<NullLitExpr>) const = 0;
-  virtual void operator()(disp<IdentifierExpr>) const = 0;
-  virtual void operator()(disp<UnaryExpr>) const = 0;
-  virtual void operator()(disp<BinaryExpr>) const = 0;
-  virtual void operator()(disp<FuncCallExpr>) const = 0;
-  virtual void operator()(disp<NewExpr>) const = 0;
+  virtual void operator()(disp<BuiltinType>) const { assert(DefaultPass); }
+  virtual void operator()(disp<UserDefinedType>) const { assert(DefaultPass); }
+  virtual void operator()(disp<ArrayType>) const { assert(DefaultPass); }
 
-  virtual void operator()(disp<VarDeclStmt>) const = 0;
-  virtual void operator()(disp<ExprStmt>) const = 0;
-  virtual void operator()(disp<ReturnStmt>) const = 0;
-  virtual void operator()(disp<ContinueStmt>) const = 0;
-  virtual void operator()(disp<BreakStmt>) const = 0;
-  virtual void operator()(disp<CompoundStmt>) const = 0;
-  virtual void operator()(disp<IfStmt>) const = 0;
-  virtual void operator()(disp<WhileStmt>) const = 0;
-  virtual void operator()(disp<ForStmt>) const = 0;
-  virtual void operator()(disp<EmptyStmt>) const = 0;
+  virtual void operator()(disp<IntLitExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<BoolLitExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<StringLitExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<NullLitExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<IdentifierExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<UnaryExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<BinaryExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<FuncCallExpr>) const { assert(DefaultPass); }
+  virtual void operator()(disp<NewExpr>) const { assert(DefaultPass); }
 
-  virtual void operator()(disp<VarDecl>) const = 0;
-  virtual void operator()(disp<FuncDecl>) const = 0;
-  virtual void operator()(disp<ClassDecl>) const = 0;
+  virtual void operator()(disp<VarDeclStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<ExprStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<ReturnStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<ContinueStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<BreakStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<CompoundStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<IfStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<WhileStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<ForStmt>) const { assert(DefaultPass); }
+  virtual void operator()(disp<EmptyStmt>) const { assert(DefaultPass); }
 
-  virtual void operator()(disp<ASTRoot>) const = 0;
+  virtual void operator()(disp<VarDecl>) const { assert(DefaultPass); }
+  virtual void operator()(disp<FuncDecl>) const { assert(DefaultPass); }
+  virtual void operator()(disp<ClassDecl>) const { assert(DefaultPass); }
+
+  virtual void operator()(disp<ASTRoot>) const { assert(DefaultPass); }
 };
 
 } // namespace detail
