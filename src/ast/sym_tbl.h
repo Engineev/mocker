@@ -9,7 +9,6 @@
 
 #include "ast_node.h"
 #include "scope_id.h"
-#include "support/optional.h"
 #include "visitor.h"
 
 namespace mocker {
@@ -39,8 +38,6 @@ public:
   bool addSymbol(const ScopeID &scopeID, const std::string &identifier,
                  std::shared_ptr<Declaration> decl);
 
-  void print() const;
-
 private:
   struct Scope {
     explicit Scope(const std::shared_ptr<Scope> &pnt);
@@ -52,9 +49,6 @@ private:
 
   // Just a helper function. Some asserts are performed.
   std::shared_ptr<Scope> getScope(const ScopeID &id);
-
-  void printImpl(const std::string &scopeName,
-                 const std::shared_ptr<Scope> &cur) const;
 
   std::shared_ptr<Scope> root;
 };

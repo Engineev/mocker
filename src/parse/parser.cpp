@@ -71,6 +71,8 @@ std::shared_ptr<ast::BuiltinType> Parser::builtinType(TokIter &iter,
     return mk(ast::BuiltinType::Int);
   case TokenID::String:
     return mk(ast::BuiltinType::String);
+  default:
+    break;
   }
   assert(false);
 }

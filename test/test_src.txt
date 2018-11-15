@@ -1,31 +1,8 @@
-class Cat{
-	void greet(){
-		println("MIAOMIAOMIAO");
-	}
+class A {
+
 }
 
-class Lamb{
-	void greet(){
-		println("MIEMIEMIE");
-	}
-}
-
-class Animals{
-	Cat c;
-	Lamb l;
-	void greet(){
-		c.greet();
-		l.greet();
-	}
-}
-
-int main(){
-	Cat cat;
-	cat = new Cat;
-	Lamb lamb;
-	lamb = new Lamb;
-	Animals a = new Animals;
-	a.c = cat;
-	a.l = lamb;
-	a.greet();
+int main() {
+    A a = A();
+    return 0;
 }
