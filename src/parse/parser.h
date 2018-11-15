@@ -93,9 +93,10 @@ private: // components
   //   = primaryExpr
   //     (
   //     | LeftBracket expr RightBracket
-  //     | Dot LeftParen? IdentifierExpr RightParen?
-  //       // some lookahead should be perform here
-  //       // Actually I don't think a.(a) is valid in Mx*
+  //     | Dot IdentifierExpr
+  //       // Some lookahead should be perform here
+  //       // Actually I don't think a.(a) is valid in Mx*, but to pass the
+  //       // semantic test, I allow it to be valid.
   //     | Dot IdentifierExpr LeftParen (expr % ',') RightParen
   //     )*
   std::shared_ptr<ast::Expression> exprPrec2BinaryOrFuncCall(TokIter &iter,

@@ -53,17 +53,5 @@ bool SymTbl::addSymbol(const ScopeID &scopeID, const std::string &identifier,
   return true;
 }
 
-void SymTbl::print() const { printImpl("=", root); }
-
-void SymTbl::printImpl(const std::string &scopeName,
-                       const std::shared_ptr<SymTbl::Scope> &cur) const {
-  std::cout << scopeName << '\n';
-  for (auto &decl : cur->syms)
-    std::cout << ast::fmtDecl(decl.second) << '\n';
-  for (auto &subscope : cur->subscopes)
-    printImpl(scopeName + "=", subscope);
-  std::cout.flush();
-}
-
 } // namespace ast
 } // namespace mocker

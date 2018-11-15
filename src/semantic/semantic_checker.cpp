@@ -1,6 +1,6 @@
-#include <utility>
-
 #include "semantic_checker.h"
+
+#include <utility>
 
 #include "ast/ast_node.h"
 #include "ast/helper.h"
@@ -198,6 +198,7 @@ public:
 
   void operator()(ast::FuncCallExpr &node) const override {
     std::shared_ptr<ast::FuncDecl> funcDecl;
+    bool isCtor = false;
     if (node.instance) {
       visit(node.instance);
       if (assignable(builtinString, node.instance->type)) {
@@ -222,8 +223,11 @@ public:
     } else {
       auto decl = syms.lookUp(scopeResiding, node.identifier->val);
       if (auto ptr = std::dynamic_pointer_cast<ast::ClassDecl>(decl)) {
-        decl =
-            syms.lookUp(ptr->scopeIntroduced, "_ctor_" + ptr->identifier->val);
+        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
+            syms.lookUp(ptr->scopeIntroduced, "_ctor_" + ptr->identifier->val));
+        isCtor = true;
+        node.type = std::make_shared<ast::UserDefinedType>(
+            mk_ast::pos(), mk_ast::pos(), ptr->identifier);
       } else {
         funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(decl);
       }
@@ -239,7 +243,8 @@ public:
       if (!assignable(funcDecl->formalParameters[i].first, node.args[i]->type))
         throw InvalidFunctionCall(node.posBeg, node.posEnd);
     }
-    node.type = funcDecl->retType;
+    if (!isCtor)
+      node.type = funcDecl->retType;
   }
 
   void operator()(ast::NewExpr &node) const override {
@@ -383,15 +388,16 @@ public:
   }
 
 private:
-  void visit(std::shared_ptr<ast::ASTNode> node) const {
-    visit(std::move(node), scopeResiding);
+  void visit(const std::shared_ptr<ast::ASTNode> &node) const {
+    visit(node, scopeResiding);
   }
 
-  void visit(std::shared_ptr<ast::ASTNode> node, ast::ScopeID residing) const {
-    visit(std::move(node), std::move(residing), inLoop, inFunc, retType);
+  void visit(const std::shared_ptr<ast::ASTNode> &node,
+             ast::ScopeID residing) const {
+    visit(node, std::move(residing), inLoop, inFunc, retType);
   }
 
-  void visit(std::shared_ptr<ast::ASTNode> node, ast::ScopeID residing,
+  void visit(const std::shared_ptr<ast::ASTNode> &node, ast::ScopeID residing,
              bool inLoop, bool inFunc,
              std::shared_ptr<ast::Type> retType) const {
     node->accept(Annotator(std::move(residing), syms, inLoop, inFunc,
@@ -457,6 +463,14 @@ ast::SymTbl SemanticChecker::annotate() {
               mk_ast::ident("this"), nullptr));
       syms.addSymbol(classDecl->scopeIntroduced, "this", declThis);
       collectSymbols(classDecl->members, classDecl->scopeIntroduced, syms);
+      std::string ctorIdent = "_ctor_" + classDecl->identifier->val;
+      if (!syms.lookUp(classDecl->scopeIntroduced, ctorIdent)) {
+        syms.addSymbol(classDecl->scopeIntroduced, ctorIdent,
+                       std::make_shared<ast::FuncDecl>(
+                           mk_ast::pos(), mk_ast::pos(), nullptr,
+                           mk_ast::ident(ctorIdent), mk_ast::emptyParams(),
+                           mk_ast::body()));
+      }
     }
   }
 

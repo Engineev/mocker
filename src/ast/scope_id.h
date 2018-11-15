@@ -1,9 +1,9 @@
 #ifndef MOCKER_SCOPE_ID_H
 #define MOCKER_SCOPE_ID_H
 
-#include <vector>
-#include <functional>
 #include <cstddef>
+#include <functional>
+#include <vector>
 
 namespace mocker {
 namespace ast {
@@ -13,11 +13,11 @@ public:
   ScopeID() = default;
   ScopeID(const ScopeID &) = default;
   ScopeID(ScopeID &&) noexcept = default;
-  ScopeID& operator=(const ScopeID&) = default;
-  ScopeID& operator=(ScopeID &&) noexcept = default;
+  ScopeID &operator=(const ScopeID &) = default;
+  ScopeID &operator=(ScopeID &&) noexcept = default;
   ~ScopeID() = default;
 
-  bool operator==(const ScopeID & rhs) const {
+  bool operator==(const ScopeID &rhs) const {
     if (rhs.ids.size() != ids.size())
       return false;
     for (std::size_t i = 0; i < ids.size(); ++i)
@@ -33,7 +33,7 @@ private:
   std::vector<std::size_t> ids;
 };
 
-}
-}
+} // namespace ast
+} // namespace mocker
 
-#endif //MOCKER_SCOPE_ID_H
+#endif // MOCKER_SCOPE_ID_H
