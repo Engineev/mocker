@@ -8,7 +8,6 @@
 
 #include "common/position.h"
 #include "fwd.h"
-#include "scope_id.h"
 #include "visitor.h"
 
 #define MOCKER_PURE_ACCEPT                                                     \
@@ -28,6 +27,8 @@ struct ASTNode : public std::enable_shared_from_this<ASTNode> {
       : posBeg(posBeg), posEnd(posEnd) {}
 
   virtual ~ASTNode() = default;
+
+  std::uintptr_t getID() const { return (std::uintptr_t)this; }
 
   virtual void accept(const Visitor &vis) = 0;
   virtual void accept(const ConstVisitor &vis) const = 0;
@@ -103,9 +104,6 @@ struct Expression : ASTNode {
       : ASTNode(posBeg, posEnd) {}
 
   MOCKER_PURE_ACCEPT
-
-  std::shared_ptr<Type> type;
-  bool leftValue = false;
 };
 
 struct LiteralExpr : Expression {
@@ -224,15 +222,14 @@ struct FuncCallExpr : Expression {
 
 struct NewExpr : Expression {
   NewExpr(const Position &posBeg, const Position &posEnd,
-          std::shared_ptr<Type> type_,
+          std::shared_ptr<Type> type,
           std::vector<std::shared_ptr<Expression>> providedDims)
-      : Expression(posBeg, posEnd), providedDims(std::move(providedDims)) {
-    type = std::move(type_);
-  }
+      : Expression(posBeg, posEnd), type(std::move(type)),
+        providedDims(std::move(providedDims)) {}
 
   MOCKER_ACCEPT
 
-  // std::shared_ptr<Type> type; inherit from Expression
+  std::shared_ptr<Type> type;
   std::vector<std::shared_ptr<Expression>> providedDims;
 };
 
@@ -396,9 +393,6 @@ struct ClassDecl : Declaration {
 
   std::shared_ptr<Identifier> identifier;
   std::vector<std::shared_ptr<Declaration>> members;
-
-  // attributes
-  ScopeID scopeIntroduced;
 };
 
 /*- root ---------------------------------------------------------------------*/

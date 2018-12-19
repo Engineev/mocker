@@ -3,8 +3,6 @@ set(HEADERS
   ast/visitor.h
   ast/fwd.h
   ast/helper.h
-  ast/scope_id.h
-  ast/sym_tbl.h
 
   common/defs.h
   common/position.h
@@ -16,6 +14,8 @@ set(HEADERS
 
   semantic/error.h
   semantic/semantic_checker.h
+  semantic/semantic_context.h
+  semantic/sym_tbl.h
 
   support/optional.h
   support/small_map.h
@@ -23,13 +23,12 @@ set(HEADERS
   compiler.h
 )
 set(LIB_SOURCES
-  ast/sym_tbl.cpp
-
   parse/lexer.cpp
   parse/parser.cpp
   parse/token.cpp
 
   semantic/semantic_checker.cpp
+  semantic/sym_tbl.cpp
 
   compiler.cpp
 )

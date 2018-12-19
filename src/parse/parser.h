@@ -174,7 +174,9 @@ private: // components
   std::shared_ptr<ast::FuncDecl> funcDecl(TokIter &iter, TokIter end);
 
   // classDecl = Class identifier LeftBrace (declaration | ctor)* RightBrace
-  // ctor is inlined
+  // ctor is inlined. If a function does not have a return type and its
+  // identifier is same as the class identifier, then it is renamed to
+  // _ctor_[identifier].
   std::shared_ptr<ast::ClassDecl> classDecl(TokIter &iter, TokIter end);
 
   std::shared_ptr<ast::Declaration> declaration(TokIter &iter, TokIter end);

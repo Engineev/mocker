@@ -6,7 +6,7 @@
 #include "ast/ast_node.h"
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
-#include "ast/sym_tbl.h"
+#include "semantic/sym_tbl.h"
 
 int main(int argc, char **argv) {
   using namespace mocker;
@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   auto root = std::static_pointer_cast<ast::ASTRoot>(p);
   assert(root);
   SemanticChecker semantic(root);
-  auto syms = semantic.annotate();
+  semantic.check();
 
   return 0;
 }

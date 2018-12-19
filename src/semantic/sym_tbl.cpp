@@ -6,7 +6,6 @@
 #include "ast/helper.h"
 
 namespace mocker {
-namespace ast {
 
 SymTbl::Scope::Scope(const std::shared_ptr<SymTbl::Scope> &pnt) : pnt(pnt) {}
 
@@ -32,7 +31,7 @@ std::shared_ptr<SymTbl::Scope> SymTbl::getScope(const ScopeID &ids) {
   return res;
 }
 
-std::shared_ptr<Declaration>
+std::shared_ptr<ast::Declaration>
 SymTbl::lookUp(const ScopeID &scopeID, const std::string &identifier) {
   auto cur = getScope(scopeID);
   while (cur != nullptr) {
@@ -45,7 +44,7 @@ SymTbl::lookUp(const ScopeID &scopeID, const std::string &identifier) {
 }
 
 bool SymTbl::addSymbol(const ScopeID &scopeID, const std::string &identifier,
-                       std::shared_ptr<Declaration> decl) {
+                       std::shared_ptr<ast::Declaration> decl) {
   auto scope = getScope(scopeID);
   if (scope->syms.find(identifier) != scope->syms.end())
     return false;
@@ -53,5 +52,4 @@ bool SymTbl::addSymbol(const ScopeID &scopeID, const std::string &identifier,
   return true;
 }
 
-} // namespace ast
 } // namespace mocker
