@@ -29,9 +29,7 @@ public:
         return false;
     return true;
   }
-  bool operator!=(const ScopeID & rhs) const {
-    return !(*this == rhs);
-  }
+  bool operator!=(const ScopeID &rhs) const { return !(*this == rhs); }
 
 private:
   friend class SymTbl;
@@ -56,7 +54,7 @@ public:
   // Try to find the given symbol in the given scope AND it parent scopes.
   // If the symbol does not exist, then the returned shared_ptr is empty.
   std::shared_ptr<ast::Declaration> lookUp(const ScopeID &scopeID,
-                                      const std::string &identifier);
+                                           const std::string &identifier);
 
   // If the identifier has already exists in the CURRENT scope, no addition will
   // be perform and the return value is false. Otherwise add the symbol into the
