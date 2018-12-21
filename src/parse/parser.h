@@ -3,13 +3,15 @@
 #ifndef MOCKER_PARSER_H
 #define MOCKER_PARSER_H
 
-#include "ast/fwd.h"
-
 #include <memory>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "ast/ast_node.h"
 #include "common/error.h"
 #include "common/position.h"
+#include "support/small_map.h"
 #include "token.h"
 
 namespace mocker {
@@ -24,7 +26,8 @@ using TokIter = std::vector<Token>::const_iterator;
 
 class Parser {
 public:
-  Parser(TokIter tokBeg, TokIter tokEnd);
+  Parser(TokIter tokBeg, TokIter tokEnd,
+         std::unordered_map<ast::NodeID, PosPair> &pos);
 
   std::shared_ptr<ast::Type> type();
 
@@ -36,6 +39,77 @@ public:
 
 private:
   TokIter tokBeg, tokEnd;
+  std::unordered_map<ast::NodeID, PosPair> &pos;
+
+private: // helpers
+  class GetTokenID {
+  public:
+    explicit GetTokenID(TokIter end) : end(end) {}
+
+    TokenID operator()(TokIter iter) const {
+      if (iter == end)
+        return TokenID::Error;
+      return iter->tokenID();
+    }
+
+  private:
+    TokIter end;
+  };
+
+  template <class Node, class... Args>
+  std::shared_ptr<Node> makeNode(Position beg, Position end, Args &&... args) {
+    auto res = std::make_shared<Node>(std::forward<Args>(args)...);
+    pos[res->getID()] = std::make_pair(beg, end);
+    return res;
+  }
+
+  template <class Node, class... Args>
+  std::shared_ptr<Node> makeNode(PosPair p, Args &&... args) {
+    return makeNode<Node>(p.first, p.second, std::forward<Args>(args)...);
+  }
+
+  template <class OperandParser>
+  std::shared_ptr<ast::Expression>
+  auxBinaryExpr(TokIter &iter, TokIter end, OperandParser operand,
+                const SmallMap<TokenID, ast::BinaryExpr::OpType> &mp) {
+    auto begPos = iter->position().first;
+    auto res = operand(iter, end);
+    if (!res)
+      return nullptr;
+
+    auto id = GetTokenID(end);
+    while (mp.in(id(iter))) {
+      ast::BinaryExpr::OpType op = mp.at(id(iter));
+      ++iter;
+      auto expr = operand(iter, end);
+      if (!expr)
+        throw SyntaxError(begPos, iter->position().second);
+      res = makeNode<ast::BinaryExpr>(begPos, pos[expr->getID()].second, op,
+                                      res, expr);
+    }
+    return res;
+  }
+
+  template <class OperandParser>
+  std::shared_ptr<ast::Expression>
+  auxBinaryExpr(TokIter &iter, TokIter end, OperandParser operand,
+                const std::pair<TokenID, ast::BinaryExpr::OpType> &mp) {
+    auto begPos = iter->position().first;
+    auto res = operand(iter, end);
+    if (!res)
+      return nullptr;
+
+    auto id = GetTokenID(end);
+    while (id(iter) == mp.first) {
+      ++iter;
+      auto expr = operand(iter, end);
+      if (!expr)
+        throw SyntaxError(begPos, iter->position().second);
+      res = makeNode<ast::BinaryExpr>(begPos, pos[expr->getID()].second,
+                                      mp.second, res, expr);
+    }
+    return res;
+  }
 
 private: // components
   // All the parser components follows the same conventions:

@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <string>
+#include <utility>
 
 #include "common/defs.h"
 
@@ -24,17 +25,17 @@ struct Position {
     col = tok - bol;
   }
   Position(const Position &) = default;
-  Position& operator=(const Position &) = default;
+  Position &operator=(const Position &) = default;
 
-  bool operator==(const Position & rhs) const {
+  bool operator==(const Position &rhs) const {
     return line == rhs.line && col == rhs.col;
   }
-  bool operator!=(const Position & rhs) const {
-    return !(*this == rhs);
-  }
+  bool operator!=(const Position &rhs) const { return !(*this == rhs); }
 
   std::size_t line = 0, col = 0;
 };
+
+using PosPair = std::pair<Position, Position>;
 
 } // namespace mocker
 

@@ -13,7 +13,8 @@ namespace mocker {
 
 class SemanticChecker {
 public:
-  explicit SemanticChecker(std::shared_ptr<ast::ASTRoot> ast);
+  explicit SemanticChecker(std::shared_ptr<ast::ASTRoot> ast,
+                           std::unordered_map<ast::NodeID, PosPair> &pos);
 
   // Throw if a semantic error occurs.
   void check();
@@ -28,11 +29,7 @@ private:
                  const ScopeID &scope, SymTbl &syms);
 
   std::shared_ptr<ast::ASTRoot> ast;
-
-private:
-  // helpers
-  using FormalParem =
-      std::pair<std::shared_ptr<ast::Type>, std::shared_ptr<ast::Identifier>>;
+  std::unordered_map<ast::NodeID, PosPair> &pos;
 };
 
 } // namespace mocker

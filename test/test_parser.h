@@ -46,7 +46,8 @@ private:
       auto toks = lex();
       bool res;
       try {
-        Parser parse(toks.begin(), toks.end());
+        std::unordered_map<ast::NodeID, PosPair> pos;
+        Parser parse(toks.begin(), toks.end(), pos);
         res = (bool)parse.type();
       } catch (SyntaxError &) {
         if (!test.shouldThrow)

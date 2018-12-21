@@ -16,12 +16,11 @@ public:
           to_string(beg.col) + " and line " + to_string(end.line) +
           ", column " + to_string(end.col);
   }
+  explicit CompileError(PosPair pos) : CompileError(pos.first, pos.second) {}
 
   const char *what() const noexcept override { return msg.c_str(); }
 
-  const std::pair<Position, Position> position() const {
-    return {beg, end};
-  }
+  const std::pair<Position, Position> position() const { return {beg, end}; }
 
 private:
   std::string msg;

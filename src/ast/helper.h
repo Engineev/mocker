@@ -48,44 +48,39 @@ inline std::string getTypeIdentifier(const std::shared_ptr<Type> &type) {
 namespace mocker {
 namespace mk_ast {
 
-inline Position pos() { return Position(); }
-
 inline std::shared_ptr<ast::Identifier> ident(std::string name) {
-  return std::make_shared<ast::Identifier>(pos(), pos(), std::move(name));
+  return std::make_shared<ast::Identifier>(std::move(name));
 }
 
 inline std::shared_ptr<ast::BuiltinType> tyInt() {
-  static auto res =
-      std::make_shared<ast::BuiltinType>(pos(), pos(), ast::BuiltinType::Int);
+  static auto res = std::make_shared<ast::BuiltinType>(ast::BuiltinType::Int);
   return res;
 }
 
 inline std::shared_ptr<ast::BuiltinType> tyString() {
-  static auto res = std::make_shared<ast::BuiltinType>(
-      pos(), pos(), ast::BuiltinType::String);
+  static auto res =
+      std::make_shared<ast::BuiltinType>(ast::BuiltinType::String);
   return res;
 }
 
 inline std::shared_ptr<ast::BuiltinType> tyBool() {
-  static auto res =
-      std::make_shared<ast::BuiltinType>(pos(), pos(), ast::BuiltinType::Bool);
+  static auto res = std::make_shared<ast::BuiltinType>(ast::BuiltinType::Bool);
   return res;
 }
 
 inline std::shared_ptr<ast::BuiltinType> tyNull() {
-  static auto res =
-      std::make_shared<ast::BuiltinType>(pos(), pos(), ast::BuiltinType::Null);
+  static auto res = std::make_shared<ast::BuiltinType>(ast::BuiltinType::Null);
   return res;
 }
 
-using FormalParam =
-    std::pair<std::shared_ptr<ast::Type>, std::shared_ptr<ast::Identifier>>;
-
-inline FormalParam param(const std::shared_ptr<ast::Type> &ty) {
-  return std::make_pair(ty, ident(""));
+inline std::shared_ptr<ast::VarDeclStmt>
+param(const std::shared_ptr<ast::Type> &ty) {
+  return std::make_shared<ast::VarDeclStmt>(ty, ident(""));
 }
 
-inline std::vector<FormalParam> emptyParams() { return {}; }
+inline std::vector<std::shared_ptr<ast::VarDeclStmt>> emptyParams() {
+  return {};
+}
 
 inline std::shared_ptr<ast::CompoundStmt> body() { return nullptr; }
 

@@ -4,20 +4,21 @@
 
 #include "ast/ast_node.h"
 #include "ast/helper.h"
-#include "sym_tbl.h"
 #include "ast/visitor.h"
 #include "error.h"
 #include "semantic_context.h"
+#include "sym_tbl.h"
 
 // annotate
 namespace mocker {
 
 class Annotator : public ast::Visitor {
 public:
-  Annotator(ScopeID scopeResiding, SemanticContext &ctx, bool inLoop,
+  Annotator(ScopeID scopeResiding, SemanticContext &ctx,
+            std::unordered_map<ast::NodeID, PosPair> &pos, bool inLoop,
             bool inFunc, std::shared_ptr<ast::Type> retType)
-      : scopeResiding(std::move(scopeResiding)), ctx(ctx), inLoop(inLoop),
-        inFunc(inFunc), retType(std::move(retType)) {
+      : scopeResiding(std::move(scopeResiding)), ctx(ctx), pos(pos),
+        inLoop(inLoop), inFunc(inFunc), retType(std::move(retType)) {
     builtinBool = mk_ast::tyBool();
     builtinInt = mk_ast::tyInt();
     builtinNull = mk_ast::tyNull();
@@ -36,7 +37,7 @@ public:
   void operator()(ast::UserDefinedType &node) const override {
     if (!std::dynamic_pointer_cast<ast::ClassDecl>(
             ctx.syms.lookUp(scopeResiding, node.name->val)))
-      throw UnresolvableSymbol(node.posBeg, node.posEnd, node.name->val);
+      throw UnresolvableSymbol(pos.at(node.getID()), node.name->val);
   }
 
   void operator()(ast::ArrayType &node) const override { visit(node.baseType); }
@@ -61,7 +62,7 @@ public:
     auto decl = std::dynamic_pointer_cast<ast::VarDecl>(
         ctx.syms.lookUp(scopeResiding, node.identifier->val));
     if (!decl)
-      throw UnresolvableSymbol(node.posBeg, node.posEnd, node.identifier->val);
+      throw UnresolvableSymbol(pos.at(node.getID()), node.identifier->val);
     ctx.exprType[node.getID()] = decl->decl->type;
     if (node.identifier->val != "this")
       ctx.leftValue.insert(node.getID());
@@ -71,30 +72,31 @@ public:
     visit(node.operand);
     if (ast::UnaryExpr::LogicalNot == node.op) {
       if (!assignable(builtinBool, ctx.exprType[node.operand->getID()]))
-        throw IncompatibleTypes(node.posBeg, node.posEnd);
+        throw IncompatibleTypes(pos.at(node.getID()));
     } else if (!assignable(builtinInt, ctx.exprType[node.operand->getID()])) {
-      throw IncompatibleTypes(node.posBeg, node.posEnd);
+      throw IncompatibleTypes(pos.at(node.getID()));
     }
     if (ast::UnaryExpr::PreDec == node.op ||
         ast::UnaryExpr::PreInc == node.op) {
       ctx.leftValue.insert(node.getID());
       if (!ctx.isLeftValue(node.operand->getID()))
-        throw InvalidRightValueOperation(node.posBeg, node.posEnd);
+        throw InvalidRightValueOperation(pos.at(node.getID()));
     }
     ctx.exprType[node.getID()] = ctx.exprType[node.operand->getID()];
   }
 
   void operator()(ast::BinaryExpr &node) const override {
-    auto ce = [&node] { throw IncompatibleTypes(node.posBeg, node.posEnd); };
-    auto ceRv = [&node] {
-      throw InvalidRightValueOperation(node.posBeg, node.posEnd);
+    auto ce = [this, &node] { throw IncompatibleTypes(pos.at(node.getID())); };
+    auto ceRv = [this, &node] {
+      throw InvalidRightValueOperation(pos.at(node.getID()));
     };
 
     visit(node.lhs);
     if (node.op != ast::BinaryExpr::Member)
       visit(node.rhs);
 
-    auto lhsT = ctx.exprType[node.lhs->getID()], rhsT = ctx.exprType[node.rhs->getID()];
+    auto lhsT = ctx.exprType[node.lhs->getID()],
+         rhsT = ctx.exprType[node.rhs->getID()];
 
     switch (node.op) {
     case ast::BinaryExpr::Assign:
@@ -106,8 +108,7 @@ public:
       return;
     case ast::BinaryExpr::LogicalOr:
     case ast::BinaryExpr::LogicalAnd:
-      if (!assignable(builtinBool, lhsT) ||
-          !assignable(builtinBool, rhsT))
+      if (!assignable(builtinBool, lhsT) || !assignable(builtinBool, rhsT))
         ce();
       ctx.exprType[node.getID()] = builtinBool;
       return;
@@ -131,8 +132,7 @@ public:
     case ast::BinaryExpr::Mul:
     case ast::BinaryExpr::Div:
     case ast::BinaryExpr::Mod:
-      if (!assignable(builtinInt, lhsT) ||
-          !assignable(builtinInt, rhsT))
+      if (!assignable(builtinInt, lhsT) || !assignable(builtinInt, rhsT))
         ce();
       ctx.exprType[node.getID()] = builtinInt;
       return;
@@ -163,8 +163,7 @@ public:
     case ast::BinaryExpr::Ge:
       if (!assignable(lhsT, rhsT))
         ce();
-      if (!assignable(builtinInt, lhsT) &&
-          !assignable(builtinString, lhsT) &&
+      if (!assignable(builtinInt, lhsT) && !assignable(builtinString, lhsT) &&
           !assignable(builtinBool, lhsT))
         ce();
       ctx.exprType[node.getID()] = builtinBool;
@@ -172,7 +171,7 @@ public:
     case ast::BinaryExpr::Subscript: {
       auto arrayTy = std::dynamic_pointer_cast<ast::ArrayType>(lhsT);
       if (!arrayTy)
-        throw CompileError(node.lhs->posBeg, node.lhs->posEnd);
+        throw CompileError(pos.at(node.lhs->getID()));
       if (!assignable(builtinInt, rhsT))
         ce();
       ctx.exprType[node.getID()] = arrayTy->baseType;
@@ -180,8 +179,7 @@ public:
       return;
     }
     case ast::BinaryExpr::Member:
-      if (auto ptr =
-              std::dynamic_pointer_cast<ast::UserDefinedType>(lhsT)) {
+      if (auto ptr = std::dynamic_pointer_cast<ast::UserDefinedType>(lhsT)) {
         auto decl = std::dynamic_pointer_cast<ast::ClassDecl>(
             ctx.syms.lookUp(scopeResiding, ptr->name->val));
         auto identExpr =
@@ -189,7 +187,8 @@ public:
         if (!identExpr)
           ce();
         auto memberVarDecl = std::dynamic_pointer_cast<ast::VarDecl>(
-            ctx.syms.lookUp(ctx.scopeIntroduced[decl->getID()], identExpr->identifier->val));
+            ctx.syms.lookUp(ctx.scopeIntroduced[decl->getID()],
+                            identExpr->identifier->val));
         if (!memberVarDecl)
           ce();
         ctx.exprType[node.getID()] = memberVarDecl->decl->type;
@@ -203,49 +202,54 @@ public:
   void operator()(ast::FuncCallExpr &node) const override {
     std::shared_ptr<ast::FuncDecl> funcDecl;
     bool isCtor = false;
-    if (node.instance) {
+    if (node.instance) { // is member functional call
       visit(node.instance);
       if (assignable(builtinString, ctx.exprType[node.instance->getID()])) {
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-            ctx.syms.lookUp(ctx.syms.global(), "_string_" + node.identifier->val));
+        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
+            ctx.syms.global(), "_string_" + node.identifier->val));
         assert(funcDecl);
       } else if (std::dynamic_pointer_cast<ast::ArrayType>(
                      ctx.exprType[node.instance->getID()])) {
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-            ctx.syms.lookUp(ctx.syms.global(), "_array_" + node.identifier->val));
+        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
+            ctx.syms.global(), "_array_" + node.identifier->val));
         assert(funcDecl);
       } else {
         auto instType = std::dynamic_pointer_cast<ast::UserDefinedType>(
             ctx.exprType[node.instance->getID()]);
         assert(instType);
-        auto classDecl = std::dynamic_pointer_cast<ast::ClassDecl>(
-            ctx.syms.lookUp(ctx.syms.global(), ast::getTypeIdentifier(instType)));
+        auto classDecl =
+            std::dynamic_pointer_cast<ast::ClassDecl>(ctx.syms.lookUp(
+                ctx.syms.global(), ast::getTypeIdentifier(instType)));
         assert(classDecl);
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-            ctx.syms.lookUp(ctx.scopeIntroduced[classDecl->getID()], node.identifier->val));
+        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
+            ctx.scopeIntroduced[classDecl->getID()], node.identifier->val));
       }
-    } else {
+    } else { // is not member function call
       auto decl = ctx.syms.lookUp(scopeResiding, node.identifier->val);
-      if (auto ptr = std::dynamic_pointer_cast<ast::ClassDecl>(decl)) {
+      if (auto ptr =
+              std::dynamic_pointer_cast<ast::ClassDecl>(decl)) { // is ctor
         funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-            ctx.syms.lookUp(ctx.scopeIntroduced[ptr->getID()], "_ctor_" + ptr->identifier->val));
+            ctx.syms.lookUp(ctx.scopeIntroduced[ptr->getID()],
+                            "_ctor_" + ptr->identifier->val));
         isCtor = true;
-        ctx.exprType[node.getID()] = std::make_shared<ast::UserDefinedType>(
-            mk_ast::pos(), mk_ast::pos(), ptr->identifier);
-      } else {
+        auto tmp = std::make_shared<ast::UserDefinedType>(ptr->identifier);
+        pos[tmp->getID()] = pos[ptr->getID()];
+        ctx.exprType[node.getID()] = tmp;
+      } else { // is not ctor
         funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(decl);
       }
     }
     if (!funcDecl)
-      throw UnresolvableSymbol(node.identifier->posBeg, node.identifier->posEnd,
+      throw UnresolvableSymbol(pos.at(node.identifier->getID()),
                                node.identifier->val);
 
     if (node.args.size() != funcDecl->formalParameters.size())
-      throw InvalidFunctionCall(node.posBeg, node.posEnd);
+      throw InvalidFunctionCall(pos.at(node.getID()));
     for (std::size_t i = 0; i < node.args.size(); ++i) {
       visit(node.args[i]);
-      if (!assignable(funcDecl->formalParameters[i].first, ctx.exprType[node.args[i]->getID()]))
-        throw InvalidFunctionCall(node.posBeg, node.posEnd);
+      if (!assignable(funcDecl->formalParameters[i]->type,
+                      ctx.exprType[node.args[i]->getID()]))
+        throw InvalidFunctionCall(pos.at(node.getID()));
     }
     if (!isCtor)
       ctx.exprType[node.getID()] = funcDecl->retType;
@@ -256,46 +260,45 @@ public:
     for (auto &expr : node.providedDims) {
       visit(expr);
       if (!assignable(builtinInt, ctx.exprType[expr->getID()]))
-        throw IncompatibleTypes(expr->posBeg, expr->posEnd);
+        throw IncompatibleTypes(pos.at(expr->getID()));
     }
   }
 
   void operator()(ast::VarDeclStmt &node) const override {
     checkVarDecl(node);
-    bool addRes = ctx.syms.addSymbol(scopeResiding, node.identifier->val,
-                                 std::make_shared<ast::VarDecl>(
-                                     mk_ast::pos(), mk_ast::pos(),
-                                     std::static_pointer_cast<ast::VarDeclStmt>(
-                                         node.shared_from_this())));
+    auto decl = std::make_shared<ast::VarDecl>(
+        std::static_pointer_cast<ast::VarDeclStmt>(node.shared_from_this()));
+    pos[decl->getID()] = pos[node.getID()];
+    bool addRes = ctx.syms.addSymbol(scopeResiding, node.identifier->val, decl);
 
     if (!addRes)
-      throw DuplicatedSymbols(node.posBeg, node.posEnd, node.identifier->val);
+      throw DuplicatedSymbols(pos[node.getID()], node.identifier->val);
   }
 
   void operator()(ast::ExprStmt &node) const override { visit(node.expr); }
 
   void operator()(ast::ReturnStmt &node) const override {
     if (!inFunc)
-      throw ReturnOutOfAFunction(node.posBeg, node.posEnd);
+      throw ReturnOutOfAFunction(pos.at(node.getID()));
     if (!node.expr) {
       if (!retType)
         return;
-      throw IncompatibleTypes(node.posBeg, node.posEnd);
+      throw IncompatibleTypes(pos.at(node.getID()));
     }
 
     visit(node.expr);
     if (!assignable(retType, ctx.exprType[node.expr->getID()]))
-      throw IncompatibleTypes(node.expr->posBeg, node.expr->posEnd);
+      throw IncompatibleTypes(pos.at(node.expr->getID()));
   }
 
   void operator()(ast::ContinueStmt &node) const override {
     if (!inLoop)
-      throw ContinueOutOfALoop(node.posBeg, node.posEnd);
+      throw ContinueOutOfALoop(pos.at(node.getID()));
   }
 
   void operator()(ast::BreakStmt &node) const override {
     if (!inLoop)
-      throw BreakOutOfALoop(node.posBeg, node.posEnd);
+      throw BreakOutOfALoop(pos.at(node.getID()));
   }
 
   void operator()(ast::CompoundStmt &node) const override {
@@ -307,7 +310,7 @@ public:
   void operator()(ast::IfStmt &node) const override {
     visit(node.condition);
     if (!assignable(builtinBool, ctx.exprType[node.condition->getID()]))
-      throw IncompatibleTypes(node.condition->posBeg, node.condition->posEnd);
+      throw IncompatibleTypes(pos.at(node.condition->getID()));
     auto thenScope = ctx.syms.createSubscope(scopeResiding);
     visit(node.then, thenScope);
     if (node.else_) {
@@ -319,7 +322,7 @@ public:
   void operator()(ast::WhileStmt &node) const override {
     visit(node.condition, scopeResiding);
     if (!assignable(builtinBool, ctx.exprType[node.condition->getID()]))
-      throw IncompatibleTypes(node.condition->posBeg, node.condition->posEnd);
+      throw IncompatibleTypes(pos.at(node.condition->getID()));
 
     auto scopeIntroduced = ctx.syms.createSubscope(scopeResiding);
     visit(node.body, scopeIntroduced, true, inFunc, retType);
@@ -331,7 +334,7 @@ public:
     if (node.condition) {
       visit(node.condition, scopeResiding);
       if (!assignable(builtinBool, ctx.exprType[node.condition->getID()]))
-        throw IncompatibleTypes(node.condition->posBeg, node.condition->posEnd);
+        throw IncompatibleTypes(pos.at(node.condition->getID()));
     }
     if (node.update)
       visit(node.update, scopeResiding);
@@ -352,21 +355,19 @@ public:
     auto scopeIntroduced = ctx.syms.createSubscope(scopeResiding);
 
     for (const auto &param : node.formalParameters) {
-      auto paramDecl = std::make_shared<ast::VarDecl>(
-          param.first->posBeg, param.second->posEnd,
-          std::make_shared<ast::VarDeclStmt>(
-              param.first->posBeg, param.second->posEnd, param.first,
-              param.second, std::shared_ptr<ast::Expression>(nullptr)));
-      visit(paramDecl, scopeIntroduced);
+      visit(param, scopeIntroduced);
     }
 
     for (auto &stmt : node.body->stmts) {
-      if (auto ptr = std::dynamic_pointer_cast<ast::VarDeclStmt>(stmt)) {
-        visit(std::make_shared<ast::VarDecl>(stmt->posBeg, stmt->posEnd, ptr),
-              scopeIntroduced, false, true, node.retType);
-      } else {
-        visit(stmt, scopeIntroduced, false, true, node.retType);
-      }
+      //      if (auto ptr = std::dynamic_pointer_cast<ast::VarDeclStmt>(stmt))
+      //      {
+      //        visit(std::make_shared<ast::VarDecl>(stmt->posBeg, stmt->posEnd,
+      //        ptr),
+      //              scopeIntroduced, false, true, node.retType);
+      //      } else {
+      //        visit(stmt, scopeIntroduced, false, true, node.retType);
+      //      }
+      visit(stmt, scopeIntroduced, false, true, node.retType);
     }
   }
 
@@ -405,7 +406,7 @@ private:
   void visit(const std::shared_ptr<ast::ASTNode> &node, ScopeID residing,
              bool inLoop, bool inFunc,
              std::shared_ptr<ast::Type> retType) const {
-    node->accept(Annotator(std::move(residing), ctx, inLoop, inFunc,
+    node->accept(Annotator(std::move(residing), ctx, pos, inLoop, inFunc,
                            std::move(retType)));
   }
 
@@ -422,17 +423,18 @@ private:
 
   void checkVarDecl(const ast::VarDeclStmt &node) const {
     if (node.identifier->val == "this")
-      throw CompileError(node.posBeg, node.posEnd);
+      throw CompileError(pos.at(node.getID()));
     visit(node.type);
     if (!node.initExpr)
       return;
     visit(node.initExpr);
     if (!assignable(node.type, ctx.exprType[node.initExpr->getID()]))
-      throw IncompatibleTypes(node.posBeg, node.posEnd);
+      throw IncompatibleTypes(pos.at(node.getID()));
   }
 
   ScopeID scopeResiding;
   SemanticContext &ctx;
+  std::unordered_map<ast::NodeID, PosPair> &pos;
   bool inLoop;
   bool inFunc;
   std::shared_ptr<ast::Type> retType;
@@ -445,8 +447,9 @@ private:
 
 namespace mocker {
 
-SemanticChecker::SemanticChecker(std::shared_ptr<ast::ASTRoot> ast)
-    : ast(std::move(ast)) {}
+SemanticChecker::SemanticChecker(std::shared_ptr<ast::ASTRoot> ast,
+                                 std::unordered_map<ast::NodeID, PosPair> &pos)
+    : ast(std::move(ast)), pos(pos) {}
 
 void SemanticChecker::check() {
   SemanticContext ctx;
@@ -460,40 +463,36 @@ void SemanticChecker::check() {
     if (auto classDecl = std::dynamic_pointer_cast<ast::ClassDecl>(decl)) {
       const auto ClassScope = ctx.syms.createSubscope(ctx.syms.global());
       ctx.scopeIntroduced[classDecl->getID()] = ClassScope;
-      auto declThis = std::make_shared<ast::VarDecl>(
-          mk_ast::pos(), mk_ast::pos(),
-          std::make_shared<ast::VarDeclStmt>(
-              mk_ast::pos(), mk_ast::pos(),
-              std::make_shared<ast::UserDefinedType>(
-                  mk_ast::pos(), mk_ast::pos(), classDecl->identifier),
+      auto declThis =
+          std::make_shared<ast::VarDecl>(std::make_shared<ast::VarDeclStmt>(
+              std::make_shared<ast::UserDefinedType>(classDecl->identifier),
               mk_ast::ident("this"), nullptr));
       ctx.syms.addSymbol(ClassScope, "this", declThis);
       collectSymbols(classDecl->members, ClassScope, ctx.syms);
 
       auto p = ctx.syms.lookUp(ClassScope, classDecl->identifier->val);
       if (p && std::dynamic_pointer_cast<ast::FuncDecl>(p))
-        throw CompileError(classDecl->posBeg, classDecl->posEnd);
+        throw CompileError(pos.at(classDecl->getID()));
 
       std::string ctorIdent = "_ctor_" + classDecl->identifier->val;
       if (!ctx.syms.lookUp(ClassScope, ctorIdent)) {
         ctx.syms.addSymbol(ClassScope, ctorIdent,
-                       std::make_shared<ast::FuncDecl>(
-                           mk_ast::pos(), mk_ast::pos(), nullptr,
-                           mk_ast::ident(ctorIdent), mk_ast::emptyParams(),
-                           mk_ast::body()));
+                           std::make_shared<ast::FuncDecl>(
+                               nullptr, mk_ast::ident(ctorIdent),
+                               mk_ast::emptyParams(), mk_ast::body()));
       }
     }
   }
 
-  ast->accept(Annotator(ctx.syms.global(), ctx, false, false, nullptr));
+  ast->accept(Annotator(ctx.syms.global(), ctx, pos, false, false, nullptr));
 
   auto mainDef = std::dynamic_pointer_cast<ast::FuncDecl>(
       ctx.syms.lookUp(ctx.syms.global(), "main"));
   if (!mainDef || !mainDef->formalParameters.empty())
-    throw InvalidMainFunction(mk_ast::pos(), mk_ast::pos());
+    throw InvalidMainFunction(Position(), Position());
   auto retTy = std::dynamic_pointer_cast<ast::BuiltinType>(mainDef->retType);
   if (!retTy || retTy->type != ast::BuiltinType::Int)
-    throw InvalidMainFunction(mainDef->posBeg, mainDef->posEnd);
+    throw InvalidMainFunction(pos.at(mainDef->getID()));
 }
 
 void SemanticChecker::collectSymbols(
@@ -501,15 +500,16 @@ void SemanticChecker::collectSymbols(
     const ScopeID &scope, SymTbl &syms) {
   class Collect : public ast::Visitor {
   public:
-    Collect(const ScopeID &scope, SymTbl &syms)
-        : scope(scope), syms(syms) {}
+    Collect(const ScopeID &scope, SymTbl &syms,
+            const std::unordered_map<ast::NodeID, PosPair> &pos)
+        : scope(scope), syms(syms), pos(pos) {}
 
     void operator()(ast::ClassDecl &decl) const override {
       auto res = syms.addSymbol(
           syms.global(), decl.identifier->val,
           std::static_pointer_cast<ast::ClassDecl>(decl.shared_from_this()));
       if (!res)
-        throw DuplicatedSymbols(decl.posBeg, decl.posEnd, decl.identifier->val);
+        throw DuplicatedSymbols(pos.at(decl.getID()), decl.identifier->val);
     }
 
     void operator()(ast::FuncDecl &decl) const override {
@@ -518,7 +518,7 @@ void SemanticChecker::collectSymbols(
           scope, funcName,
           std::static_pointer_cast<ast::FuncDecl>(decl.shared_from_this()));
       if (!res)
-        throw DuplicatedSymbols(decl.posBeg, decl.posEnd, funcName);
+        throw DuplicatedSymbols(pos.at(decl.getID()), funcName);
     }
 
     void operator()(ast::VarDecl &decl) const override {
@@ -532,57 +532,57 @@ void SemanticChecker::collectSymbols(
           scope, varName,
           std::static_pointer_cast<ast::VarDecl>(decl.shared_from_this()));
       if (!res)
-        throw DuplicatedSymbols(decl.posBeg, decl.posEnd, varName);
+        throw DuplicatedSymbols(pos.at(decl.getID()), varName);
     }
 
   private:
     const ScopeID &scope;
     SymTbl &syms;
+    const std::unordered_map<ast::NodeID, PosPair> &pos;
   };
 
   for (const auto &decl : decls)
-    decl->accept(Collect(scope, syms));
+    decl->accept(Collect(scope, syms, pos));
 }
 
 void SemanticChecker::initSymTbl(SymTbl &syms) {
   using namespace mk_ast;
+  using FormalParam = std::shared_ptr<ast::VarDeclStmt>;
   // builtin functions
   // clang-format off
-  syms.addSymbol(syms.global(), "print", std::make_shared<ast::FuncDecl>(
-      pos(), pos(), nullptr, ident("print"),
+  syms.addSymbol(syms.global(), "print", std::make_shared<ast::FuncDecl>(nullptr, ident("print"),
       std::vector<FormalParam>({param(tyString())}), body()));
   syms.addSymbol(syms.global(), "println", std::make_shared<ast::FuncDecl>(
-      pos(), pos(), nullptr, ident("println"),
+      nullptr, ident("println"),
       std::vector<FormalParam>({param(tyString())}), body()));
   syms.addSymbol(syms.global(), "getString", std::make_shared<ast::FuncDecl>(
-      pos(), pos(), tyString(), ident("getString"), emptyParams(), body()));
+       tyString(), ident("getString"), emptyParams(), body()));
   syms.addSymbol(syms.global(), "getInt", std::make_shared<ast::FuncDecl>(
-      pos(), pos(), tyInt(), ident("getInt"), emptyParams(), body()));
+       tyInt(), ident("getInt"), emptyParams(), body()));
   syms.addSymbol(syms.global(), "toString", std::make_shared<ast::FuncDecl>(
-      pos(), pos(), tyString(), ident("toString"),
+       tyString(), ident("toString"),
       std::vector<FormalParam>({param(tyInt())}), body()));
 
   // member functions of string
   syms.addSymbol(
       syms.global(), "_string_length", std::make_shared<ast::FuncDecl>(
-          pos(), pos(), tyInt(), ident("length"),
+           tyInt(), ident("length"),
           emptyParams(), body()));
   syms.addSymbol(
       syms.global(), "_string_substring", std::make_shared<ast::FuncDecl>(
-          pos(), pos(), tyString(), ident("substring"),
-          std::vector<FormalParem>({param(tyInt()), param(tyInt())}), body()));
+           tyString(), ident("substring"),
+          std::vector<FormalParam>({param(tyInt()), param(tyInt())}), body()));
   syms.addSymbol(
       syms.global(), "_string_parseInt", std::make_shared<ast::FuncDecl>(
-          pos(), pos(), tyInt(), ident("parseInt"), emptyParams(), body()));
+           tyInt(), ident("parseInt"), emptyParams(), body()));
   syms.addSymbol(
       syms.global(), "_string_ord", std::make_shared<ast::FuncDecl>(
-          pos(), pos(), tyInt(), ident("ord"),
-          std::vector<FormalParem>({param(tyInt())}), body()));
+           tyInt(), ident("ord"),
+          std::vector<FormalParam>({param(tyInt())}), body()));
   // member function of array
   syms.addSymbol(syms.global(), "_array_size", std::make_shared<ast::FuncDecl>(
-      pos(), pos(), tyInt(), ident("size"), emptyParams(), body()));
+       tyInt(), ident("size"), emptyParams(), body()));
   // clang-format on
 }
-
 
 } // namespace mocker

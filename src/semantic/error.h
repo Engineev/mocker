@@ -12,6 +12,8 @@ public:
       : CompileError(beg, end) {
     msg = std::string(CompileError::what()) + ". Symbol: " + symName;
   }
+  UnresolvableSymbol(const PosPair &pos, const std::string &symName)
+      : UnresolvableSymbol(pos.first, pos.second, symName) {}
 
   const char *what() const noexcept override { return msg.c_str(); }
 
@@ -26,6 +28,8 @@ public:
       : CompileError(beg, end) {
     msg = std::string(CompileError::what()) + ". Symbol: " + symName;
   }
+  DuplicatedSymbols(const PosPair &pos, const std::string &symName)
+      : DuplicatedSymbols(pos.first, pos.second, symName) {}
 
   const char *what() const noexcept override { return msg.c_str(); }
 
@@ -35,44 +39,37 @@ private:
 
 class IncompatibleTypes : public CompileError {
 public:
-  IncompatibleTypes(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 class BreakOutOfALoop : public CompileError {
 public:
-  BreakOutOfALoop(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 class ContinueOutOfALoop : public CompileError {
 public:
-  ContinueOutOfALoop(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 class ReturnOutOfAFunction : public CompileError {
 public:
-  ReturnOutOfAFunction(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 class InvalidFunctionCall : public CompileError {
 public:
-  InvalidFunctionCall(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 class InvalidMainFunction : public CompileError {
 public:
-  InvalidMainFunction(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 class InvalidRightValueOperation : public CompileError {
 public:
-  InvalidRightValueOperation(const Position &beg, const Position &end)
-      : CompileError(beg, end) {}
+  using CompileError::CompileError;
 };
 
 } // namespace mocker
