@@ -11,7 +11,7 @@ namespace ast {
 
 namespace detail {
 
-template <bool AddConst, bool DefaultPass = false> class VisitorBase {
+template <bool AddConst, bool DefaultPass = true> class VisitorBase {
 private:
   template <class T, bool> struct Dispatch;
 

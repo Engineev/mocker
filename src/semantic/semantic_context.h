@@ -13,15 +13,22 @@
 namespace mocker {
 
 struct SemanticContext {
+  SemanticContext() = default;
+  SemanticContext(SemanticContext &&) noexcept = default;
+  SemanticContext& operator=(SemanticContext &&) noexcept = default;
 
   bool isLeftValue(ast::NodeID v) const {
     return leftValue.find(v) != leftValue.end();
   }
 
+  enum class State {
+    Unused, Completed, Dirty
+  } state = State::Unused;
   SymTbl syms;
   std::unordered_map<ast::NodeID, std::shared_ptr<ast::Type>> exprType;
   std::unordered_set<ast::NodeID> leftValue;
   std::unordered_map<ast::NodeID, ScopeID> scopeIntroduced;
+  std::unordered_map<ast::NodeID, ScopeID> scopeResiding;
 };
 
 } // namespace mocker

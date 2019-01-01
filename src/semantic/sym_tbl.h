@@ -31,6 +31,13 @@ public:
   }
   bool operator!=(const ScopeID &rhs) const { return !(*this == rhs); }
 
+  std::string fmt() const {
+    std::string res = "_";
+    for (std::size_t id : ids)
+      res += std::to_string(id) + "_";
+    return res;
+  }
+
 private:
   friend class SymTbl;
   ScopeID(std::vector<std::size_t> ids) : ids(std::move(ids)) {}
@@ -42,7 +49,10 @@ class SymTbl {
 public:
   SymTbl();
   SymTbl(const SymTbl &) = delete;
-  SymTbl(SymTbl &&) = default;
+  SymTbl(SymTbl &&) noexcept = default;
+  SymTbl& operator=(const SymTbl &) = delete;
+  SymTbl& operator=(SymTbl &&) noexcept = default;
+  ~SymTbl() = default;
 
   // return the scope ID of the global scope
   ScopeID global() const;

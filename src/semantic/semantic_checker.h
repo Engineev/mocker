@@ -7,6 +7,7 @@
 
 #include "ast/fwd.h"
 #include "common/position.h"
+#include "semantic_context.h"
 #include "sym_tbl.h"
 
 namespace mocker {
@@ -19,6 +20,14 @@ public:
   // Throw if a semantic error occurs.
   void check();
 
+  void renameIdentifiers();
+
+  const auto & getExprType() const {
+    if (ctx.state != SemanticContext::State::Completed)
+      std::terminate();
+    return ctx.exprType;
+  }
+
 private:
   void initSymTbl(SymTbl &syms);
 
@@ -28,6 +37,7 @@ private:
   collectSymbols(const std::vector<std::shared_ptr<ast::Declaration>> &decls,
                  const ScopeID &scope, SymTbl &syms);
 
+  SemanticContext ctx;
   std::shared_ptr<ast::ASTRoot> ast;
   std::unordered_map<ast::NodeID, PosPair> &pos;
 };

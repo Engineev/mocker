@@ -26,9 +26,8 @@ public:
   }
 
   void operator()(ast::Identifier &node) const override {
-    // The semantic check of an identifier varies. Therefore it makes no sense
-    // to provide this function
-    assert(false);
+    // This function is used to update ctx.scopeResiding only
+    ctx.scopeResiding[node.getID()] = scopeResiding;
   }
 
   void operator()(ast::BuiltinType &node) const override { /* empty */
@@ -59,6 +58,7 @@ public:
   }
 
   void operator()(ast::IdentifierExpr &node) const override {
+    visit(node.identifier);
     auto decl = std::dynamic_pointer_cast<ast::VarDecl>(
         ctx.syms.lookUp(scopeResiding, node.identifier->val));
     if (!decl)
@@ -265,6 +265,8 @@ public:
   }
 
   void operator()(ast::VarDeclStmt &node) const override {
+    visit(node.identifier);
+
     checkVarDecl(node);
     auto decl = std::make_shared<ast::VarDecl>(
         std::static_pointer_cast<ast::VarDeclStmt>(node.shared_from_this()));
@@ -359,14 +361,6 @@ public:
     }
 
     for (auto &stmt : node.body->stmts) {
-      //      if (auto ptr = std::dynamic_pointer_cast<ast::VarDeclStmt>(stmt))
-      //      {
-      //        visit(std::make_shared<ast::VarDecl>(stmt->posBeg, stmt->posEnd,
-      //        ptr),
-      //              scopeIntroduced, false, true, node.retType);
-      //      } else {
-      //        visit(stmt, scopeIntroduced, false, true, node.retType);
-      //      }
       visit(stmt, scopeIntroduced, false, true, node.retType);
     }
   }
@@ -452,7 +446,10 @@ SemanticChecker::SemanticChecker(std::shared_ptr<ast::ASTRoot> ast,
     : ast(std::move(ast)), pos(pos) {}
 
 void SemanticChecker::check() {
-  SemanticContext ctx;
+  if (ctx.state != SemanticContext::State::Unused)
+    std::terminate();
+
+  ctx.state = SemanticContext::State::Dirty;
 
   initSymTbl(ctx.syms);
   // User defined types, free functions and global variables
@@ -493,6 +490,8 @@ void SemanticChecker::check() {
   auto retTy = std::dynamic_pointer_cast<ast::BuiltinType>(mainDef->retType);
   if (!retTy || retTy->type != ast::BuiltinType::Int)
     throw InvalidMainFunction(pos.at(mainDef->getID()));
+
+  ctx.state = SemanticContext::State::Completed;
 }
 
 void SemanticChecker::collectSymbols(
@@ -583,6 +582,81 @@ void SemanticChecker::initSymTbl(SymTbl &syms) {
   syms.addSymbol(syms.global(), "_array_size", std::make_shared<ast::FuncDecl>(
        tyInt(), ident("size"), emptyParams(), body()));
   // clang-format on
+}
+
+void SemanticChecker::renameIdentifiers() {
+  if (ctx.state != SemanticContext::State::Completed)
+    std::terminate();
+
+  class Rename : public ast::Visitor {
+  public:
+    explicit Rename(const SemanticContext &ctx) : ctx(ctx) {}
+
+    void operator()(ast::Identifier &node) const override {
+      node.val = ctx.scopeResiding.at(node.getID()).fmt() + node.val;
+    }
+    void operator()(ast::IdentifierExpr &node) const override {
+      visit(node.identifier);
+    }
+    void operator()(ast::UnaryExpr &node) const override {
+      visit(node.operand);
+    }
+    void operator()(ast::BinaryExpr &node) const override {
+      visit(node.lhs);
+      visit(node.rhs);
+    }
+    void operator()(ast::FuncCallExpr &node) const override {
+      for (auto &arg : node.args)
+        visit(arg);
+    }
+    void operator()(ast::VarDeclStmt &node) const override {
+      visit(node.identifier);
+    }
+    void operator()(ast::ExprStmt &node) const override { visit(node.expr); }
+    void operator()(ast::ReturnStmt &node) const override { visit(node.expr); }
+    void operator()(ast::CompoundStmt &node) const override {
+      for (auto &stmt : node.stmts)
+        visit(stmt);
+    }
+    void operator()(ast::IfStmt &node) const override {
+      visit(node.condition);
+      visit(node.then);
+      visit(node.else_);
+    }
+    void operator()(ast::WhileStmt &node) const override {
+      visit(node.condition);
+      visit(node.body);
+    }
+    void operator()(ast::ForStmt &node) const override {
+      visit(node.init);
+      visit(node.condition);
+      visit(node.update);
+      visit(node.body);
+    }
+    void operator()(ast::VarDecl &node) const override { visit(node.decl); }
+    void operator()(ast::FuncDecl &node) const override {
+      for (auto &param : node.formalParameters)
+        visit(param);
+      visit(node.body);
+    }
+    void operator()(ast::ClassDecl &node) const override {
+      for (auto &member : node.members)
+        visit(member);
+    }
+    void operator()(ast::ASTRoot &node) const override {
+      for (auto &decl : node.decls)
+        visit(decl);
+    }
+
+  private:
+    void visit(const std::shared_ptr<ast::ASTNode> &p) const {
+      p->accept(*this);
+    }
+
+    const SemanticContext &ctx;
+  };
+
+  ast->accept(Rename(ctx));
 }
 
 } // namespace mocker
