@@ -21,7 +21,7 @@ ScopeID SymTbl::createSubscope(const ScopeID &pntID) {
   return ScopeID(std::move(id));
 }
 
-std::shared_ptr<SymTbl::Scope> SymTbl::getScope(const ScopeID &ids) {
+std::shared_ptr<SymTbl::Scope> SymTbl::getScope(const ScopeID &ids) const {
   auto res = root;
   for (const std::size_t i : ids.ids) {
     if (i >= res->subscopes.size())
@@ -32,7 +32,7 @@ std::shared_ptr<SymTbl::Scope> SymTbl::getScope(const ScopeID &ids) {
 }
 
 std::shared_ptr<ast::Declaration>
-SymTbl::lookUp(const ScopeID &scopeID, const std::string &identifier) {
+SymTbl::lookUp(const ScopeID &scopeID, const std::string &identifier) const {
   auto cur = getScope(scopeID);
   while (cur != nullptr) {
     auto iter = cur->syms.find(identifier);

@@ -50,8 +50,8 @@ public:
   SymTbl();
   SymTbl(const SymTbl &) = delete;
   SymTbl(SymTbl &&) noexcept = default;
-  SymTbl& operator=(const SymTbl &) = delete;
-  SymTbl& operator=(SymTbl &&) noexcept = default;
+  SymTbl &operator=(const SymTbl &) = delete;
+  SymTbl &operator=(SymTbl &&) noexcept = default;
   ~SymTbl() = default;
 
   // return the scope ID of the global scope
@@ -64,7 +64,7 @@ public:
   // Try to find the given symbol in the given scope AND it parent scopes.
   // If the symbol does not exist, then the returned shared_ptr is empty.
   std::shared_ptr<ast::Declaration> lookUp(const ScopeID &scopeID,
-                                           const std::string &identifier);
+                                           const std::string &identifier) const;
 
   // If the identifier has already exists in the CURRENT scope, no addition will
   // be perform and the return value is false. Otherwise add the symbol into the
@@ -82,7 +82,7 @@ private:
   };
 
   // Just a helper function. Some asserts are performed.
-  std::shared_ptr<Scope> getScope(const ScopeID &id);
+  std::shared_ptr<Scope> getScope(const ScopeID &id) const;
 
   std::shared_ptr<Scope> root;
 };

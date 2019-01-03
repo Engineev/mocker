@@ -368,6 +368,7 @@ public:
   void operator()(ast::ClassDecl &node) const override {
     for (auto &member : node.members) {
       if (auto ptr = std::dynamic_pointer_cast<ast::VarDecl>(member)) {
+        visit(ptr->decl->identifier);
         checkVarDecl(*ptr->decl);
         continue;
       }
@@ -592,25 +593,31 @@ void SemanticChecker::renameIdentifiers() {
   public:
     explicit Rename(const SemanticContext &ctx) : ctx(ctx) {}
 
-    void operator()(ast::Identifier &node) const override {
-      node.val = ctx.scopeResiding.at(node.getID()).fmt() + node.val;
-    }
+    void operator()(ast::Identifier &node) const override { assert(false); }
     void operator()(ast::IdentifierExpr &node) const override {
-      visit(node.identifier);
+      auto decl = std::dynamic_pointer_cast<ast::VarDecl>(
+          ctx.syms.lookUp(ctx.scopeResiding.at(node.identifier->getID()),
+                          node.identifier->val));
+      node.identifier->val = decl->decl->identifier->val;
     }
     void operator()(ast::UnaryExpr &node) const override {
       visit(node.operand);
     }
     void operator()(ast::BinaryExpr &node) const override {
       visit(node.lhs);
-      visit(node.rhs);
+      if (node.op != ast::BinaryExpr::Member)
+        visit(node.rhs);
     }
     void operator()(ast::FuncCallExpr &node) const override {
       for (auto &arg : node.args)
         visit(arg);
     }
     void operator()(ast::VarDeclStmt &node) const override {
-      visit(node.identifier);
+      node.identifier->val =
+          ctx.scopeResiding.at(node.identifier->getID()).fmt() +
+          node.identifier->val;
+      if (node.initExpr)
+        visit(node.initExpr);
     }
     void operator()(ast::ExprStmt &node) const override { visit(node.expr); }
     void operator()(ast::ReturnStmt &node) const override { visit(node.expr); }
@@ -621,7 +628,8 @@ void SemanticChecker::renameIdentifiers() {
     void operator()(ast::IfStmt &node) const override {
       visit(node.condition);
       visit(node.then);
-      visit(node.else_);
+      if (node.else_)
+        visit(node.else_);
     }
     void operator()(ast::WhileStmt &node) const override {
       visit(node.condition);
