@@ -613,14 +613,15 @@ void SemanticChecker::renameIdentifiers() {
         visit(arg);
     }
     void operator()(ast::VarDeclStmt &node) const override {
-      node.identifier->val =
-          ctx.scopeResiding.at(node.identifier->getID()).fmt() +
-          node.identifier->val;
+      renameLocalVar(node);
       if (node.initExpr)
         visit(node.initExpr);
     }
     void operator()(ast::ExprStmt &node) const override { visit(node.expr); }
-    void operator()(ast::ReturnStmt &node) const override { visit(node.expr); }
+    void operator()(ast::ReturnStmt &node) const override {
+      if (node.expr)
+        visit(node.expr);
+    }
     void operator()(ast::CompoundStmt &node) const override {
       for (auto &stmt : node.stmts)
         visit(stmt);
@@ -636,29 +637,76 @@ void SemanticChecker::renameIdentifiers() {
       visit(node.body);
     }
     void operator()(ast::ForStmt &node) const override {
-      visit(node.init);
-      visit(node.condition);
-      visit(node.update);
+      if (node.init)
+        visit(node.init);
+      if (node.condition)
+        visit(node.condition);
+      if (node.update)
+        visit(node.update);
       visit(node.body);
     }
-    void operator()(ast::VarDecl &node) const override { visit(node.decl); }
+    void operator()(ast::VarDecl &node) const override { assert(false); }
     void operator()(ast::FuncDecl &node) const override {
       for (auto &param : node.formalParameters)
         visit(param);
       visit(node.body);
     }
     void operator()(ast::ClassDecl &node) const override {
+      std::vector<std::shared_ptr<ast::VarDecl>> memberVars;
       for (auto &member : node.members)
+        if (auto p = std::dynamic_pointer_cast<ast::VarDecl>(member))
+          memberVars.emplace_back(std::move(p));
+
+      for (auto &var : memberVars)
+        renameMemberVar(*var);
+      for (auto &var : memberVars)
+        if (var->decl->initExpr)
+          visit(var->decl->initExpr);
+
+      for (auto &member : node.members) {
+        if (std::dynamic_pointer_cast<ast::VarDecl>(member))
+          continue;
         visit(member);
+      }
     }
     void operator()(ast::ASTRoot &node) const override {
+      std::vector<std::shared_ptr<ast::VarDecl>> globalVars;
       for (auto &decl : node.decls)
+        if (auto p = std::dynamic_pointer_cast<ast::VarDecl>(decl))
+          globalVars.emplace_back(std::move(p));
+
+      for (auto &var : globalVars)
+        renameGlobalVar(*var);
+      for (auto &var : globalVars)
+        if (var->decl->initExpr)
+          visit(var->decl->initExpr);
+
+      for (auto &decl : node.decls) {
+        if (std::dynamic_pointer_cast<ast::VarDecl>(decl))
+          continue;
         visit(decl);
+      }
     }
 
   private:
     void visit(const std::shared_ptr<ast::ASTNode> &p) const {
       p->accept(*this);
+    }
+
+    void renameGlobalVar(ast::VarDecl &node) const {
+      auto oldIdent = node.decl->identifier->val;
+      node.decl->identifier->val = "@" + oldIdent;
+    }
+
+    void renameMemberVar(ast::VarDecl &node) const {
+      auto oldIdent = node.decl->identifier->val;
+      node.decl->identifier->val = "#" + oldIdent;
+    }
+
+    void renameLocalVar(ast::VarDeclStmt &node) const {
+      auto scopeInfo = ctx.scopeResiding.at(node.identifier->getID()).fmt();
+      assert(scopeInfo.find('_') == std::string::npos);
+      node.identifier->val = scopeInfo + '_' + node.identifier->val;
     }
 
     const SemanticContext &ctx;

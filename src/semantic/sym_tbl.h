@@ -32,9 +32,10 @@ public:
   bool operator!=(const ScopeID &rhs) const { return !(*this == rhs); }
 
   std::string fmt() const {
-    std::string res = "_";
+    std::string res;
     for (std::size_t id : ids)
-      res += std::to_string(id) + "_";
+      res += std::to_string(id) + "-";
+    res.pop_back();
     return res;
   }
 
