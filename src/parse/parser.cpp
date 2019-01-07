@@ -709,8 +709,7 @@ std::shared_ptr<ast::ClassDecl> Parser::classDecl(TokIter &iter, TokIter end) {
       auto ctor = makeNode<ast::FuncDecl>(
           ctorPos.first, pos[body->getID()].second,
           std::shared_ptr<ast::Type>(nullptr),
-          makeNode<ast::Identifier>(ctorPos.first, ctorPos.second,
-                                    "_ctor_" + ident->val),
+          makeNode<ast::Identifier>(ctorPos.first, ctorPos.second, "_ctor_"),
           std::vector<std::shared_ptr<ast::VarDeclStmt>>(), body);
       members.emplace_back(ctor);
       continue;

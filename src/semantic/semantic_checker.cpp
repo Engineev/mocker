@@ -200,6 +200,7 @@ public:
   }
 
   void operator()(ast::FuncCallExpr &node) const override {
+    visit(node.identifier);
     std::shared_ptr<ast::FuncDecl> funcDecl;
     bool isCtor = false;
     if (node.instance) { // is member functional call
@@ -229,8 +230,7 @@ public:
       if (auto ptr =
               std::dynamic_pointer_cast<ast::ClassDecl>(decl)) { // is ctor
         funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-            ctx.syms.lookUp(ctx.scopeIntroduced[ptr->getID()],
-                            "_ctor_" + ptr->identifier->val));
+            ctx.syms.lookUp(ctx.scopeIntroduced[ptr->getID()], "_ctor_"));
         isCtor = true;
         auto tmp = std::make_shared<ast::UserDefinedType>(ptr->identifier);
         pos[tmp->getID()] = pos[ptr->getID()];
@@ -366,13 +366,14 @@ public:
   }
 
   void operator()(ast::ClassDecl &node) const override {
+    auto scopeIntroduced = ctx.scopeIntroduced[node.getID()];
     for (auto &member : node.members) {
       if (auto ptr = std::dynamic_pointer_cast<ast::VarDecl>(member)) {
         visit(ptr->decl->identifier);
         checkVarDecl(*ptr->decl);
         continue;
       }
-      visit(member, ctx.scopeIntroduced[node.getID()]);
+      visit(member, scopeIntroduced);
     }
   }
 
@@ -472,12 +473,14 @@ void SemanticChecker::check() {
       if (p && std::dynamic_pointer_cast<ast::FuncDecl>(p))
         throw CompileError(pos.at(classDecl->getID()));
 
-      std::string ctorIdent = "_ctor_" + classDecl->identifier->val;
+      std::string ctorIdent = "_ctor_";
       if (!ctx.syms.lookUp(ClassScope, ctorIdent)) {
-        ctx.syms.addSymbol(ClassScope, ctorIdent,
-                           std::make_shared<ast::FuncDecl>(
-                               nullptr, mk_ast::ident(ctorIdent),
-                               mk_ast::emptyParams(), mk_ast::body()));
+        auto ctor = std::make_shared<ast::FuncDecl>(
+            nullptr, mk_ast::ident(ctorIdent), mk_ast::emptyParams(),
+            std::make_shared<ast::CompoundStmt>(
+                std::vector<std::shared_ptr<ast::Statement>>()));
+        ctx.syms.addSymbol(ClassScope, ctorIdent, ctor);
+        classDecl->members.emplace_back(ctor);
       }
     }
   }
@@ -609,6 +612,10 @@ void SemanticChecker::renameIdentifiers() {
         visit(node.rhs);
     }
     void operator()(ast::FuncCallExpr &node) const override {
+      auto funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
+          ctx.syms.lookUp(ctx.scopeResiding.at(node.identifier->getID()),
+                          node.identifier->val));
+      node.identifier->val = funcDecl->identifier->val;
       for (auto &arg : node.args)
         visit(arg);
     }
@@ -652,13 +659,17 @@ void SemanticChecker::renameIdentifiers() {
       visit(node.body);
     }
     void operator()(ast::ClassDecl &node) const override {
+      for (auto &member : node.members)
+        if (auto p = std::dynamic_pointer_cast<ast::FuncDecl>(member))
+          renameMemberFunc(*p, node.identifier->val);
+
       std::vector<std::shared_ptr<ast::VarDecl>> memberVars;
       for (auto &member : node.members)
         if (auto p = std::dynamic_pointer_cast<ast::VarDecl>(member))
           memberVars.emplace_back(std::move(p));
 
       for (auto &var : memberVars)
-        renameMemberVar(*var);
+        renameMemberVar(*var, node.identifier->val);
       for (auto &var : memberVars)
         if (var->decl->initExpr)
           visit(var->decl->initExpr);
@@ -698,15 +709,22 @@ void SemanticChecker::renameIdentifiers() {
       node.decl->identifier->val = "@" + oldIdent;
     }
 
-    void renameMemberVar(ast::VarDecl &node) const {
+    void renameMemberVar(ast::VarDecl &node,
+                         const std::string &className) const {
       auto oldIdent = node.decl->identifier->val;
-      node.decl->identifier->val = "#" + oldIdent;
+      node.decl->identifier->val = "#" + className + "#" + oldIdent;
     }
 
     void renameLocalVar(ast::VarDeclStmt &node) const {
       auto scopeInfo = ctx.scopeResiding.at(node.identifier->getID()).fmt();
       assert(scopeInfo.find('_') == std::string::npos);
       node.identifier->val = scopeInfo + '_' + node.identifier->val;
+    }
+
+    void renameMemberFunc(ast::FuncDecl &node,
+                          const std::string &className) const {
+      auto oldIdent = node.identifier->val;
+      node.identifier->val = "#" + className + "#" + oldIdent;
     }
 
     const SemanticContext &ctx;
