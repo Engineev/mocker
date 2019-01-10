@@ -8,6 +8,12 @@ set(HEADERS
   common/position.h
   common/error.h
 
+  ir/builder.h
+  ir/builder_context.h
+  ir/ir_inst.h
+  ir/module.h
+  ir/printer.h
+
   parse/lexer.h
   parse/parser.h
   parse/token.h
@@ -23,6 +29,11 @@ set(HEADERS
   compiler.h
 )
 set(LIB_SOURCES
+  ir/builder.cpp
+  ir/builder_context.cpp
+  ir/module.cpp
+  ir/printer.cpp
+
   parse/lexer.cpp
   parse/parser.cpp
   parse/token.cpp

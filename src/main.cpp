@@ -7,13 +7,16 @@
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
 #include "semantic/sym_tbl.h"
+#include "ir/builder.h"
+#include "ir/builder_context.h"
+#include "ir/printer.h"
 
 int main(int argc, char **argv) {
   using namespace mocker;
 
-  std::string path = argv[1];
-  //  std::string path = std::string(CMAKE_SOURCE_DIR) + "/test/test_src.txt";
-  //  std::string path = std::string(CMAKE_SOURCE_DIR) + "/program.in";
+//  std::string path = argv[1];
+//  std::string path = std::string(CMAKE_SOURCE_DIR) + "/test/test_src.txt";
+  std::string path = std::string(CMAKE_SOURCE_DIR) + "/program.in";
 
   std::ifstream fin(path);
   std::stringstream sstr;
@@ -31,6 +34,12 @@ int main(int argc, char **argv) {
   assert(root);
   SemanticChecker semantic(root, pos);
   semantic.check();
+  semantic.renameIdentifiers();
+
+  ir::BuilderContext IRCtx;
+  IRCtx.setExprType(semantic.getExprType());
+  root->accept(ir::Builder(IRCtx));
+  ir::Printer(IRCtx.getResult())();
 
   return 0;
 }
