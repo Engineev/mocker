@@ -224,6 +224,8 @@ public:
         assert(classDecl);
         funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
             ctx.scopeIntroduced[classDecl->getID()], node.identifier->val));
+        ctx.scopeResiding[node.identifier->getID()] =
+            ctx.scopeIntroduced[classDecl->getID()];
       }
     } else { // is not member function call
       auto decl = ctx.syms.lookUp(scopeResiding, node.identifier->val);
@@ -612,12 +614,31 @@ void SemanticChecker::renameIdentifiers() {
         visit(node.rhs);
     }
     void operator()(ast::FuncCallExpr &node) const override {
+      for (auto &arg : node.args)
+        visit(arg);
+      if (!node.instance) // free functions
+        return;
+
+      auto &ident = node.identifier->val;
+
+      if (auto p = std::dynamic_pointer_cast<ast::ArrayType>(
+              ctx.exprType.at(node.instance->getID()))) {
+        assert(ident == "size");
+        ident = "#_array_#size";
+        return;
+      }
+      if (auto p = std::dynamic_pointer_cast<ast::BuiltinType>(
+              ctx.exprType.at(node.instance->getID()))) {
+        assert(p->type == ast::BuiltinType::String);
+        ident = "#string#" + ident;
+        return;
+      }
+
       auto funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
           ctx.syms.lookUp(ctx.scopeResiding.at(node.identifier->getID()),
                           node.identifier->val));
-      node.identifier->val = funcDecl->identifier->val;
-      for (auto &arg : node.args)
-        visit(arg);
+      assert(funcDecl);
+      ident = funcDecl->identifier->val;
     }
     void operator()(ast::VarDeclStmt &node) const override {
       renameLocalVar(node);
