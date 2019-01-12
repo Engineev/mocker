@@ -48,8 +48,8 @@ public:
   FunctionModule(std::string identifier, std::vector<std::string> args,
                  bool isExternal = false);
 
-  FunctionModule(FunctionModule &&) noexcept = default;
-  FunctionModule &operator=(FunctionModule &&) noexcept = default;
+  FunctionModule(FunctionModule &&) = default;
+  FunctionModule &operator=(FunctionModule &&) = default;
 
   BBLIter pushBackBB();
 
