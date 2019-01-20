@@ -618,6 +618,7 @@ void SemanticChecker::renameIdentifiers() {
         visit(arg);
       if (!node.instance) // free functions
         return;
+      visit(node.instance);
 
       auto &ident = node.identifier->val;
 
@@ -639,6 +640,10 @@ void SemanticChecker::renameIdentifiers() {
                           node.identifier->val));
       assert(funcDecl);
       ident = funcDecl->identifier->val;
+    }
+    void operator()(ast::NewExpr &node) const override {
+      for (auto & exp : node.providedDims)
+        visit(exp);
     }
     void operator()(ast::VarDeclStmt &node) const override {
       renameLocalVar(node);
