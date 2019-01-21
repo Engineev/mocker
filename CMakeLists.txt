@@ -1,16 +1,7 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(mocker)
 
-set(CMAKE_CXX_STANDARD 14)
+add_subdirectory(support)
+add_subdirectory(ir)
+add_subdirectory(compiler)
 
-if (UNIX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -o2 -Wall")
-endif ()
-
-add_definitions(
-  -DCMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
-  -DDISABLE_FORWARD_REFERENCE_FOR_GLOBAL_VAR
-)
-
-add_subdirectory(src)
-add_subdirectory(test)
