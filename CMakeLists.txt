@@ -4,4 +4,4 @@ project(mocker)
 add_subdirectory(support)
 add_subdirectory(ir)
 add_subdirectory(compiler)
-
+add_subdirectory(ir-interpreter)
