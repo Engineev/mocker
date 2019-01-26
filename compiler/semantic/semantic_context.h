@@ -27,6 +27,8 @@ struct SemanticContext {
   std::unordered_set<ast::NodeID> leftValue;
   std::unordered_map<ast::NodeID, ScopeID> scopeIntroduced;
   std::unordered_map<ast::NodeID, ScopeID> scopeResiding;
+  std::unordered_map<ast::NodeID, std::shared_ptr<ast::Declaration>>
+      associatedDecl;
 };
 
 } // namespace mocker
