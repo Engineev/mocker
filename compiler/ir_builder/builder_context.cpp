@@ -29,12 +29,6 @@ void BuilderContext::appendInst(BBLIter bblIter, std::shared_ptr<IRInst> inst) {
   bblIter->appendInst(std::move(inst));
 }
 
-void BuilderContext::appendInst(const std::string &funcName,
-                                std::shared_ptr<IRInst> inst) {
-  auto &func = module.funcs.at(funcName);
-  func.insertAtBeginning(std::move(inst));
-}
-
 void BuilderContext::setCurBasicBlock(BBLIter val) { curBasicBlock = val; }
 
 BBLIter BuilderContext::getCurBasicBlock() const { return curBasicBlock; }
@@ -91,9 +85,9 @@ BuilderContext::getExprType(ast::NodeID id) const {
   return exprType.at(id);
 }
 
-void BuilderContext::initFuncCtx() {
+void BuilderContext::initFuncCtx(std::size_t paramNum) {
   assert(loopEntry.empty());
-  tempRegCounter = 0;
+  tempRegCounter = paramNum;
   curBasicBlock = BBLIter();
 
   exprAddr.clear();
@@ -102,20 +96,47 @@ void BuilderContext::initFuncCtx() {
 
 std::shared_ptr<GlobalReg>
 BuilderContext::addStringLiteral(const std::string &literal) {
+  // Note that what we store is a string object, i.e., length + content, instead
+  // of the literal itself.
+
   auto iter = strLits.find(literal);
   if (iter != strLits.end())
     return iter->second;
 
-  auto ident = "@_strlit_" + std::to_string(strLitCounter);
-  module.globalVars.emplace_back(ident, literal.size(), literal);
-  auto reg = std::make_shared<GlobalReg>(std::move(ident));
-  strLits.emplace(literal, reg);
-  return reg;
+  // !!! The member version must be hidden here
+  std::size_t tempRegCounter = 0;
+  auto makeTempLocalReg = [&tempRegCounter](std::string hint) {
+    return std::make_shared<LocalReg>(hint + std::to_string(tempRegCounter++));
+  };
+
+  auto ident = "@_strlit_" + std::to_string(strLitCounter++);
+
+  GlobalVarModule var(ident);
+
+  // init
+  auto strInstPtrPtr = std::make_shared<GlobalReg>(ident);
+  var.emplaceInst<SAlloc>(strInstPtrPtr, 8);
+  auto strInstPtr = makeTempLocalReg("strInstPtr");
+  var.emplaceInst<Malloc>(strInstPtr, std::make_shared<IntLiteral>(16));
+  var.emplaceInst<Store>(strInstPtrPtr, strInstPtr);
+
+  auto litLen = std::make_shared<IntLiteral>(literal.length());
+  var.emplaceInst<Store>(strInstPtr, litLen);
+  auto contentPtr = makeTempLocalReg("contentPtr");
+  var.emplaceInst<Malloc>(contentPtr, litLen);
+  auto contentPtrPtr = makeTempLocalReg("contentPtrPtr");
+  var.emplaceInst<ArithBinaryInst>(contentPtrPtr, ArithBinaryInst::Add,
+                                   strInstPtr, std::make_shared<IntLiteral>(8));
+  var.emplaceInst<Store>(contentPtrPtr, contentPtr);
+  var.emplaceInst<StrCpy>(contentPtr, literal);
+
+  module.globalVars.emplace_back(std::move(var));
+  strLits.emplace(literal, strInstPtrPtr);
+  return strInstPtrPtr;
 }
 
-void BuilderContext::addGlobalVar(std::string identifier, size_t size,
-                                  std::string data) {
-  module.globalVars.emplace_back(std::move(identifier), size, std::move(data));
+void BuilderContext::addGlobalVar(GlobalVarModule var) {
+  module.globalVars.emplace_back(std::move(var));
 }
 
 } // namespace ir

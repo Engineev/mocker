@@ -1,6 +1,7 @@
 #include "printer.h"
 
 #include <cassert>
+#include <sstream>
 
 #include "small_map.h"
 
@@ -33,6 +34,9 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
   }
   if (auto p = std::dynamic_pointer_cast<Malloc>(inst)) {
     return fmtAddr(p->dest) + " = malloc " + fmtAddr(p->size);
+  }
+  if (auto p = std::dynamic_pointer_cast<SAlloc>(inst)) {
+    return fmtAddr(p->dest) + " = salloc " + std::to_string(p->size);
   }
   if (auto p = std::dynamic_pointer_cast<Store>(inst)) {
     return "store " + fmtAddr(p->dest) + " " + fmtAddr(p->operand);
@@ -81,10 +85,29 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
       res += " " + fmtAddr(addr);
     return res;
   }
+  if (auto p = std::dynamic_pointer_cast<StrCpy>(inst)) {
+    std::string fmtStr;
+    for (auto &ch : p->data) {
+      if (ch == '\n') {
+        fmtStr += "\\n";
+        continue;
+      }
+      if (ch == '\\') {
+        fmtStr += "\\\\";
+        continue;
+      }
+      if (ch == '\"') {
+        fmtStr += "\\\"";
+        continue;
+      }
+      fmtStr.push_back(ch);
+    }
+    return "strcpy " + fmtAddr(p->dest) + " \"" + fmtStr + "\"";
+  }
   if (auto p = std::dynamic_pointer_cast<Phi>(inst)) {
     std::string res = fmtAddr(p->dest) + " = phi ";
     for (auto &kv : p->options)
-      res += "[" + fmtAddr(kv.first) + ", " + fmtAddr(kv.second) + "] ";
+      res += "[ " + fmtAddr(kv.first) + " " + fmtAddr(kv.second) + " ] ";
     return res;
   }
   if (auto p = std::dynamic_pointer_cast<RelationInst>(inst)) {
@@ -98,17 +121,25 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
   assert(false);
 }
 
+std::string fmtGlobalVarDef(const GlobalVarModule &var) {
+  std::string res;
+  res += var.getIdentifier() + " = {\n";
+  for (auto &inst : var.getInit()) {
+    res += "  " + fmtInst(inst) + "\n";
+  }
+  res += "}\n";
+  return res;
+}
+
 void Printer::operator()(bool printExternal) const {
   for (auto &var : module.globalVars) {
-    std::cout << var.getIdentifier() << "[" << var.getSize() << "]";
-    std::cout << " = r\"" << var.getData() << "\"\n";
+    out << fmtGlobalVarDef(var) << std::endl;
   }
-  std::cout << std::endl;
 
   for (auto &kv : module.funcs) {
     if (printExternal || !kv.second.isExternalFunc()) {
       printFunc(kv.first, kv.second);
-      std::cout << std::endl;
+      out << std::endl;
     }
   }
 }
@@ -117,20 +148,20 @@ void Printer::printFunc(const std::string &name,
                         const FunctionModule &func) const {
   std::string attachedComment;
 
-  std::cout << "define " << name << "(";
+  out << "define " << name << " ( ";
   for (std::size_t i = 0; i < func.getArgs().size(); ++i) {
     if (i != 0)
-      std::cout << ", ";
-    std::cout << func.getArgs()[i];
+      out << " ";
+    out << func.getArgs()[i];
   }
-  std::cout << ")";
+  out << " )";
   if (func.isExternalFunc()) {
-    std::cout << " external\n";
+    out << " external\n";
     return;
   }
-  std::cout << " {\n";
+  out << " {\n";
   for (const auto &bb : func.getBBs()) {
-    std::cout << "<" << bb.getLabelID() << ">:\n";
+    out << "<" << bb.getLabelID() << ">:\n";
     for (const auto &inst : bb.getInsts()) {
       if (auto p = std::dynamic_pointer_cast<AttachedComment>(inst)) {
         attachedComment = p->str;
@@ -141,11 +172,12 @@ void Printer::printFunc(const std::string &name,
                  (attachedComment.empty() ? "" : "  ; " + attachedComment);
       attachedComment.clear();
       if (str.at(0) != ';')
-        std::cout << "  ";
-      std::cout << str << "\n";
+        out << "  ";
+      out << str << "\n";
     }
   }
-  std::cout << "}" << std::endl;
+  out << "}" << std::endl;
 }
+
 } // namespace ir
 } // namespace mocker

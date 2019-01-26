@@ -97,9 +97,13 @@ private:
     return (bool)type && type->type == ast::BuiltinType::String;
   }
 
-  // If [exp] is a left value, then return its memory address.
+  // The behavior is undefined if [exp] is not an left value.
+  // Return a register containing the address of the expression. If the
+  // expression is of type bool or int, then it is just the address of the
+  // value. For other cases, it is the address of the pointer pointing to the
+  // actual instance.
   std::shared_ptr<Addr>
-  getElementPtr(const std::shared_ptr<ast::Expression> &exp) const;
+  getElementPtr(const std::shared_ptr<ast::ASTNode> &exp) const;
 
   std::pair<std::string, std::string>
   splitMemberVarIdent(const std::string &ident) const;
@@ -115,6 +119,8 @@ private:
 
   void addBuiltinAndExternal() const;
 
+  void addGlobalVariable(const std::shared_ptr<ast::VarDecl> &decl) const;
+
 private:
   std::shared_ptr<LocalReg>
   getMemberElementPtr(const std::shared_ptr<Addr> &base,
@@ -123,7 +129,7 @@ private:
 
   std::shared_ptr<Addr> makeReg(std::string identifier) const;
 
-  std::shared_ptr<Addr>
+  std::shared_ptr<Addr> /* contains the pointer to the actual instance */
   makeNewNonarray(const std::shared_ptr<ast::Type> &type) const;
 
   std::shared_ptr<Addr> makeILit(Integer val) const;

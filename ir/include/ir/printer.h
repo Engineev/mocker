@@ -13,16 +13,20 @@ std::string fmtAddr(const std::shared_ptr<Addr> &addr);
 
 std::string fmtInst(const std::shared_ptr<IRInst> &inst);
 
+std::string fmtGlobalVarDef(const GlobalVarModule &var);
+
 class Printer {
 public:
-  explicit Printer(const Module &module) : module(module) {}
+  explicit Printer(const Module &module, std::ostream &out = std::cout)
+      : module(module), out(out) {}
 
-  void operator()(bool printExternal = false) const;
+  void operator()(bool printExternal = true) const;
 
 private:
   void printFunc(const std::string &name, const FunctionModule &func) const;
 
   const Module &module;
+  std::ostream &out;
 };
 
 } // namespace ir

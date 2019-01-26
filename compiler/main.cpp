@@ -1,4 +1,5 @@
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 
@@ -14,9 +15,9 @@
 int main(int argc, char **argv) {
   using namespace mocker;
 
-  //  std::string path = argv[1];
+  std::string path = argv[1];
   //  std::string path = std::string(CMAKE_SOURCE_DIR) + "/test/test_src.txt";
-  std::string path = std::string(CMAKE_SOURCE_DIR) + "/program.in";
+  //  std::string path = std::string(CMAKE_SOURCE_DIR) + "/program.in";
 
   std::ifstream fin(path);
   std::stringstream sstr;
@@ -39,7 +40,14 @@ int main(int argc, char **argv) {
   ir::BuilderContext IRCtx;
   IRCtx.setExprType(semantic.getExprType());
   root->accept(ir::Builder(IRCtx));
-  ir::Printer(IRCtx.getResult())();
+
+  if (argc == 3) {
+    std::string irPath = argv[2];
+    std::ofstream dumpIR(irPath);
+    ir::Printer(IRCtx.getResult(), dumpIR)();
+  } else {
+    ir::Printer(IRCtx.getResult())();
+  }
 
   return 0;
 }

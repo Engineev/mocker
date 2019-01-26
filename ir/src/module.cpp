@@ -42,9 +42,5 @@ BBLIter FunctionModule::insertBBAfter(BBLIter iter) {
   return bbs.emplace(iter, *this, bbsSz++);
 }
 
-void FunctionModule::insertAtBeginning(std::shared_ptr<IRInst> inst) {
-  bbs.front().appendFront(std::move(inst));
-}
-
 } // namespace ir
 } // namespace mocker

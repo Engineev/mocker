@@ -55,8 +55,6 @@ public:
 
   BBLIter insertBBAfter(BBLIter iter);
 
-  void insertAtBeginning(std::shared_ptr<IRInst> inst);
-
   const std::vector<std::string> &getArgs() const { return args; }
 
   const BasicBlockList &getBBs() const { return bbs; }
@@ -75,19 +73,21 @@ private:
 
 class GlobalVarModule {
 public:
-  GlobalVarModule(std::string identifier, size_t size, std::string data = "")
-      : identifier(std::move(identifier)), size(size), data(std::move(data)) {}
+  explicit GlobalVarModule(std::string identifier)
+      : identifier(std::move(identifier)) {}
 
   const std::string &getIdentifier() const { return identifier; }
 
-  const std::size_t getSize() const { return size; }
+  template <class InstType, class... Args> void emplaceInst(Args &&... args) {
+    auto inst = std::make_shared<InstType>(std::forward<Args>(args)...);
+    init.emplace_back(std::move(inst));
+  }
 
-  const std::string &getData() const { return data; }
+  const InstList &getInit() const { return init; }
 
 private:
   std::string identifier;
-  std::size_t size;
-  std::string data;
+  InstList init;
 };
 
 struct Module {

@@ -17,8 +17,10 @@ void Builder::operator()(const ast::BoolLitExpr &node) const {
 }
 
 void Builder::operator()(const ast::StringLitExpr &node) const {
-  auto addr = ctx.addStringLiteral(node.val);
-  ctx.setExprAddr(node.getID(), std::move(addr));
+  auto globalReg = ctx.addStringLiteral(node.val);
+  auto res = ctx.makeTempLocalReg();
+  ctx.emplaceInst<Load>(res, globalReg);
+  ctx.setExprAddr(node.getID(), res);
 }
 
 void Builder::operator()(const ast::NullLitExpr &node) const {
@@ -26,16 +28,9 @@ void Builder::operator()(const ast::NullLitExpr &node) const {
 }
 
 void Builder::operator()(const ast::IdentifierExpr &node) const {
-  auto ty = ctx.getExprType(node.getID());
-  if (isIntTy(ty) || isBoolTy(ty)) {
-    auto dest = ctx.makeTempLocalReg();
-    ctx.setExprAddr(node.getID(), dest);
-    ctx.emplaceInst<Load>(dest, makeReg(node.identifier->val));
-    return;
-  }
-
-  auto addr = makeReg(node.identifier->val);
-  ctx.setExprAddr(node.getID(), std::move(addr));
+  auto dest = ctx.makeTempLocalReg();
+  ctx.setExprAddr(node.getID(), dest);
+  ctx.emplaceInst<Load>(dest, makeReg(node.identifier->val));
 }
 
 void Builder::operator()(const ast::UnaryExpr &node) const {
@@ -95,9 +90,9 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
       node.op == ast::BinaryExpr::Member) {
     auto addr = getElementPtr(std::static_pointer_cast<ast::Expression>(
         const_cast<ast::BinaryExpr &>(node).shared_from_this()));
-    auto val = ctx.makeTempLocalReg();
+    auto val = ctx.makeTempLocalReg("valOrInstPtr");
+    ctx.emplaceInst<Load>(val, addr);
     ctx.setExprAddr(node.getID(), val);
-    ctx.emplaceInst<Load>(addr, val);
     return;
   }
   // Eq, Ne, Lt, Gt, Le, Ge,
@@ -108,44 +103,48 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
     ctx.setExprAddr(node.getID(), val);
 
     visit(*node.lhs);
-    auto lhs = ctx.makeTempLocalReg("lhsV");
-    ctx.emplaceInst<Load>(lhs, ctx.getExprAddr(node.lhs->getID()));
+    auto lhs = ctx.getExprAddr(node.lhs->getID());
     visit(*node.rhs);
-    auto rhs = ctx.makeTempLocalReg("rhsV");
-    ctx.emplaceInst<Load>(rhs, ctx.getExprAddr(node.rhs->getID()));
-
+    auto rhs = ctx.getExprAddr(node.rhs->getID());
     ctx.emplaceInst<RelationInst>(val, op, lhs, rhs);
     return;
   }
-  if (node.op == ast::BinaryExpr::LogicalOr ||
-      node.op == ast::BinaryExpr::LogicalAnd) {
+  if (node.op == ast::BinaryExpr::LogicalAnd ||
+      node.op == ast::BinaryExpr::LogicalOr) {
     auto originBB = ctx.getCurBasicBlock();
     auto originLabel = getBBLabel(originBB);
     FunctionModule &func = originBB->getFuncRef();
 
-    auto rhsBB = func.insertBBAfter(originBB);
-    auto rhsLabel = getBBLabel(rhsBB);
-    auto successorBB = func.insertBBAfter(rhsBB);
+    auto rhsFirstBB = func.insertBBAfter(originBB);
+    auto rhsFirstLabel = getBBLabel(rhsFirstBB);
+    auto successorBB = func.insertBBAfter(rhsFirstBB);
     auto successorLabel = getBBLabel(successorBB);
 
     visit(*node.lhs);
-    // lhsBranch
-    ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()), successorLabel,
-                            rhsLabel);
-    ctx.setCurBasicBlock(rhsBB);
+    auto lhsLastBB = ctx.getCurBasicBlock();
+    if (node.op == ast::BinaryExpr::LogicalAnd) {
+      ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()), rhsFirstLabel,
+                              successorLabel);
+    } else {
+      ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()),
+                              successorLabel, rhsFirstLabel);
+    }
+
+    ctx.setCurBasicBlock(rhsFirstBB);
     visit(*node.rhs);
-    auto rhsVal = ctx.getExprAddr(node.rhs->getID());
-    ctx.emplaceInst<Jump>(successorLabel); // rhsJump
+    auto rhsLastBB = ctx.getCurBasicBlock();
+    ctx.emplaceInst<Jump>(successorLabel);
 
     ctx.setCurBasicBlock(successorBB);
-    // phi
     auto val = ctx.makeTempLocalReg("v");
     ctx.setExprAddr(node.getID(), val);
     auto boolLit = std::make_shared<IntLiteral>(
         (Integer)(node.op == ast::BinaryExpr::LogicalOr));
     std::vector<std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>>
-        phiOptions = {std::make_pair(boolLit, originLabel),
-                      std::make_pair(rhsVal, rhsLabel)};
+        phiOptions = {std::make_pair(boolLit, getBBLabel(lhsLastBB)),
+                      std::make_pair(ctx.getExprAddr(node.rhs->getID()),
+                                     getBBLabel(rhsLastBB))};
+
     ctx.emplaceInst<Phi>(val, std::move(phiOptions));
     return;
   }
@@ -188,6 +187,10 @@ void Builder::operator()(const ast::FuncCallExpr &node) const {
   std::string funcName = node.identifier->val;
 
   std::vector<std::shared_ptr<Addr>> args;
+  if (funcName.at(0) == '#') {
+    visit(*node.instance);
+    args.emplace_back(ctx.getExprAddr(node.instance->getID()));
+  }
   for (auto &arg : node.args) {
     visit(*arg);
     args.emplace_back(ctx.getExprAddr(arg->getID()));
@@ -204,6 +207,7 @@ void Builder::operator()(const ast::NewExpr &node) const {
   if (!p) {
     auto instancePtr = makeNewNonarray(node.type);
     ctx.setExprAddr(node.getID(), instancePtr);
+    return;
   }
   std::queue<std::shared_ptr<Addr>> providedSize;
   for (auto &exp : node.providedDims) {
@@ -219,12 +223,15 @@ void Builder::operator()(const ast::VarDeclStmt &node) const {
   auto valPtr = makeReg(name);
   ctx.emplaceInst<Alloca>(valPtr, 8);
 
-  if (!node.initExpr || isNullTy(ctx.getExprType(node.initExpr->getID())))
+  if (node.initExpr && !isNullTy(ctx.getExprType(node.initExpr->getID()))) {
+    visit(*node.initExpr);
+    ctx.emplaceInst<Store>(makeReg(name),
+                           ctx.getExprAddr(node.initExpr->getID()));
     return;
-
-  visit(*node.initExpr);
-  ctx.emplaceInst<Store>(makeReg(name),
-                         ctx.getExprAddr(node.initExpr->getID()));
+  }
+  if (isBoolTy(node.type) || isIntTy(node.type))
+    return;
+  ctx.emplaceInst<Store>(makeReg(name), makeReg("@null"));
 }
 
 void Builder::operator()(const ast::ExprStmt &node) const { visit(*node.expr); }
@@ -320,8 +327,20 @@ void Builder::operator()(const ast::FuncDecl &node) const {
 
   auto &func =
       ctx.addFunc(FunctionModule(node.identifier->val, std::move(paramIdent)));
-  ctx.initFuncCtx();
+  ctx.initFuncCtx(node.formalParameters.size());
   ctx.setCurBasicBlock(func.pushBackBB());
+
+  if (isMember) {
+    auto reg = makeReg("this");
+    ctx.emplaceInst<Alloca>(reg, 8);
+    ctx.emplaceInst<Store>(reg, makeReg("0"));
+  }
+  for (std::size_t i = 0; i < node.formalParameters.size(); ++i) {
+    auto name = node.formalParameters[i]->identifier->val;
+    auto reg = makeReg(name);
+    ctx.emplaceInst<Alloca>(reg, 8);
+    ctx.emplaceInst<Store>(reg, makeReg(std::to_string(i + isMember)));
+  }
 
   for (auto &p : node.body->stmts)
     visit(*p);
@@ -347,7 +366,7 @@ void Builder::operator()(const ast::ASTRoot &node) const {
   for (auto &decl : node.decls) {
     if (auto p = std::dynamic_pointer_cast<ast::VarDecl>(decl)) {
       auto type = p->decl->type;
-      ctx.addGlobalVar(p->decl->identifier->val, 8);
+      addGlobalVariable(p);
     }
   }
 
@@ -355,20 +374,6 @@ void Builder::operator()(const ast::ASTRoot &node) const {
     if (!std::dynamic_pointer_cast<ast::VarDecl>(decl))
       visit(*decl);
   }
-
-  std::string initializerName = "_initGlobalVars_";
-  auto &func = ctx.addFunc(FunctionModule(initializerName, {}));
-  ctx.initFuncCtx();
-  ctx.setCurBasicBlock(func.pushBackBB());
-  for (auto &decl : node.decls) {
-    if (auto p = std::dynamic_pointer_cast<ast::VarDecl>(decl)) {
-      if (p->decl->initExpr)
-        visit(*p->decl->initExpr);
-    }
-  }
-  ctx.emplaceInst<Ret>();
-  auto initGlobal = std::make_shared<Call>(initializerName);
-  ctx.appendInst("main", initGlobal);
 }
 
 } // namespace ir
@@ -396,10 +401,16 @@ Builder::getBBLabel(BasicBlockList::const_iterator bb) const {
 }
 
 std::shared_ptr<Addr>
-Builder::getElementPtr(const std::shared_ptr<ast::Expression> &exp) const {
+Builder::getElementPtr(const std::shared_ptr<ast::ASTNode> &exp) const {
+  // identifier
+  if (auto p = std::dynamic_pointer_cast<ast::Identifier>(exp)) {
+    return makeReg(p->val);
+  }
+  // identifier expr
   if (auto p = std::dynamic_pointer_cast<ast::IdentifierExpr>(exp)) {
     return makeReg(p->identifier->val);
   }
+  // ++ or --
   if (auto p = std::dynamic_pointer_cast<ast::UnaryExpr>(exp)) {
     assert(p->op == ast::UnaryExpr::PreInc || p->op == ast::UnaryExpr::PreDec);
     return getElementPtr(p->operand);
@@ -407,6 +418,7 @@ Builder::getElementPtr(const std::shared_ptr<ast::Expression> &exp) const {
   auto p = std::dynamic_pointer_cast<ast::BinaryExpr>(exp);
   assert(p);
   visit(*p->lhs);
+  // member
   if (p->op == ast::BinaryExpr::Member) {
     auto basePtr = ctx.getExprAddr(p->lhs->getID());
     auto className = std::dynamic_pointer_cast<ast::UserDefinedType>(
@@ -417,18 +429,27 @@ Builder::getElementPtr(const std::shared_ptr<ast::Expression> &exp) const {
     auto elementPtr = getMemberElementPtr(basePtr, className, varName);
     return elementPtr;
   }
+  // subscript
   if (p->op == ast::BinaryExpr::Subscript) {
+    ctx.emplaceInst<Comment>("get element ptr: subscript");
     visit(*p->rhs);
-    auto arrayBasePtr = ctx.makeTempLocalReg();
-    // calcBassePtr
-    ctx.emplaceInst<ArithBinaryInst>(arrayBasePtr, ArithBinaryInst::OpType::Add,
-                                     ctx.getExprAddr(p->lhs->getID()),
-                                     std::make_shared<IntLiteral>((Integer)8));
-    auto offset = ctx.getExprAddr(p->rhs->getID());
-    auto address = ctx.makeTempLocalReg("ptr");
-    ctx.emplaceInst<ArithBinaryInst>(address, ArithBinaryInst::OpType::Add,
-                                     arrayBasePtr, offset);
-    return address;
+
+    auto arrayInstPtr = ctx.getExprAddr(p->lhs->getID());
+    auto contentPtrPtr = ctx.makeTempLocalReg("contentPtrPtr");
+    ctx.emplaceInst<ArithBinaryInst>(contentPtrPtr, ArithBinaryInst::Add,
+                                     arrayInstPtr, makeILit(8));
+    auto contentPtr = ctx.makeTempLocalReg("contentPtr");
+    ctx.emplaceInst<Load>(contentPtr, contentPtrPtr);
+
+    auto idx = ctx.getExprAddr(p->rhs->getID());
+    auto offset = ctx.makeTempLocalReg("offset");
+    ctx.emplaceInst<ArithBinaryInst>(offset, ArithBinaryInst::Mul, idx,
+                                     makeILit(8));
+    auto addr = ctx.makeTempLocalReg("elementPtr");
+    ctx.emplaceInst<ArithBinaryInst>(addr, ArithBinaryInst::Add, contentPtr,
+                                     offset);
+    ctx.emplaceInst<Comment>("");
+    return addr;
   }
   assert(false);
 }
@@ -447,6 +468,9 @@ void Builder::translateLoop(
     const std::shared_ptr<ast::Expression> &condition,
     const std::shared_ptr<ast::Statement> &body,
     const std::shared_ptr<ast::Expression> &update) const {
+  ctx.emplaceInst<Comment>("loop");
+  auto defer = std::shared_ptr<void>(
+      nullptr, [&](void *) { ctx.emplaceInst<Comment>(""); });
   auto originBB = ctx.getCurBasicBlock();
   FunctionModule &func = originBB->getFuncRef();
 
@@ -493,43 +517,95 @@ void Builder::translateLoop(
 std::shared_ptr<Addr> Builder::translateNewArray(
     const std::shared_ptr<ast::Type> &rawCurType,
     std::queue<std::shared_ptr<Addr>> &sizeProvided) const {
+  // We describe the translation of statements "new T[N]" here. First, note that
+  // the result is a pointer arrayInstPtr, which points to the address of the
+  // array instance. It is stored in a temporary register, which is the return
+  // value of this function. Hence, the first step is
+  //   1. to malloc a piece of memory of length 16 and store the address into
+  //      arrayInstPtr.
+  // Then, we shall construct the array instance. The first thing to do is
+  //   2. to store the length into the first 8 bytes of the instance.
+  // After that, we shall deal with the last 8 bytes, which will store the
+  // address of the head of the content. We shall process as follow.
+  //   3. Calculate the bytes required. Note that this is a java-like language
+  //      instead of a C-like one, so the bytes required are expected to be
+  //      8 * arraySize if we do not treat bool in a different way.
+  //   4. Malloc the memory. The head address will be store in a temporary
+  //      register named contentPtr
+  //   5. Store the contentPtr into the last 8 bytes of the instance
+  // Finally, we initialize each element with a loop. If T is int or bool, then
+  // there is nothing to do. If T is a class (or string), then we shall malloc
+  // each instance and store its address into the corresponding position. To
+  // implement the loop, we first need a temporary variable to store the address
+  // of the current element since our registers are of SSA form, that is, they
+  // can not be assigned more than once. Namely, we shall
+  //  6. alloca a piece of memory for the temporary variable and store the
+  //     address into the register curElementPtrPtr. And store contentPtr into
+  //     the address stored in curElementPtrPtr. (Meanwhile, we shall compute
+  //     the address of the end of the content for later use.)
+  // Then, after finishing the routine of creating basic blocks and labels, we
+  // construct the condition for the loop to end.
+  //   7. Load curElementPtr from the address stored in curElementPtrPtr.
+  //   8. Compare it with contentEndPtr and jump based on the result.
+  // Now, we implement the body of the loop. In fact, what we need to do is just
+  // initialize the current element.
+  //   9. New a element. (See next section for details.)
+  //   10. Store the address into the current element.
+  //   11. Update the loop variable and jump back to the condition basic block.
+  //
+  // In this passage, we handle some details. First, we need to support newing
+  // a jagged array. To achieve this, we let this function to be recursive, that
+  // is, in step 9., if the type of the element is still array, then, instead of
+  // newing a element, we call this function recursively and pass down the
+  // remaining provided sizes.
+  // Note that the number of sizes provided may be less than the dimension of
+  // the array. This case is similar to the int/bool case. We just return after
+  // step 5., leaving the elements uninitialized.
+
   auto curType = std::dynamic_pointer_cast<ast::ArrayType>(rawCurType);
-  if (!curType) {
-    return makeNewNonarray(rawCurType);
-  }
-  auto res = ctx.makeTempLocalReg("p");
-  ctx.emplaceInst<Malloc>(res, makeILit(16)); // mallocArrayInstance
+  assert(curType);
+  auto elementType = curType->baseType;
 
-  // store the size
-  auto size = sizeProvided.front(); // contains the value
+  // 1.
+  auto arrayInstPtr = ctx.makeTempLocalReg("arrayInstPtr");
+  ctx.emplaceInst<Malloc>(arrayInstPtr, makeILit(16));
+
+  // 2.
+  auto size = sizeProvided.front();
   sizeProvided.pop();
-  ctx.emplaceInst<Store>(res, size);
+  ctx.emplaceInst<Store>(arrayInstPtr, size);
 
-  // malloc the content
-  auto elementSize =
-      std::make_shared<IntLiteral>((Integer)getTypeSize(curType->baseType));
+  // 3. ~ 5.
+  //  auto elementSize =
+  //      std::make_shared<IntLiteral>((Integer)getTypeSize(elementType));
   auto memLen = ctx.makeTempLocalReg("memLen");
-  ctx.emplaceInst<ArithBinaryInst>(memLen, ArithBinaryInst::Mul, elementSize,
+  ctx.emplaceInst<AttachedComment>("Calculate the memory needed");
+  ctx.emplaceInst<ArithBinaryInst>(memLen, ArithBinaryInst::Mul, makeILit(8),
                                    size); // calcMemLen
-
   auto contentPtr = ctx.makeTempLocalReg("contentPtr");
   ctx.emplaceInst<Malloc>(contentPtr, memLen); // mallocContent
 
   auto contentPtrPtr = ctx.makeTempLocalReg("contentPtrPtr");
-
   ctx.emplaceInst<ArithBinaryInst>(
-      contentPtrPtr, ArithBinaryInst::Add, res,
+      contentPtrPtr, ArithBinaryInst::Add, arrayInstPtr,
       std::make_shared<IntLiteral>((Integer)8)); // calcContentPtrPtr
   ctx.emplaceInst<Store>(contentPtrPtr, contentPtr);
 
-  // initialize each element via a loop
-  // init
-  if (sizeProvided.empty())
-    return res;
-  auto curElementPtrAddr = ctx.makeTempLocalReg("curElementPtrAddr");
-  ctx.emplaceInst<Alloca>(curElementPtrAddr, 8);
-  ctx.emplaceInst<Store>(curElementPtrAddr, contentPtr); // storeCurElementPtr
-  auto contentEndPtr = ctx.makeTempLocalReg();
+  if (isIntTy(elementType) || isBoolTy(elementType))
+    return arrayInstPtr;
+  if ((bool)std::dynamic_pointer_cast<ast::ArrayType>(elementType) &&
+      sizeProvided.empty())
+    return arrayInstPtr;
+
+  ctx.emplaceInst<Comment>("init the content of array");
+  auto defer = std::shared_ptr<void *>(
+      nullptr, [this](void *) { ctx.emplaceInst<Comment>(""); });
+
+  // 6.
+  auto curElementPtrPtr = ctx.makeTempLocalReg("curElementPtrPtr");
+  ctx.emplaceInst<Alloca>(curElementPtrPtr, 8);
+  ctx.emplaceInst<Store>(curElementPtrPtr, contentPtr);
+  auto contentEndPtr = ctx.makeTempLocalReg("contentEndPtr");
   ctx.emplaceInst<ArithBinaryInst>(contentEndPtr, ArithBinaryInst::Add,
                                    contentPtr, memLen); // calcContentEndPtr
 
@@ -545,28 +621,34 @@ std::shared_ptr<Addr> Builder::translateNewArray(
   auto jump2condition = std::make_shared<Jump>(conditionLabel);
   ctx.appendInst(jump2condition);
 
-  // loop condition
+  // 7.
   ctx.setCurBasicBlock(conditionFirstBB);
-  auto cmpRes = ctx.makeTempLocalReg("v");
-  auto curElementPtr = ctx.makeTempLocalReg();
-  ctx.emplaceInst<Load>(curElementPtr, curElementPtrAddr);
+  auto curElementPtr = ctx.makeTempLocalReg("curElementPtr");
+  ctx.emplaceInst<Load>(curElementPtr, curElementPtrPtr);
+  // 8.
+  auto cmpRes = ctx.makeTempLocalReg("cmpRes");
   ctx.emplaceInst<RelationInst>(cmpRes, RelationInst::Ne, curElementPtr,
                                 contentEndPtr);
   ctx.emplaceInst<Branch>(cmpRes, bodyLabel, successorLabel);
 
-  // body
+  // 9.
   ctx.setCurBasicBlock(bodyFirstBB);
-  auto elementInst = translateNewArray(curType->baseType, sizeProvided);
-  ctx.emplaceInst<Store>(curElementPtr, elementInst); // storeCurElement
-  auto nextElementPtr = ctx.makeTempLocalReg();
+  auto elementInstPtr =
+      (bool)std::dynamic_pointer_cast<ast::ArrayType>(elementType)
+          ? translateNewArray(elementType, sizeProvided)
+          : makeNewNonarray(elementType);
+  // 10.
+  ctx.emplaceInst<Store>(curElementPtr, elementInstPtr);
+  // 11.
+  auto nextElementPtr = ctx.makeTempLocalReg("nextElementPtr");
   ctx.emplaceInst<ArithBinaryInst>(nextElementPtr, ArithBinaryInst::Add,
                                    curElementPtr,
-                                   elementSize); // calcNextElementPtr
-  ctx.emplaceInst<Store>(curElementPtrAddr, nextElementPtr);
+                                   makeILit(8)); // calcNextElementPtr
+  ctx.emplaceInst<Store>(curElementPtrPtr, nextElementPtr);
   ctx.appendInst(jump2condition);
 
   ctx.setCurBasicBlock(successorBB);
-  return res;
+  return arrayInstPtr;
 }
 
 void Builder::addBuiltinAndExternal() const {
@@ -578,7 +660,10 @@ void Builder::addBuiltinAndExternal() const {
   //    ctx.addClassLayout("_array_", std::move(arrayLayout));
 
   // null
-  ctx.addGlobalVar("@null", 8);
+  GlobalVarModule nullModule(std::string("@null"));
+  nullModule.emplaceInst<Malloc>(std::make_shared<GlobalReg>("@null"),
+                                 makeILit(1));
+  ctx.addGlobalVar(std::move(nullModule));
 
   auto add = [this](std::string name, std::vector<std::string> args) {
     ctx.addFunc(FunctionModule(std::move(name), std::move(args), true));
@@ -586,7 +671,6 @@ void Builder::addBuiltinAndExternal() const {
 
   // extern C
   add("memcpy", {"dest", "src", "count"});
-  add("atol", {"str"});
 
   // builtin functions
   add("print", {"str"});
@@ -608,6 +692,29 @@ void Builder::addBuiltinAndExternal() const {
   add("#_array_#size", {"this"});
 }
 
+void Builder::addGlobalVariable(
+    const std::shared_ptr<ast::VarDecl> &decl) const {
+  auto ident = decl->decl->identifier->val;
+  GlobalVarModule var(ident);
+
+  auto reg = makeReg(ident);
+  var.emplaceInst<SAlloc>(reg, 8);
+  if (!decl->decl->initExpr) {
+    ctx.addGlobalVar(std::move(var));
+    return;
+  }
+
+  auto funcName = "_init_" + ident;
+  auto &func = ctx.addFunc(FunctionModule(funcName, {}));
+  ctx.initFuncCtx(0);
+  ctx.setCurBasicBlock(func.pushBackBB());
+  visit(*decl->decl->initExpr);
+  ctx.emplaceInst<Store>(reg, ctx.getExprAddr(decl->decl->initExpr->getID()));
+
+  var.emplaceInst<Call>(funcName);
+  ctx.addGlobalVar(std::move(var));
+}
+
 std::shared_ptr<LocalReg>
 Builder::getMemberElementPtr(const std::shared_ptr<Addr> &base,
                              const std::string &className,
@@ -616,12 +723,12 @@ Builder::getMemberElementPtr(const std::shared_ptr<Addr> &base,
       "getElementPtr: " + className + "::" + varName);
   ctx.appendInst(std::move(attachedComment));
 
-  auto elementAddr = ctx.makeTempLocalReg("ptr");
   std::size_t offset = ctx.getOffset(className, varName);
   auto offsetLit = std::make_shared<IntLiteral>((Integer)offset);
-  ctx.emplaceInst<ArithBinaryInst>(elementAddr, ArithBinaryInst::Add, base,
+  auto varPtr = ctx.makeTempLocalReg("varPtr");
+  ctx.emplaceInst<ArithBinaryInst>(varPtr, ArithBinaryInst::Add, base,
                                    offsetLit);
-  return elementAddr;
+  return varPtr;
 }
 
 std::shared_ptr<Addr> Builder::makeReg(std::string identifier) const {
@@ -630,7 +737,9 @@ std::shared_ptr<Addr> Builder::makeReg(std::string identifier) const {
   if (identifier.at(0) == '#') { // is member variable
     std::string className, varName;
     std::tie(className, varName) = splitMemberVarIdent(identifier);
-    auto instancePtr = std::make_shared<LocalReg>("this");
+    auto instancePtrPtr = std::make_shared<LocalReg>("this");
+    auto instancePtr = ctx.makeTempLocalReg("instPtr");
+    ctx.emplaceInst<Load>(instancePtr, instancePtrPtr);
     return getMemberElementPtr(instancePtr, className, varName);
   }
   return std::make_shared<LocalReg>(std::move(identifier));
@@ -642,11 +751,11 @@ Builder::makeNewNonarray(const std::shared_ptr<ast::Type> &type) const {
   if (auto p = std::dynamic_pointer_cast<ast::BuiltinType>(type))
     assert(p->type == ast::BuiltinType::String);
 
-  auto typeSize = makeILit(getTypeSize(type));
-  auto instancePtr = ctx.makeTempLocalReg("p");
+  auto typeSize = makeILit((Integer)getTypeSize(type));
+  auto instancePtr = ctx.makeTempLocalReg("instPtr");
   ctx.emplaceInst<Malloc>(instancePtr, typeSize);
   auto ctorName = "#" + getTypeIdentifier(type) + "#_ctor_";
-  auto callCtor = std::make_shared<Call>(ctorName, instancePtr);
+  ctx.emplaceInst<Call>(ctorName, instancePtr);
   return instancePtr;
 }
 
@@ -658,7 +767,7 @@ std::string
 Builder::getTypeIdentifier(const std::shared_ptr<ast::Type> &type) const {
   if (auto p = std::dynamic_pointer_cast<ast::BuiltinType>(type)) {
     assert(p->type == ast::BuiltinType::String);
-    return "_string_";
+    return "string";
   }
   if (auto p = std::dynamic_pointer_cast<ast::UserDefinedType>(type)) {
     return p->name->val;

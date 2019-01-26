@@ -145,6 +145,22 @@ struct Malloc : IRInst {
   std::shared_ptr<Addr> dest, size;
 };
 
+struct SAlloc : IRInst {
+  SAlloc(std::shared_ptr<Addr> dest, size_t size)
+      : dest(std::move(dest)), size(size) {}
+
+  std::shared_ptr<Addr> dest;
+  std::size_t size;
+};
+
+struct StrCpy : IRInst {
+  StrCpy(std::shared_ptr<Addr> dest, std::string data)
+      : dest(std::move(dest)), data(std::move(data)) {}
+
+  std::shared_ptr<Addr> dest;
+  std::string data;
+};
+
 struct Branch : IRInst {
   Branch(std::shared_ptr<Addr> condition, std::shared_ptr<Label> then,
          std::shared_ptr<Label> else_)
@@ -177,6 +193,11 @@ struct Call : IRInst {
   explicit Call(std::string funcName, Args... args)
       : dest(nullptr), funcName(std::move(funcName)),
         args({std::move(args)...}) {}
+
+  Call(std::shared_ptr<Addr> dest, std::string funcName,
+       std::vector<std::shared_ptr<Addr>> args)
+      : dest(std::move(dest)), funcName(std::move(funcName)),
+        args(std::move(args)) {}
 
   std::shared_ptr<Addr> dest;
   std::string funcName;

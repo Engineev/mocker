@@ -21,6 +21,13 @@ class BuilderContext {
 public:
   const Module &getResult();
 
+  // If the expression is a bool literal or int literal, then the return value
+  // is just a IntLiteral containing the same value.
+  // If the expression is of type bool or int but is not a literal, then the
+  // return value is the register containing the value.
+  // If the expression is of type array or string or some user-defined type,
+  // then the return value is the register containing the pointer which points
+  // to the actual instance.
   std::shared_ptr<Addr> getExprAddr(ast::NodeID id) const;
 
   void setExprAddr(ast::NodeID id, std::shared_ptr<Addr> addr);
@@ -29,14 +36,12 @@ public:
 
   template <class InstType, class... Args> void emplaceInst(Args &&... args) {
     auto inst = std::make_shared<InstType>(std::forward<Args>(args)...);
-    appendInst(inst);
+    appendInst(std::move(inst));
   }
 
   void appendInst(std::shared_ptr<IRInst> inst);
 
   void appendInst(BBLIter bblIter, std::shared_ptr<IRInst> inst);
-
-  void appendInst(const std::string &funcName, std::shared_ptr<IRInst> inst);
 
   void setCurBasicBlock(BBLIter val);
 
@@ -77,12 +82,11 @@ public:
 
   const std::shared_ptr<ast::Type> getExprType(ast::NodeID id) const;
 
-  void initFuncCtx();
+  void initFuncCtx(std::size_t paramNum);
 
   std::shared_ptr<GlobalReg> addStringLiteral(const std::string &literal);
 
-  void addGlobalVar(std::string identifier, std::size_t size = 0,
-                    std::string data = "");
+  void addGlobalVar(GlobalVarModule var);
 
 private:
   ASTIDMap<std::shared_ptr<Addr>> exprAddr;
