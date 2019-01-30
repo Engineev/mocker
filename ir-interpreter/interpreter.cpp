@@ -307,8 +307,8 @@ void Interpreter::initExternalFuncs() {
     //    assert(false);
     auto instPtr = reinterpret_cast<char *>(args[0]);
     *(std::int64_t *)(instPtr) = args[1];
-    malloced.emplace_back(std::malloc((std::size_t)(args[1] * args[2])));
-    *(void **)(instPtr + 8) = malloced.back();
+    auto addr = fastMalloc((std::size_t)(args[1] * args[2]));
+    *(void **)(instPtr + 8) = addr;
     return 0;
   });
   // #_array_#size ( this )
@@ -322,18 +322,14 @@ void Interpreter::initExternalFuncs() {
                         [](Args args) { return *(std::int64_t *)(args[0]); });
   // #string#add ( lhs rhs )
   externalFuncs.emplace("#string#add", [this](Args args) {
-    //    assert(false);
-    //    return 0;
-    auto resInstPtr = std::malloc(16);
-    malloced.emplace_back(resInstPtr);
+    auto resInstPtr = fastMalloc(16);
 
     auto lhsLen = externalFuncs["#string#length"]({args[0]});
     auto rhsLen = externalFuncs["#string#length"]({args[1]});
     std::int64_t length = lhsLen + rhsLen;
     *(std::int64_t *)resInstPtr = length;
 
-    auto resContentPtr = std::malloc((std::size_t)length);
-    malloced.emplace_back(resContentPtr);
+    auto resContentPtr = fastMalloc((std::size_t)length);
     *((void **)(resInstPtr) + 1) = (void *)resContentPtr;
 
     auto lhsContentPtr = *(void **)((char *)args[0] + 8);
@@ -347,14 +343,12 @@ void Interpreter::initExternalFuncs() {
   externalFuncs.emplace("#string#substring", [this](Args args) {
     //    assert(false);
     //    return 0;
-    auto resInstPtr = std::malloc(16);
-    malloced.emplace_back(resInstPtr);
+    auto resInstPtr = fastMalloc(16);
 
     auto len = args[2] - args[1];
     *(std::int64_t *)(resInstPtr) = len;
 
-    auto resContentPtr = std::malloc((std::size_t)len);
-    malloced.emplace_back(resContentPtr);
+    auto resContentPtr = fastMalloc((std::size_t)len);
     auto resContentPtrPtr = (char *)resInstPtr + 8;
     *(char **)resContentPtrPtr = (char *)resContentPtr;
 
@@ -408,16 +402,14 @@ void Interpreter::initExternalFuncs() {
   externalFuncs.emplace("getString", [this](Args args) {
     //    assert(false);
     //    return 0;
-    auto resInstPtr = std::malloc(16);
-    malloced.emplace_back(resInstPtr);
+    auto resInstPtr = fastMalloc(16);
 
     std::string str;
     std::cin >> str;
 
     *(std::int64_t *)resInstPtr = (std::int64_t)str.length();
 
-    auto resContentPtr = std::malloc(str.length());
-    malloced.emplace_back(resContentPtr);
+    auto resContentPtr = fastMalloc(str.length());
     *((char **)(resInstPtr) + 1) = (char *)resContentPtr;
     std::memcpy(resContentPtr, str.c_str(), str.length());
 
@@ -429,13 +421,11 @@ void Interpreter::initExternalFuncs() {
     //    return 0;
     auto str = std::to_string(args[0]);
 
-    auto resInstPtr = std::malloc(16);
-    malloced.emplace_back(resInstPtr);
+    auto resInstPtr = fastMalloc(16);
 
     *(std::int64_t *)resInstPtr = (std::int64_t)str.length();
 
-    auto resContentPtr = std::malloc(str.length());
-    malloced.emplace_back(resContentPtr);
+    auto resContentPtr = fastMalloc(str.length());
     *((char **)(resInstPtr) + 1) = (char *)resContentPtr;
     std::memcpy(resContentPtr, str.c_str(), str.length());
 
@@ -455,7 +445,6 @@ std::int64_t Interpreter::executeFunc(const FuncModule &func,
   assert(func.args.size() == args.size());
   for (std::size_t i = 0; i < args.size(); ++i) {
     ar.localReg[std::to_string(i)] = args[i];
-    //    printLog(func.args[i], args[i]);
   }
 
   ars.emplace(std::move(ar));
@@ -558,8 +547,6 @@ std::size_t Interpreter::executeInst(const std::size_t idx) {
   if (auto p = std::dynamic_pointer_cast<Load>(inst)) {
     auto addr = reinterpret_cast<std::int64_t *>(readVal(p->addr));
     auto val = *addr;
-    //    auto addr = reinterpret_cast<void*>(readVal(p->addr));
-    //    auto val = memSim.read(addr);
     writeReg(p->dest, val);
     return idx + 1;
   }
@@ -567,8 +554,6 @@ std::size_t Interpreter::executeInst(const std::size_t idx) {
     std::int64_t val = readVal(p->operand);
     auto addr = reinterpret_cast<std::int64_t *>(readVal(p->dest));
     *addr = val;
-    //    auto addr = (void*)readVal(p->dest);
-    //    memSim.write(addr, val, inst);
     printLog((std::int64_t)addr, val);
     return idx + 1;
   }
@@ -578,23 +563,19 @@ std::size_t Interpreter::executeInst(const std::size_t idx) {
     return idx + 1;
   }
   if (auto p = std::dynamic_pointer_cast<Alloca>(inst)) {
-    malloced.emplace_back(std::malloc(p->size));
-    auto res = malloced.back();
-    //    auto res = memSim.allocA(p->size, inst);
+    auto res = fastMalloc(p->size);
     writeReg(p->dest, res);
     return idx + 1;
   }
   if (auto p = std::dynamic_pointer_cast<SAlloc>(inst)) {
-    malloced.emplace_back(std::malloc(p->size));
-    //    auto res = memSim.salloc(p->size, inst);
-    writeReg(p->dest, malloced.back());
+    auto res = fastMalloc(p->size);
+    writeReg(p->dest, res);
     return idx + 1;
   }
   if (auto p = std::dynamic_pointer_cast<Malloc>(inst)) {
-    auto sz = readVal(p->size);
-    malloced.emplace_back(std::malloc((std::size_t)sz));
-    //    auto res = memSim.malloc(sz, inst);
-    writeReg(p->dest, malloced.back());
+    auto sz = (std::size_t)readVal(p->size);
+    auto res = fastMalloc(sz);
+    writeReg(p->dest, res);
     return idx + 1;
   }
   if (auto p = std::dynamic_pointer_cast<Branch>(inst)) {
@@ -647,6 +628,18 @@ std::int64_t Interpreter::readVal(const std::shared_ptr<Addr> &reg) const {
     return p->val;
   }
   assert(false);
+}
+
+void *Interpreter::fastMalloc(std::size_t sz) {
+  if (curSize + sz <= Capacity && sz <= 128) {
+    auto res = (void *)(fastMem + curSize);
+    curSize += sz;
+    return res;
+  }
+
+  auto res = std::malloc(sz);
+  malloced.emplace_back(res);
+  return res;
 }
 
 void Interpreter::printLog(const std::shared_ptr<Addr> &addr,

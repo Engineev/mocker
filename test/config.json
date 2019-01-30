@@ -3,6 +3,7 @@
   "bash_dir": "../",
   "ir_interpreter": "../build/ir-interpreter/ir-interpreter",
   "phases": [
+    "semantic pretest", "semantic extended",
     "codegen pretest", "codegen extended"
   ]
 }

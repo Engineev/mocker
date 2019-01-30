@@ -26,9 +26,14 @@ struct SemanticContext {
   std::unordered_map<ast::NodeID, std::shared_ptr<ast::Type>> exprType;
   std::unordered_set<ast::NodeID> leftValue;
   std::unordered_map<ast::NodeID, ScopeID> scopeIntroduced;
+
   std::unordered_map<ast::NodeID, ScopeID> scopeResiding;
+  // Map the declarations to the scope they reside
+
   std::unordered_map<ast::NodeID, std::shared_ptr<ast::Declaration>>
       associatedDecl;
+  // Map the variable identifiers in IdentifierExpr and VarDeclStmt and the
+  // function identifiers in FuncCallExpr to their declarations.
 };
 
 } // namespace mocker

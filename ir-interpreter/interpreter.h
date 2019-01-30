@@ -72,6 +72,8 @@ private:
     assert(false);
   }
 
+  void *fastMalloc(std::size_t sz);
+
   void printLog(const std::shared_ptr<Addr> &addr, std::int64_t val);
 
   void printLog(std::int64_t addr, std::int64_t val);
@@ -104,7 +106,11 @@ private:
   std::unordered_map<std::string, Integer> globalReg;
   std::stack<ActivationRecord> ars;
   std::vector<void *> malloced;
-  //  MemorySimulator memSim;
+
+  // fastMalloc
+  static constexpr std::size_t Capacity = 32 * 1024;
+  std::size_t curSize = 0;
+  std::int8_t fastMem[Capacity];
 };
 
 } // namespace ir

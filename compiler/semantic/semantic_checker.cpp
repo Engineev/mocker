@@ -25,10 +25,7 @@ public:
     builtinString = mk_ast::tyString();
   }
 
-  void operator()(ast::Identifier &node) const override {
-    // This function is used to update ctx.scopeResiding only
-    ctx.scopeResiding[node.getID()] = scopeResiding;
-  }
+  void operator()(ast::Identifier &node) const override { assert(false); }
 
   void operator()(ast::BuiltinType &node) const override { /* empty */
   }
@@ -58,8 +55,8 @@ public:
   }
 
   void operator()(ast::IdentifierExpr &node) const override {
-    visit(node.identifier);
-    updateAssociatedDecl(node.identifier);
+    ctx.associatedDecl[node.identifier->getID()] =
+        ctx.syms.lookUp(scopeResiding, node.identifier->val);
     auto decl = std::dynamic_pointer_cast<ast::VarDecl>(
         ctx.syms.lookUp(scopeResiding, node.identifier->val));
     if (!decl)
@@ -201,64 +198,14 @@ public:
   }
 
   void operator()(ast::FuncCallExpr &node) const override {
-    std::shared_ptr<ast::FuncDecl> funcDecl;
-    bool isCtor = false;
-    if (node.instance) { // is an explicit member functional call
-      visit(node.instance);
-      if (assignable(builtinString, ctx.exprType[node.instance->getID()])) {
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
-            ctx.syms.global(), "_string_" + node.identifier->val));
-        assert(funcDecl);
-      } else if (std::dynamic_pointer_cast<ast::ArrayType>(
-                     ctx.exprType[node.instance->getID()])) {
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
-            ctx.syms.global(), "_array_" + node.identifier->val));
-        assert(funcDecl);
-      } else {
-        auto instType = std::dynamic_pointer_cast<ast::UserDefinedType>(
-            ctx.exprType[node.instance->getID()]);
-        assert(instType);
-        auto classDecl =
-            std::dynamic_pointer_cast<ast::ClassDecl>(ctx.syms.lookUp(
-                ctx.syms.global(), ast::getTypeIdentifier(instType)));
-        assert(classDecl);
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
-            ctx.scopeIntroduced[classDecl->getID()], node.identifier->val));
-        ctx.scopeResiding[node.identifier->getID()] =
-            ctx.scopeIntroduced[classDecl->getID()];
-      }
-    } else { // is not an explicit member function call
-      auto decl = ctx.syms.lookUp(scopeResiding, node.identifier->val);
-      if (auto ptr =
-              std::dynamic_pointer_cast<ast::ClassDecl>(decl)) { // is ctor
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-            ctx.syms.lookUp(ctx.scopeIntroduced[ptr->getID()], "_ctor_"));
-        isCtor = true;
-        auto tmp = std::make_shared<ast::UserDefinedType>(ptr->identifier);
-        pos[tmp->getID()] = pos[ptr->getID()];
-        ctx.exprType[node.getID()] = tmp;
-      } else { // is not ctor
-        funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(decl);
-        updateAssociatedDecl(node.identifier);
-
-        auto &name = funcDecl->identifier->val;
-        bool isMember =
-            name != "print" && name != "println" && name != "getInt" &&
-            name != "getString" && name != "toString" &&
-            ctx.scopeResiding.at(decl->getID()) != ctx.syms.global();
-        if (isMember) {
-          node.instance = std::make_shared<ast::IdentifierExpr>(
-              std::make_shared<ast::Identifier>(std::string("this")));
-          auto declThis = std::dynamic_pointer_cast<ast::VarDecl>(
-              ctx.syms.lookUp(scopeResiding, "this"));
-          ctx.exprType[node.instance->getID()] = declThis->decl->type;
-          ctx.scopeResiding[node.identifier->getID()] = scopeResiding;
-        }
-      }
-    }
+    setInstance(node);
+    auto funcDecl = getFuncDecl(node);
     if (!funcDecl)
       throw UnresolvableSymbol(pos.at(node.identifier->getID()),
                                node.identifier->val);
+
+    ctx.associatedDecl[node.identifier->getID()] = funcDecl;
+
     if (node.args.size() != funcDecl->formalParameters.size())
       throw InvalidFunctionCall(pos.at(node.getID()));
     for (std::size_t i = 0; i < node.args.size(); ++i) {
@@ -267,8 +214,15 @@ public:
                       ctx.exprType[node.args[i]->getID()]))
         throw InvalidFunctionCall(pos.at(node.getID()));
     }
-    if (!isCtor)
+
+    if (funcDecl->identifier->val == "_ctor_") {
+      auto decl = std::static_pointer_cast<ast::ClassDecl>(
+          ctx.syms.lookUp(scopeResiding, node.identifier->val));
+      ctx.exprType[node.getID()] =
+          std::make_shared<ast::UserDefinedType>(decl->identifier);
+    } else {
       ctx.exprType[node.getID()] = funcDecl->retType;
+    }
   }
 
   void operator()(ast::NewExpr &node) const override {
@@ -281,10 +235,11 @@ public:
   }
 
   void operator()(ast::VarDeclStmt &node) const override {
-    visit(node.identifier);
     checkVarDecl(node);
     auto decl = std::make_shared<ast::VarDecl>(
         std::static_pointer_cast<ast::VarDeclStmt>(node.shared_from_this()));
+    ctx.scopeResiding[decl->getID()] = scopeResiding;
+    ctx.associatedDecl[node.identifier->getID()] = decl;
     pos[decl->getID()] = pos[node.getID()];
     bool addRes = ctx.syms.addSymbol(scopeResiding, node.identifier->val, decl);
 
@@ -360,8 +315,7 @@ public:
     visit(node.body, scopeIntroduced, true, inFunc, retType);
   }
 
-  void operator()(ast::EmptyStmt &node) const override { /* pass */
-  }
+  void operator()(ast::EmptyStmt &node) const override {}
 
   void operator()(ast::VarDecl &node) const override { visit(node.decl); }
 
@@ -371,13 +325,11 @@ public:
 
     auto scopeIntroduced = ctx.syms.createSubscope(scopeResiding);
 
-    for (const auto &param : node.formalParameters) {
+    for (const auto &param : node.formalParameters)
       visit(param, scopeIntroduced);
-    }
 
-    for (auto &stmt : node.body->stmts) {
+    for (auto &stmt : node.body->stmts)
       visit(stmt, scopeIntroduced, false, true, node.retType);
-    }
   }
 
   void operator()(ast::ClassDecl &node) const override {
@@ -385,7 +337,6 @@ public:
     for (auto &member : node.members) {
       if (auto ptr = std::dynamic_pointer_cast<ast::VarDecl>(member)) {
         checkVarDecl(*ptr->decl);
-        visit(ptr->decl->identifier);
         continue;
       }
       visit(member, scopeIntroduced);
@@ -443,11 +394,48 @@ private:
       throw IncompatibleTypes(pos.at(node.getID()));
   }
 
-  void
-  updateAssociatedDecl(const std::shared_ptr<ast::Identifier> &ident) const {
-    auto decl = ctx.syms.lookUp(scopeResiding, ident->val);
-    assert(decl);
-    ctx.associatedDecl[ident->getID()] = decl;
+  // Given a FuncCallExpr, if the function called is a member function, then
+  // set node.instance. Note that in the unannotated AST, a FuncCallExpr can be
+  // a member function call even though its instance is nullptr.
+  void setInstance(ast::FuncCallExpr &node) const {
+    if (node.instance)
+      return;
+    auto decl = ctx.syms.lookUp(scopeResiding, node.identifier->val);
+    // constructor
+    if (std::dynamic_pointer_cast<ast::ClassDecl>(decl))
+      return;
+    // free function
+    if (ctx.scopeResiding.at(decl->getID()) == ctx.syms.global())
+      return;
+
+    node.instance = std::make_shared<ast::IdentifierExpr>(
+        std::make_shared<ast::Identifier>(std::string("this")));
+  }
+
+  // Do the semantic check and return the corresponding function declaration.
+  std::shared_ptr<ast::FuncDecl> getFuncDecl(ast::FuncCallExpr &node) const {
+    if (node.instance) {
+      visit(node.instance);
+      if (assignable(builtinString, ctx.exprType[node.instance->getID()]))
+        return std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
+            ctx.syms.global(), "_string_" + node.identifier->val));
+      if (std::dynamic_pointer_cast<ast::ArrayType>(
+              ctx.exprType[node.instance->getID()]))
+        return std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
+            ctx.syms.global(), "_array_" + node.identifier->val));
+      auto instType = std::dynamic_pointer_cast<ast::UserDefinedType>(
+          ctx.exprType[node.instance->getID()]);
+      auto classDecl = std::dynamic_pointer_cast<ast::ClassDecl>(
+          ctx.syms.lookUp(ctx.syms.global(), ast::getTypeIdentifier(instType)));
+      return std::dynamic_pointer_cast<ast::FuncDecl>(ctx.syms.lookUp(
+          ctx.scopeIntroduced[classDecl->getID()], node.identifier->val));
+    }
+
+    auto decl = ctx.syms.lookUp(scopeResiding, node.identifier->val);
+    if (auto ptr = std::dynamic_pointer_cast<ast::ClassDecl>(decl)) // is ctor
+      return std::dynamic_pointer_cast<ast::FuncDecl>(
+          ctx.syms.lookUp(ctx.scopeIntroduced[ptr->getID()], "_ctor_"));
+    return std::dynamic_pointer_cast<ast::FuncDecl>(decl);
   }
 
   ScopeID scopeResiding;
@@ -575,18 +563,24 @@ void SemanticChecker::initSymTbl(SymTbl &syms) {
   using FormalParam = std::shared_ptr<ast::VarDeclStmt>;
   // builtin functions
   // clang-format off
-  syms.addSymbol(syms.global(), "print", std::make_shared<ast::FuncDecl>(nullptr, ident("print"),
-      std::vector<FormalParam>({param(tyString())}), body()));
-  syms.addSymbol(syms.global(), "println", std::make_shared<ast::FuncDecl>(
-      nullptr, ident("println"),
-      std::vector<FormalParam>({param(tyString())}), body()));
-  syms.addSymbol(syms.global(), "getString", std::make_shared<ast::FuncDecl>(
-       tyString(), ident("getString"), emptyParams(), body()));
-  syms.addSymbol(syms.global(), "getInt", std::make_shared<ast::FuncDecl>(
-       tyInt(), ident("getInt"), emptyParams(), body()));
-  syms.addSymbol(syms.global(), "toString", std::make_shared<ast::FuncDecl>(
-       tyString(), ident("toString"),
-      std::vector<FormalParam>({param(tyInt())}), body()));
+  std::vector<std::shared_ptr<ast::FuncDecl>> builtinFuncs = {
+      std::make_shared<ast::FuncDecl>(nullptr, ident("print"),
+                                      std::vector<FormalParam>({param(tyString())}), body()),
+      std::make_shared<ast::FuncDecl>(
+          nullptr, ident("println"),
+          std::vector<FormalParam>({param(tyString())}), body()),
+      std::make_shared<ast::FuncDecl>(
+          tyString(), ident("getString"), emptyParams(), body()),
+      std::make_shared<ast::FuncDecl>(
+          tyInt(), ident("getInt"), emptyParams(), body()),
+      std::make_shared<ast::FuncDecl>(
+          tyString(), ident("toString"),
+          std::vector<FormalParam>({param(tyInt())}), body())
+  };
+  for (auto && builtinF : builtinFuncs) {
+    ctx.scopeResiding[builtinF->getID()] = ctx.syms.global();
+    syms.addSymbol(syms.global(), builtinF->identifier->val, builtinF);
+  }
 
   // member functions of string
   syms.addSymbol(
@@ -625,9 +619,6 @@ void SemanticChecker::renameIdentifiers() {
       auto decl = std::dynamic_pointer_cast<ast::VarDecl>(
           ctx.associatedDecl.at(node.identifier->getID()));
       assert(decl);
-      //      auto decl = std::dynamic_pointer_cast<ast::VarDecl>(
-      //          ctx.syms.lookUp(ctx.scopeResiding.at(node.identifier->getID()),
-      //                          node.identifier->val));
       node.identifier->val = decl->decl->identifier->val;
     }
     void operator()(ast::UnaryExpr &node) const override {
@@ -660,9 +651,8 @@ void SemanticChecker::renameIdentifiers() {
         return;
       }
 
-      auto funcDecl = std::dynamic_pointer_cast<ast::FuncDecl>(
-          ctx.syms.lookUp(ctx.scopeResiding.at(node.identifier->getID()),
-                          node.identifier->val));
+      auto funcDecl = std::static_pointer_cast<ast::FuncDecl>(
+          ctx.associatedDecl.at(node.identifier->getID()));
       assert(funcDecl);
       ident = funcDecl->identifier->val;
     }
@@ -767,7 +757,8 @@ void SemanticChecker::renameIdentifiers() {
     }
 
     void renameLocalVar(ast::VarDeclStmt &node) const {
-      auto scopeInfo = ctx.scopeResiding.at(node.identifier->getID()).fmt();
+      auto decl = ctx.associatedDecl.at(node.identifier->getID());
+      auto scopeInfo = ctx.scopeResiding.at(decl->getID()).fmt();
       assert(scopeInfo.find('_') == std::string::npos);
       node.identifier->val = scopeInfo + '_' + node.identifier->val;
     }
