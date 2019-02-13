@@ -19,7 +19,7 @@ class BuilderContext {
   template <class V> using InstIDMap = std::unordered_map<InstID, V>;
 
 public:
-  const Module &getResult();
+  Module &getResult();
 
   // If the expression is a bool literal or int literal, then the return value
   // is just a IntLiteral containing the same value.
@@ -43,9 +43,13 @@ public:
 
   void appendInst(BBLIter bblIter, std::shared_ptr<IRInst> inst);
 
+  void appendInstFront(BBLIter bblIter, std::shared_ptr<IRInst> inst);
+
   void setCurBasicBlock(BBLIter val);
 
   BBLIter getCurBasicBlock() const;
+
+  FunctionModule &getCurFunc() const { return *curFunc; }
 
   const std::shared_ptr<Label> &getCurLoopEntry() const;
 
@@ -97,11 +101,11 @@ private:
   std::unordered_map<std::string, ClassLayout> classLayout;
   std::unordered_map<std::string, std::shared_ptr<GlobalReg>> strLits;
 
-  std::size_t tempRegCounter = 0;
+  Module module;
+
   std::size_t strLitCounter = 0;
   BBLIter curBasicBlock;
-
-  Module module;
+  FunctionModule *curFunc = nullptr;
 };
 
 } // namespace ir

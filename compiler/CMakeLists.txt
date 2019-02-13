@@ -11,6 +11,11 @@ set(HEADERS
   ir_builder/builder.h
   ir_builder/builder_context.h
 
+  optim/opt_pass.h
+  optim/optimizer.h
+  optim/remove_dead_blocks.h
+  optim/ssa.h
+
   parse/lexer.h
   parse/parser.h
   parse/token.h
@@ -25,6 +30,9 @@ set(HEADERS
 set(SOURCES
   ir_builder/builder.cpp
   ir_builder/builder_context.cpp
+
+  optim/remove_dead_blocks.cpp
+  optim/ssa.cpp
 
   parse/lexer.cpp
   parse/parser.cpp

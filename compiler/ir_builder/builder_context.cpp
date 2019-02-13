@@ -7,7 +7,7 @@ namespace ir {
 
 std::shared_ptr<LocalReg>
 BuilderContext::makeTempLocalReg(const std::string &hint) {
-  return std::make_shared<LocalReg>(hint + std::to_string(tempRegCounter++));
+  return curFunc->makeTempLocalReg(hint);
 }
 
 std::shared_ptr<Addr> BuilderContext::getExprAddr(ast::NodeID id) const {
@@ -18,7 +18,7 @@ void BuilderContext::setExprAddr(ast::NodeID id, std::shared_ptr<Addr> addr) {
   exprAddr[id] = std::move(addr);
 }
 
-const Module &BuilderContext::getResult() { return module; }
+Module &BuilderContext::getResult() { return module; }
 
 void BuilderContext::appendInst(std::shared_ptr<IRInst> inst) {
   appendInst(curBasicBlock, std::move(inst));
@@ -27,6 +27,12 @@ void BuilderContext::appendInst(std::shared_ptr<IRInst> inst) {
 void BuilderContext::appendInst(BBLIter bblIter, std::shared_ptr<IRInst> inst) {
   bbReside[inst->getID()] = bblIter;
   bblIter->appendInst(std::move(inst));
+}
+
+void BuilderContext::appendInstFront(BBLIter bblIter,
+                                     std::shared_ptr<IRInst> inst) {
+  bbReside[inst->getID()] = bblIter;
+  bblIter->appendInstFront(std::move(inst));
 }
 
 void BuilderContext::setCurBasicBlock(BBLIter val) { curBasicBlock = val; }
@@ -57,9 +63,8 @@ void BuilderContext::popLoopSuccessor() { loopSuccessor.pop(); }
 
 FunctionModule &BuilderContext::addFunc(FunctionModule func) {
   auto ident = func.getIdentifier();
-  auto p = module.funcs.emplace(ident, std::move(func));
-  assert(p.second);
-  return p.first->second;
+  curFunc = &module.addFunc(std::move(ident), std::move(func));
+  return getCurFunc();
 }
 
 void BuilderContext::addClassLayout(std::string className, ClassLayout layout) {
@@ -87,7 +92,6 @@ BuilderContext::getExprType(ast::NodeID id) const {
 
 void BuilderContext::initFuncCtx(std::size_t paramNum) {
   assert(loopEntry.empty());
-  tempRegCounter = paramNum;
   curBasicBlock = BBLIter();
 
   exprAddr.clear();
@@ -130,13 +134,13 @@ BuilderContext::addStringLiteral(const std::string &literal) {
   var.emplaceInst<Store>(contentPtrPtr, contentPtr);
   var.emplaceInst<StrCpy>(contentPtr, literal);
 
-  module.globalVars.emplace_back(std::move(var));
+  module.appendGlobalVar(std::move(var));
   strLits.emplace(literal, strInstPtrPtr);
   return strInstPtrPtr;
 }
 
 void BuilderContext::addGlobalVar(GlobalVarModule var) {
-  module.globalVars.emplace_back(std::move(var));
+  module.appendGlobalVar(std::move(var));
 }
 
 } // namespace ir

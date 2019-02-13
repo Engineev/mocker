@@ -7,6 +7,9 @@
 #include "ir/printer.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
+#include "optim/optimizer.h"
+#include "optim/remove_dead_blocks.h"
+#include "optim/ssa.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
@@ -40,6 +43,18 @@ int main(int argc, char **argv) {
   ir::BuilderContext IRCtx;
   IRCtx.setExprType(semantic.getExprType());
   root->accept(ir::Builder(IRCtx));
+
+  if (argc == 3) {
+    std::string irPath = argv[2];
+    std::ofstream dumpIR(irPath + "2.ll");
+    ir::Printer(IRCtx.getResult(), dumpIR)();
+  } else {
+    ir::Printer(IRCtx.getResult())();
+  }
+
+  Optimizer opt(IRCtx.getResult());
+  opt.addPass<RemoveDeadBlocks>().addPass<ConstructSSA>();
+  opt.run();
 
   if (argc == 3) {
     std::string irPath = argv[2];

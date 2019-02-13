@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "defer.h"
 #include "small_map.h"
 
 namespace mocker {
@@ -113,7 +114,7 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
       node.op == ast::BinaryExpr::LogicalOr) {
     auto originBB = ctx.getCurBasicBlock();
     auto originLabel = getBBLabel(originBB);
-    FunctionModule &func = originBB->getFuncRef();
+    FunctionModule &func = ctx.getCurFunc();
 
     auto rhsFirstBB = func.insertBBAfter(originBB);
     auto rhsFirstLabel = getBBLabel(rhsFirstBB);
@@ -219,9 +220,10 @@ void Builder::operator()(const ast::NewExpr &node) const {
 }
 
 void Builder::operator()(const ast::VarDeclStmt &node) const {
+  auto &func = ctx.getCurFunc();
   auto name = node.identifier->val;
   auto valPtr = makeReg(name);
-  ctx.emplaceInst<Alloca>(valPtr, 8);
+  ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(valPtr, 8));
 
   if (node.initExpr && !isNullTy(ctx.getExprType(node.initExpr->getID()))) {
     visit(*node.initExpr);
@@ -229,8 +231,9 @@ void Builder::operator()(const ast::VarDeclStmt &node) const {
                            ctx.getExprAddr(node.initExpr->getID()));
     return;
   }
-  if (isBoolTy(node.type) || isIntTy(node.type))
+  if (isBoolTy(node.type) || isIntTy(node.type)) {
     return;
+  }
   ctx.emplaceInst<Store>(makeReg(name), makeReg("@null"));
 }
 
@@ -245,7 +248,7 @@ void Builder::operator()(const ast::ReturnStmt &node) const {
 
 void Builder::operator()(const ast::ContinueStmt &node) const {
   auto originBB = ctx.getCurBasicBlock();
-  FunctionModule &func = originBB->getFuncRef();
+  FunctionModule &func = ctx.getCurFunc();
 
   auto loopEntry = ctx.getCurLoopEntry();
   ctx.emplaceInst<Jump>(loopEntry);
@@ -256,7 +259,7 @@ void Builder::operator()(const ast::ContinueStmt &node) const {
 
 void Builder::operator()(const ast::BreakStmt &node) const {
   auto originBB = ctx.getCurBasicBlock();
-  FunctionModule &func = originBB->getFuncRef();
+  FunctionModule &func = ctx.getCurFunc();
 
   auto loopSuccessor = ctx.getCurLoopSuccessor();
   ctx.emplaceInst<Jump>(loopSuccessor);
@@ -274,7 +277,7 @@ void Builder::operator()(const ast::IfStmt &node) const {
   visit(*node.condition);
 
   auto originalBB = ctx.getCurBasicBlock();
-  FunctionModule &func = originalBB->getFuncRef();
+  FunctionModule &func = ctx.getCurFunc();
 
   auto thenFirstBB = func.insertBBAfter(originalBB);
   auto thenFirstLabel = getBBLabel(thenFirstBB);
@@ -300,8 +303,9 @@ void Builder::operator()(const ast::IfStmt &node) const {
       node.else_ ? elseFirstLabel : successorLabel);
   ctx.appendInst(originalBB, br);
   auto jump = std::make_shared<Jump>(successorLabel);
-  ctx.appendInst(thenLastBB, jump);
-  if (node.else_)
+  if (!thenLastBB->isCompleted())
+    ctx.appendInst(thenLastBB, jump);
+  if (node.else_ && !elseLastBB->isCompleted())
     ctx.appendInst(elseLastBB, jump);
 
   ctx.setCurBasicBlock(successorBB);
@@ -332,21 +336,23 @@ void Builder::operator()(const ast::FuncDecl &node) const {
 
   if (isMember) {
     auto reg = makeReg("this");
-    ctx.emplaceInst<Alloca>(reg, 8);
+    ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(reg, 8));
     ctx.emplaceInst<Store>(reg, makeReg("0"));
   }
   for (std::size_t i = 0; i < node.formalParameters.size(); ++i) {
     auto name = node.formalParameters[i]->identifier->val;
     auto reg = makeReg(name);
-    ctx.emplaceInst<Alloca>(reg, 8);
+    ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(reg, 8));
     ctx.emplaceInst<Store>(reg, makeReg(std::to_string(i + isMember)));
   }
 
-  for (auto &p : node.body->stmts)
+  for (auto &p : node.body->stmts) {
+    if (ctx.getCurBasicBlock()->isCompleted())
+      return;
     visit(*p);
-  if (!ctx.getCurBasicBlock()->isCompleted()) {
-    ctx.emplaceInst<Ret>();
   }
+  if (!ctx.getCurBasicBlock()->isCompleted())
+    ctx.emplaceInst<Ret>();
 }
 
 void Builder::operator()(const ast::ClassDecl &node) const {
@@ -469,10 +475,10 @@ void Builder::translateLoop(
     const std::shared_ptr<ast::Statement> &body,
     const std::shared_ptr<ast::Expression> &update) const {
   ctx.emplaceInst<Comment>("loop");
-  auto defer = std::shared_ptr<void>(
+  auto defer1 = std::shared_ptr<void>(
       nullptr, [&](void *) { ctx.emplaceInst<Comment>(""); });
   auto originBB = ctx.getCurBasicBlock();
-  FunctionModule &func = originBB->getFuncRef();
+  FunctionModule &func = ctx.getCurFunc();
 
   // insert BBs and get labels
   auto conditionFirstBB = func.insertBBAfter(originBB);
@@ -481,6 +487,11 @@ void Builder::translateLoop(
   auto bodyLabel = getBBLabel(bodyFirstBB);
   auto successorBB = func.insertBBAfter(bodyFirstBB);
   auto successorLabel = getBBLabel(successorBB);
+  auto defer2 =
+      Defer([this, &successorBB] { ctx.setCurBasicBlock(successorBB); });
+
+  auto jump = std::make_shared<Jump>(conditionLabel);
+  ctx.appendInst(originBB, jump);
 
   // condition
   ctx.setCurBasicBlock(conditionFirstBB);
@@ -496,22 +507,22 @@ void Builder::translateLoop(
     ctx.popLoopSuccessor();
   });
 
+  auto br = std::make_shared<Branch>(ctx.getExprAddr(condition->getID()),
+                                     bodyLabel, successorLabel);
+  ctx.appendInst(conditionLastBB, br);
+
   // body
   ctx.setCurBasicBlock(bodyFirstBB);
   visit(*body);
+  // e.g while (...) return;
+  if (ctx.getCurBasicBlock()->isCompleted())
+    return;
   if (update)
     visit(*update);
   auto bodyLastBB = ctx.getCurBasicBlock();
 
   // br & jump
-  auto br = std::make_shared<Branch>(ctx.getExprAddr(condition->getID()),
-                                     bodyLabel, successorLabel);
-  ctx.appendInst(conditionLastBB, br);
-  auto jump = std::make_shared<Jump>(conditionLabel);
   ctx.appendInst(bodyLastBB, jump);
-  ctx.appendInst(originBB, jump);
-
-  ctx.setCurBasicBlock(successorBB);
 }
 
 std::shared_ptr<Addr> Builder::translateNewArray(
@@ -562,6 +573,7 @@ std::shared_ptr<Addr> Builder::translateNewArray(
   // the array. This case is similar to the int/bool case. We just return after
   // step 5., leaving the elements uninitialized.
 
+  auto &func = ctx.getCurFunc();
   auto curType = std::dynamic_pointer_cast<ast::ArrayType>(rawCurType);
   assert(curType);
   auto elementType = curType->baseType;
@@ -603,14 +615,15 @@ std::shared_ptr<Addr> Builder::translateNewArray(
 
   // 6.
   auto curElementPtrPtr = ctx.makeTempLocalReg("curElementPtrPtr");
-  ctx.emplaceInst<Alloca>(curElementPtrPtr, 8);
+  ctx.appendInstFront(func.getFirstBB(),
+                      std::make_shared<Alloca>(curElementPtrPtr, 8));
+  //  ctx.emplaceInst<Alloca>(curElementPtrPtr, 8);
   ctx.emplaceInst<Store>(curElementPtrPtr, contentPtr);
   auto contentEndPtr = ctx.makeTempLocalReg("contentEndPtr");
   ctx.emplaceInst<ArithBinaryInst>(contentEndPtr, ArithBinaryInst::Add,
                                    contentPtr, memLen); // calcContentEndPtr
 
   auto originBB = ctx.getCurBasicBlock();
-  FunctionModule &func = originBB->getFuncRef();
   auto conditionFirstBB = func.insertBBAfter(originBB);
   auto conditionLabel = getBBLabel(conditionFirstBB);
   auto bodyFirstBB = func.insertBBAfter(conditionFirstBB);
@@ -710,6 +723,7 @@ void Builder::addGlobalVariable(
   ctx.setCurBasicBlock(func.pushBackBB());
   visit(*decl->decl->initExpr);
   ctx.emplaceInst<Store>(reg, ctx.getExprAddr(decl->decl->initExpr->getID()));
+  ctx.emplaceInst<Ret>();
 
   var.emplaceInst<Call>(funcName);
   ctx.addGlobalVar(std::move(var));
