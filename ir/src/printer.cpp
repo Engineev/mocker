@@ -23,6 +23,12 @@ std::string fmtAddr(const std::shared_ptr<Addr> &addr) {
 std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
   using namespace std::string_literals;
 
+  if (std::dynamic_pointer_cast<Deleted>(inst)) {
+    return "";
+  }
+  if (auto p = std::dynamic_pointer_cast<Assign>(inst)) {
+    return fmtAddr(p->dest) + " = assign " + fmtAddr(p->operand);
+  }
   if (auto p = std::dynamic_pointer_cast<ArithUnaryInst>(inst)) {
     auto res = fmtAddr(p->dest) + " = ";
     res += (p->op == ArithUnaryInst::Neg ? "neg" : "bitnot");
@@ -132,11 +138,11 @@ std::string fmtGlobalVarDef(const GlobalVarModule &var) {
 }
 
 void Printer::operator()(bool printExternal) const {
-  for (auto &var : module.globalVars) {
+  for (auto &var : module.getGlobalVars()) {
     out << fmtGlobalVarDef(var) << std::endl;
   }
 
-  for (auto &kv : module.funcs) {
+  for (auto &kv : module.getFuncs()) {
     if (printExternal || !kv.second.isExternalFunc()) {
       printFunc(kv.first, kv.second);
       out << std::endl;
@@ -162,6 +168,10 @@ void Printer::printFunc(const std::string &name,
   out << " {\n";
   for (const auto &bb : func.getBBs()) {
     out << "<" << bb.getLabelID() << ">:\n";
+    for (const auto &phi : bb.getPhis()) {
+      out << "  " << fmtInst(phi) << "\n";
+    }
+
     for (const auto &inst : bb.getInsts()) {
       if (auto p = std::dynamic_pointer_cast<AttachedComment>(inst)) {
         attachedComment = p->str;

@@ -54,6 +54,8 @@ private:
   std::int64_t executeFunc(const FuncModule &func,
                            const std::vector<std::int64_t> &args);
 
+  void executePhis(const std::vector<std::shared_ptr<Phi>> &phis);
+
   std::size_t executeInst(std::size_t idx);
 
   std::int64_t readVal(const std::shared_ptr<Addr> &reg) const;

@@ -213,6 +213,11 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
   lineSS >> buffer;
   assert(buffer == "=");
   lineSS >> buffer;
+  if (buffer == "assign") {
+    lineSS >> buffer;
+    auto operand = parseAddr(buffer);
+    return std::make_shared<Assign>(dest, operand);
+  }
   if (buffer == "load") {
     lineSS >> buffer;
     auto addr = parseAddr(buffer);
@@ -448,12 +453,42 @@ std::int64_t Interpreter::executeFunc(const FuncModule &func,
   }
 
   ars.emplace(std::move(ar));
+
   std::size_t idx = func.firstBB;
-  while (idx != func.insts.size())
+  while (idx != func.insts.size()) {
     idx = executeInst(idx);
+  }
   auto res = ars.top().retVal;
   ars.pop();
   return res;
+}
+
+void Interpreter::executePhis(const std::vector<std::shared_ptr<Phi>> &phis) {
+  struct Change {
+    Change(std::shared_ptr<Addr> reg, int64_t val)
+        : reg(std::move(reg)), val(val) {}
+    std::shared_ptr<Addr> reg;
+    std::int64_t val;
+  };
+  std::vector<Change> changes;
+  auto &ar = ars.top();
+
+  for (const auto &p : phis) {
+    bool found = false;
+    for (auto &option : p->options) {
+      if (option.second->id == ar.lastBB) {
+        auto val = readVal(option.first);
+        changes.emplace_back(p->dest, (std::int64_t)val);
+        found = true;
+        break;
+      }
+    }
+    assert(found);
+  }
+
+  for (const auto &change : changes) {
+    writeReg(change.reg, change.val);
+  }
 }
 
 std::int64_t Interpreter::executeFunc(const std::string &funcName,
@@ -465,13 +500,18 @@ std::int64_t Interpreter::executeFunc(const std::string &funcName,
   return executeFunc(funcs.at(funcName), args);
 }
 
-std::size_t Interpreter::executeInst(const std::size_t idx) {
+std::size_t Interpreter::executeInst(std::size_t idx) {
   auto &ar = ars.top();
   auto inst = ar.curFunc.get().insts.at(idx);
 #ifdef PRINT_LOG
   std::cerr << fmtInst(inst) << std::endl;
 #endif
   auto &func = ar.curFunc;
+  if (auto p = std::dynamic_pointer_cast<Assign>(inst)) {
+    auto operand = readVal(p->operand);
+    writeReg(p->dest, operand);
+    return idx + 1;
+  }
   if (auto p = std::dynamic_pointer_cast<ArithUnaryInst>(inst)) {
     auto operand = readVal(p->operand);
     writeReg(p->dest,
@@ -605,14 +645,16 @@ std::size_t Interpreter::executeInst(const std::size_t idx) {
     return idx + 1;
   }
   if (auto p = std::dynamic_pointer_cast<Phi>(inst)) {
-    for (auto &option : p->options) {
-      if (option.second->id == ar.lastBB) {
-        auto val = readVal(option.first);
-        writeReg(p->dest, val);
-        return idx + 1;
+    std::vector<std::shared_ptr<Phi>> phis;
+    while (true) {
+      auto phi = std::dynamic_pointer_cast<Phi>(ar.curFunc.get().insts.at(idx));
+      if (!phi) {
+        executePhis(phis);
+        return idx;
       }
+      phis.emplace_back(std::move(phi));
+      ++idx;
     }
-    assert(false);
   }
   assert(false);
 }

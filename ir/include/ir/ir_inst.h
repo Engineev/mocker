@@ -53,6 +53,10 @@ struct IRInst : std::enable_shared_from_this<IRInst> {
   InstID getID() const { return (InstID)this; }
 };
 
+struct Terminator {};
+
+struct Deleted : IRInst {};
+
 struct Comment : IRInst {
   explicit Comment(std::string str) : str(std::move(str)) {}
   explicit Comment(const char *str) : str(str) {}
@@ -67,6 +71,13 @@ struct AttachedComment : IRInst {
   explicit AttachedComment(const char *str) : str(str) {}
 
   std::string str;
+};
+
+struct Assign : IRInst {
+  Assign(std::shared_ptr<Addr> dest, std::shared_ptr<Addr> operand)
+      : dest(std::move(dest)), operand(std::move(operand)) {}
+  std::shared_ptr<Addr> dest;
+  std::shared_ptr<Addr> operand;
 };
 
 struct ArithUnaryInst : IRInst {
@@ -161,7 +172,7 @@ struct StrCpy : IRInst {
   std::string data;
 };
 
-struct Branch : IRInst {
+struct Branch : IRInst, Terminator {
   Branch(std::shared_ptr<Addr> condition, std::shared_ptr<Label> then,
          std::shared_ptr<Label> else_)
       : condition(std::move(condition)), then(std::move(then)),
@@ -171,13 +182,13 @@ struct Branch : IRInst {
   std::shared_ptr<Label> then, else_;
 };
 
-struct Jump : IRInst {
+struct Jump : IRInst, Terminator {
   explicit Jump(std::shared_ptr<Label> dest) : dest(std::move(dest)) {}
 
   std::shared_ptr<Label> dest;
 };
 
-struct Ret : IRInst {
+struct Ret : IRInst, Terminator {
   explicit Ret(std::shared_ptr<Addr> val = nullptr) : val(std::move(val)) {}
 
   std::shared_ptr<Addr> val;
@@ -205,9 +216,9 @@ struct Call : IRInst {
 };
 
 struct Phi : IRInst {
-  Phi(std::shared_ptr<Addr> dest,
-      std::vector<std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>>
-          options)
+  using Option = std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>;
+
+  Phi(std::shared_ptr<Addr> dest, std::vector<Option> options)
       : dest(std::move(dest)), options(std::move(options)) {}
 
   std::shared_ptr<Addr> dest;
