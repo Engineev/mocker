@@ -5,6 +5,7 @@
 
 #include "ast/ast_node.h"
 #include "ir/printer.h"
+#include "ir/stats.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
 #include "optim/optimizer.h"
@@ -14,6 +15,16 @@
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
 #include "semantic/sym_tbl.h"
+
+void printIRStats(const mocker::ir::Stats &stats) {
+  using namespace mocker::ir;
+  std::cerr << "#BB = " << stats.countBBs() << std::endl;
+  std::cerr << "#insts = " << stats.countInsts<IRInst>() << std::endl;
+  std::cerr << "#phis = " << stats.countInsts<Phi>() << std::endl;
+  std::cerr << "#store and load "
+            << stats.countInsts<Store>() + stats.countInsts<Load>()
+            << std::endl;
+};
 
 int main(int argc, char **argv) {
   using namespace mocker;
@@ -44,24 +55,33 @@ int main(int argc, char **argv) {
   IRCtx.setExprType(semantic.getExprType());
   root->accept(ir::Builder(IRCtx));
 
+  auto &module = IRCtx.getResult();
+  Optimizer opt(module);
+  ir::Stats stats(module);
+
+  std::cerr << "Original:\n";
+  printIRStats(stats);
+
   if (argc == 3) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath + "2.ll");
-    ir::Printer(IRCtx.getResult(), dumpIR)();
+    ir::Printer(module, dumpIR)();
   } else {
-    ir::Printer(IRCtx.getResult())();
+    ir::Printer{module}();
   }
 
-  Optimizer opt(IRCtx.getResult());
   opt.addPass<RemoveDeadBlocks>().addPass<ConstructSSA>();
   opt.run();
+
+  std::cerr << "\nAfter removing dead blocks & constructing SSA:\n";
+  printIRStats(stats);
 
   if (argc == 3) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath);
-    ir::Printer(IRCtx.getResult(), dumpIR)();
+    ir::Printer(module, dumpIR)();
   } else {
-    ir::Printer(IRCtx.getResult())();
+    ir::Printer{module}();
   }
 
   return 0;
