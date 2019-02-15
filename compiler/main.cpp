@@ -8,6 +8,7 @@
 #include "ir/stats.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
+#include "optim/opt_context.h"
 #include "optim/optimizer.h"
 #include "optim/remove_dead_blocks.h"
 #include "optim/ssa.h"
@@ -56,7 +57,10 @@ int main(int argc, char **argv) {
   root->accept(ir::Builder(IRCtx));
 
   auto &module = IRCtx.getResult();
-  Optimizer opt(module);
+  for (auto &func : module.getFuncs())
+    func.second.buildContext();
+
+  OptContext optCtx(module);
   ir::Stats stats(module);
 
   std::cerr << "Original:\n";
@@ -70,8 +74,8 @@ int main(int argc, char **argv) {
     ir::Printer{module}();
   }
 
-  opt.addPass<RemoveDeadBlocks>().addPass<ConstructSSA>();
-  opt.run();
+  runOptPasses<RemoveDeadBlocks>(optCtx);
+  runOptPasses<ConstructSSA>(optCtx);
 
   std::cerr << "\nAfter removing dead blocks & constructing SSA:\n";
   printIRStats(stats);

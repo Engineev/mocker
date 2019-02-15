@@ -9,7 +9,6 @@ namespace mocker {
 ConstructSSA::ConstructSSA(ir::FunctionModule &func) : FuncPass(func) {}
 
 void ConstructSSA::operator()() {
-  func.buildContext();
   computeAuxiliaryInfo();
   insertPhiFunctions();
   renameVariables();
@@ -230,6 +229,19 @@ void ConstructSSA::renameVariables() {
 void ConstructSSA::renameVariablesImpl(
     const std::shared_ptr<ConstructSSA::DTNode> &curNode) {
   auto &bb = curNode->content.get();
+  for (auto &p : bb.getMutablePhis()) {
+    auto iter = varDefined.find(p->getID());
+    if (iter == varDefined.end())
+      continue;
+    auto varName = iter->second;
+    updateReachingDef(varName, bb.getLabelID());
+
+    auto newVarName =
+        std::dynamic_pointer_cast<ir::LocalReg>(p->dest)->identifier;
+    reachingDef[newVarName] = reachingDef[varName];
+    reachingDef[varName] = newVarName;
+  }
+
   for (auto &inst : bb.getMutableInsts()) {
     if (auto p = std::dynamic_pointer_cast<ir::Load>(inst)) {
       auto var = std::dynamic_pointer_cast<ir::LocalReg>(p->addr);
@@ -255,18 +267,6 @@ void ConstructSSA::renameVariablesImpl(
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
     }
-  }
-  for (auto &p : bb.getMutablePhis()) {
-    auto iter = varDefined.find(p->getID());
-    if (iter == varDefined.end())
-      continue;
-    auto varName = iter->second;
-    updateReachingDef(varName, bb.getLabelID());
-
-    auto newVarName =
-        std::dynamic_pointer_cast<ir::LocalReg>(p->dest)->identifier;
-    reachingDef[newVarName] = reachingDef[varName];
-    reachingDef[varName] = newVarName;
   }
 
   for (const auto &sucLabel : bb.getSuccessors()) {

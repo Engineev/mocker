@@ -16,17 +16,18 @@ namespace mocker {
 // standard SSA construction algorithm.
 class ConstructSSA : public FuncPass {
 public:
-  ConstructSSA(ir::FunctionModule &func);
-
-  const std::string &passID() const override {
+  static const std::string &PassID() {
     static const std::string id = "ConstructSSA";
     return id;
   }
 
-  const std::vector<std::string> &prerequisites() const override {
+  static const std::vector<std::string> &Prerequisites() {
     static const std::vector<std::string> res = {"RemoveDeadBlocks"};
     return res;
   }
+
+public:
+  explicit ConstructSSA(ir::FunctionModule &func);
 
   void operator()() override;
 

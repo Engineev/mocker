@@ -11,6 +11,7 @@ set(HEADERS
   ir_builder/builder.h
   ir_builder/builder_context.h
 
+  optim/opt_context.h
   optim/opt_pass.h
   optim/optimizer.h
   optim/remove_dead_blocks.h

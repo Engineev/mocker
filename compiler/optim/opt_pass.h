@@ -7,13 +7,7 @@ namespace mocker {
 
 class OptPass {
 public:
-  OptPass() = default;
-
   virtual ~OptPass() = default;
-
-  virtual const std::string &passID() const = 0;
-
-  virtual const std::vector<std::string> &prerequisites() const = 0;
 };
 
 class FuncPass : public OptPass {
@@ -24,6 +18,16 @@ public:
 
 protected:
   ir::FunctionModule &func;
+};
+
+class BasicBlockPass : public OptPass {
+public:
+  explicit BasicBlockPass(ir::BasicBlock &bb) : bb(bb) {}
+
+  virtual void operator()() = 0;
+
+protected:
+  ir::BasicBlock &bb;
 };
 
 } // namespace mocker

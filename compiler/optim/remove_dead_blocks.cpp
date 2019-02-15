@@ -8,8 +8,6 @@ namespace mocker {
 RemoveDeadBlocks::RemoveDeadBlocks(ir::FunctionModule &func) : FuncPass(func) {}
 
 void RemoveDeadBlocks::operator()() {
-  func.buildContext();
-
   std::unordered_set<std::size_t> reachable;
   std::function<void(std::size_t cur)> visit = [&visit, &reachable,
                                                 this](std::size_t cur) {
