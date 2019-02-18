@@ -8,6 +8,7 @@
 #include "ir/stats.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
+#include "optim/constant_propagation.h"
 #include "optim/opt_context.h"
 #include "optim/optimizer.h"
 #include "optim/remove_dead_blocks.h"
@@ -66,16 +67,18 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
+  runOptPasses<RemoveDeadBlocks>(optCtx);
+  runOptPasses<ConstructSSA>(optCtx);
+
   if (argc == 3) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath + "2.ll");
     ir::Printer(module, dumpIR)();
   }
 
-  runOptPasses<RemoveDeadBlocks>(optCtx);
-  runOptPasses<ConstructSSA>(optCtx);
+  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
 
-  std::cerr << "\nAfter removing dead blocks & constructing SSA:\n";
+  std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);
 
   if (argc == 3) {
