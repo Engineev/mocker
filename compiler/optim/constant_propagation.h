@@ -3,6 +3,7 @@
 
 #include <queue>
 #include <unordered_map>
+#include <cassert>
 
 #include "opt_pass.h"
 

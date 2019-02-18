@@ -48,7 +48,6 @@ void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {
 }
 
 void SparseSimpleConstantPropagation::initialize() {
-  workList = {};
   for (auto &kv : instDefine) {
     auto val = computeValue(kv.first);
     values[kv.first] = val;
