@@ -71,6 +71,9 @@ private:
 private:
   void computeAuxiliaryInfo();
 
+  // Prerequisites: computeAuxiliaryInfo
+  void printAuxiliaryInfo();
+
   // Prerequisites: None
   void buildDominating();
 

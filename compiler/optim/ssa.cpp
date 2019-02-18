@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <functional>
+#include <iostream>
 #include <queue>
 
 namespace mocker {
@@ -20,6 +21,30 @@ void ConstructSSA::computeAuxiliaryInfo() {
   buildImmediateDominator();
   buildDominatorTree();
   buildDominatingFrontier();
+
+  //  printAuxiliaryInfo();
+}
+
+void ConstructSSA::printAuxiliaryInfo() {
+  std::cerr << "ImmediateDominator:\n";
+  for (auto &kv : bbInfo) {
+    if (kv.first == func.getFirstBB()->getLabelID())
+      continue;
+    std::cerr << "idom(" << kv.first << ") = " << kv.second.immediateDominator
+              << std::endl;
+  }
+
+  std::cerr << "children in the dominator tree:\n";
+  std::function<void(const std::shared_ptr<DTNode> &)> printDTChildren =
+      [&](const std::shared_ptr<DTNode> &cur) {
+        std::cerr << cur->content.get().getLabelID() << ": ";
+        for (auto &child : cur->children)
+          std::cerr << child->content.get().getLabelID() << ", ";
+        std::cerr << std::endl;
+        for (auto &child : cur->children)
+          printDTChildren(child);
+      };
+  printDTChildren(root);
 }
 
 void ConstructSSA::buildDominating() {
@@ -179,7 +204,7 @@ void ConstructSSA::insertPhiFunctions(const std::string &varName) {
       if (isIn(frontierBB, added))
         continue;
 
-      auto dest = func.makeTempLocalReg();
+      auto dest = func.makeTempLocalReg(varName);
       auto phi =
           std::make_shared<ir::Phi>(dest, std::vector<ir::Phi::Option>());
       varDefined[phi->getID()] = varName;
@@ -207,7 +232,7 @@ ConstructSSA::collectAndReplaceDefs(const std::string &name) {
         continue;
       if (reg->identifier != name)
         continue;
-      auto dest = func.makeTempLocalReg();
+      auto dest = func.makeTempLocalReg(name);
       res.emplace_back(bb.getLabelID(), reg);
       auto assign = std::make_shared<ir::Assign>(dest, p->operand);
       inst = assign;
@@ -229,6 +254,7 @@ void ConstructSSA::renameVariables() {
 void ConstructSSA::renameVariablesImpl(
     const std::shared_ptr<ConstructSSA::DTNode> &curNode) {
   auto &bb = curNode->content.get();
+
   for (auto &p : bb.getMutablePhis()) {
     auto iter = varDefined.find(p->getID());
     if (iter == varDefined.end())
@@ -249,6 +275,7 @@ void ConstructSSA::renameVariablesImpl(
         continue;
       if (!isIn(var->identifier, varNames))
         continue;
+      // I think that the corresponding line in the SSA book is wrong.
       updateReachingDef(var->identifier, bb.getLabelID());
       inst = std::make_shared<ir::Assign>(
           p->dest,
@@ -269,6 +296,7 @@ void ConstructSSA::renameVariablesImpl(
     }
   }
 
+  // Update the option lists of the phi-functions in the successors
   for (const auto &sucLabel : bb.getSuccessors()) {
     auto sucBB = func.getMutableBasicBlock(sucLabel);
     for (auto &phi : sucBB.getMutablePhis()) {
@@ -276,9 +304,10 @@ void ConstructSSA::renameVariablesImpl(
       if (iter == varDefined.end())
         continue;
       auto varName = iter->second;
-      phi->options.emplace_back(
-          std::make_shared<ir::LocalReg>(reachingDef.at(varName)),
-          std::make_shared<ir::Label>(bb.getLabelID()));
+      updateReachingDef(varName, bb.getLabelID());
+      auto reachingDefOfV = reachingDef.at(varName);
+      phi->options.emplace_back(std::make_shared<ir::LocalReg>(reachingDefOfV),
+                                std::make_shared<ir::Label>(bb.getLabelID()));
     }
   }
 

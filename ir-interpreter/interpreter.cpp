@@ -661,6 +661,8 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
 
 std::int64_t Interpreter::readVal(const std::shared_ptr<Addr> &reg) const {
   if (auto p = std::dynamic_pointer_cast<LocalReg>(reg)) {
+    if (p->identifier == ".phi_nan")
+      return -123;
     return ars.top().localReg.at(p->identifier);
   }
   if (auto p = std::dynamic_pointer_cast<GlobalReg>(reg)) {

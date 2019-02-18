@@ -70,8 +70,6 @@ int main(int argc, char **argv) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath + "2.ll");
     ir::Printer(module, dumpIR)();
-  } else {
-    ir::Printer{module}();
   }
 
   runOptPasses<RemoveDeadBlocks>(optCtx);
