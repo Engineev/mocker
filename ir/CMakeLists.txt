@@ -1,4 +1,5 @@
 add_library(${PROJECT_NAME}-ir
+  include/ir/helper.h
   include/ir/ir_inst.h
   include/ir/module.h
   include/ir/printer.h
