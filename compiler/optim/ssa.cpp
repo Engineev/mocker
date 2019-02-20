@@ -210,7 +210,7 @@ void ConstructSSA::insertPhiFunctions(const std::string &varName) {
       varDefined[phi->getID()] = varName;
       bbDefined[dest->identifier] = frontierBB;
       auto &bbInst = func.getMutableBasicBlock(frontierBB);
-      bbInst.getMutablePhis().emplace_back(phi);
+      bbInst.appendInstFront(phi);
 
       added.emplace(frontierBB);
       if (!isIn(frontierBB, originalDefs))
@@ -255,20 +255,20 @@ void ConstructSSA::renameVariablesImpl(
     const std::shared_ptr<ConstructSSA::DTNode> &curNode) {
   auto &bb = curNode->content.get();
 
-  for (auto &p : bb.getMutablePhis()) {
-    auto iter = varDefined.find(p->getID());
-    if (iter == varDefined.end())
-      continue;
-    auto varName = iter->second;
-    updateReachingDef(varName, bb.getLabelID());
-
-    auto newVarName =
-        std::dynamic_pointer_cast<ir::LocalReg>(p->dest)->identifier;
-    reachingDef[newVarName] = reachingDef[varName];
-    reachingDef[varName] = newVarName;
-  }
-
   for (auto &inst : bb.getMutableInsts()) {
+    if (auto p = std::dynamic_pointer_cast<ir::Phi>(inst)) {
+      auto iter = varDefined.find(p->getID());
+      if (iter == varDefined.end())
+        continue;
+      auto varName = iter->second;
+      updateReachingDef(varName, bb.getLabelID());
+
+      auto newVarName =
+          std::dynamic_pointer_cast<ir::LocalReg>(p->dest)->identifier;
+      reachingDef[newVarName] = reachingDef[varName];
+      reachingDef[varName] = newVarName;
+      continue;
+    }
     if (auto p = std::dynamic_pointer_cast<ir::Load>(inst)) {
       auto var = std::dynamic_pointer_cast<ir::LocalReg>(p->addr);
       if (!var) // is a global variable
@@ -299,7 +299,11 @@ void ConstructSSA::renameVariablesImpl(
   // Update the option lists of the phi-functions in the successors
   for (const auto &sucLabel : bb.getSuccessors()) {
     auto sucBB = func.getMutableBasicBlock(sucLabel);
-    for (auto &phi : sucBB.getMutablePhis()) {
+    for (auto &inst : sucBB.getMutableInsts()) {
+      auto phi = std::dynamic_pointer_cast<ir::Phi>(inst);
+      if (!phi)
+        break;
+
       auto iter = varDefined.find(phi->getID());
       if (iter == varDefined.end())
         continue;

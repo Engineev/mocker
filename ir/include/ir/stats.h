@@ -20,11 +20,18 @@ public:
     return res;
   }
 
-  template <class Inst> std::size_t countInsts() const {
+  template <class Condition>
+  std::size_t countInstsIf(const Condition &condition) const {
     std::size_t res = 0;
     for (auto &f : module.getFuncs())
-      res += countInsts<Inst>(f.second);
+      res += countInstsIf(condition, f.second);
     return res;
+  }
+
+  template <class Inst> std::size_t countInsts() const {
+    return countInstsIf([&](const std::shared_ptr<ir::IRInst> &inst) {
+      return (bool)std::dynamic_pointer_cast<Inst>(inst);
+    });
   }
 
   template <class Inst>
@@ -33,17 +40,13 @@ public:
   }
 
 private:
-  template <class Inst>
-  std::size_t countInsts(const FunctionModule &func) const {
+  template <class Condition>
+  std::size_t countInstsIf(const Condition &condition,
+                           const FunctionModule &func) const {
     std::size_t res = 0;
     for (const auto &bb : func.getBBs()) {
-      if (std::is_same<Phi, Inst>::value) {
-        res += bb.getPhis().size();
-        continue;
-      }
-
       for (const auto &inst : bb.getInsts()) {
-        if (std::dynamic_pointer_cast<Inst>(inst))
+        if (condition(inst))
           ++res;
       }
     }

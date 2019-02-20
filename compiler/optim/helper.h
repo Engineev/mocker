@@ -14,8 +14,6 @@ buildInstDefine(const ir::FunctionModule &func) {
   std::unordered_map<std::string, std::shared_ptr<ir::IRInst>> res;
 
   for (auto &bb : func.getBBs()) {
-    for (auto &phi : bb.getPhis())
-      res[std::dynamic_pointer_cast<ir::LocalReg>(phi->dest)->identifier] = phi;
     for (auto &inst : bb.getInsts()) {
       auto dest = ir::getDest(inst);
       if (!dest)

@@ -5,6 +5,7 @@ add_library(${PROJECT_NAME}-ir
   include/ir/printer.h
   include/ir/stats.h
 
+  src/helper.cpp
   src/module.cpp
   src/printer.cpp
 )

@@ -23,10 +23,6 @@ public:
 
   std::size_t getLabelID() const { return labelID; }
 
-  const auto &getPhis() const { return phis; }
-
-  std::vector<std::shared_ptr<Phi>> &getMutablePhis() { return phis; }
-
   const InstList &getInsts() const { return insts; }
 
   InstList &getMutableInsts() { return insts; }
@@ -41,7 +37,6 @@ public:
   std::vector<std::size_t> getSuccessors() const;
 
 private:
-  std::vector<std::shared_ptr<Phi>> phis;
   std::size_t labelID;
   InstList insts;
 };

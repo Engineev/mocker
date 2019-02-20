@@ -31,11 +31,6 @@ void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {
   };
 
   for (auto &bb : func.getBBs()) {
-    for (auto &phi : bb.getPhis()) {
-      auto destName = ir::getLocalRegIdentifier(phi->dest);
-      instDefine.emplace(destName, phi);
-      updateInstsUse(phi);
-    }
     for (auto &inst : bb.getInsts()) {
       auto dest = ir::getDest(inst);
       if (!dest)
@@ -94,8 +89,6 @@ void SparseSimpleConstantPropagation::rewrite() {
   };
 
   for (auto &bb : func.getMutableBBs()) {
-    for (auto &phi : bb.getMutablePhis())
-      phi = std::static_pointer_cast<ir::Phi>(rewriteIfPossible(phi));
     for (auto &inst : bb.getMutableInsts())
       inst = rewriteIfPossible(inst);
   }

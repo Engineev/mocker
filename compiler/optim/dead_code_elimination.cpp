@@ -73,13 +73,6 @@ void DeadCodeElimination::sweep() {
   std::size_t cnt = 0;
 
   for (auto &bb : func.getMutableBBs()) {
-    std::vector<std::shared_ptr<ir::Phi>> newPhis;
-    for (auto &phi : bb.getPhis())
-      if (useful.find(phi->getID()) != useful.end())
-        newPhis.emplace_back(phi);
-    cnt += bb.getPhis().size() - newPhis.size();
-    bb.getMutablePhis() = std::move(newPhis);
-
     ir::InstList newInsts;
     for (auto &inst : bb.getInsts())
       if (useful.find(inst->getID()) != useful.end())

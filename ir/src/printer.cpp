@@ -168,10 +168,6 @@ void Printer::printFunc(const std::string &name,
   out << " {\n";
   for (const auto &bb : func.getBBs()) {
     out << "<" << bb.getLabelID() << ">:\n";
-    for (const auto &phi : bb.getPhis()) {
-      out << "  " << fmtInst(phi) << "\n";
-    }
-
     for (const auto &inst : bb.getInsts()) {
       if (auto p = std::dynamic_pointer_cast<AttachedComment>(inst)) {
         attachedComment = p->str;

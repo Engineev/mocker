@@ -5,6 +5,8 @@
 #include <list>
 #include <memory>
 #include <utility>
+#include <string>
+#include <vector>
 
 namespace mocker {
 // Addr

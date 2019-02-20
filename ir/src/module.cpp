@@ -15,18 +15,10 @@ BasicBlock::BasicBlock(size_t labelID) : labelID(labelID) {}
 void BasicBlock::appendInst(std::shared_ptr<IRInst> inst) {
   if (isCompleted())
     throw std::logic_error("Can't append insts into a completed block");
-  if (auto phi = std::dynamic_pointer_cast<Phi>(inst)) {
-    phis.emplace_back(std::move(phi));
-    return;
-  }
   insts.emplace_back(std::move(inst));
 }
 
 void BasicBlock::appendInstFront(std::shared_ptr<IRInst> inst) {
-  if (auto phi = std::dynamic_pointer_cast<Phi>(inst)) {
-    phis.emplace_back(std::move(phi));
-    return;
-  }
   insts.emplace_front(std::move(inst));
 }
 
