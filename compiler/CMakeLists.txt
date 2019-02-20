@@ -12,6 +12,8 @@ set(HEADERS
   ir_builder/builder_context.h
 
   optim/constant_propagation.h
+  optim/dead_code_elimination.h
+  optim/helper.h
   optim/opt_context.h
   optim/opt_pass.h
   optim/optimizer.h
@@ -34,6 +36,7 @@ set(SOURCES
   ir_builder/builder_context.cpp
 
   optim/constant_propagation.cpp
+  optim/dead_code_elimination.cpp
   optim/remove_dead_blocks.cpp
   optim/ssa.cpp
 

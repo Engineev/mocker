@@ -12,6 +12,7 @@
 #include "optim/opt_context.h"
 #include "optim/optimizer.h"
 #include "optim/remove_dead_blocks.h"
+#include "optim/dead_code_elimination.h"
 #include "optim/ssa.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
@@ -69,6 +70,7 @@ int main(int argc, char **argv) {
 
   runOptPasses<RemoveDeadBlocks>(optCtx);
   runOptPasses<ConstructSSA>(optCtx);
+  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
 
   if (argc == 3) {
     std::string irPath = argv[2];
@@ -76,7 +78,10 @@ int main(int argc, char **argv) {
     ir::Printer(module, dumpIR)();
   }
 
-  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
+  std::cerr << "\nBefore dead code elimination:\n";
+  printIRStats(stats);
+
+  runOptPasses<DeadCodeElimination>(optCtx);
 
   std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);
