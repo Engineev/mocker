@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iostream>
 
+#include "helper.h"
 #include "ir/helper.h"
 #include "optional.h"
 
@@ -17,6 +18,7 @@ void SparseSimpleConstantPropagation::operator()() {
   initialize();
   propagate();
   rewrite();
+  removeDeletedInsts(func);
   std::cerr << "SSCP: Modify " << modificationCnt << " insts in "
             << func.getIdentifier() << std::endl;
 }
@@ -77,15 +79,33 @@ void SparseSimpleConstantPropagation::rewrite() {
   auto rewriteIfPossible = [&](const std::shared_ptr<ir::IRInst> &inst)
       -> std::shared_ptr<ir::IRInst> {
     auto dest = dyc<ir::LocalReg>(ir::getDest(inst));
-    if (!dest)
-      return inst;
-    auto destName = ir::getLocalRegIdentifier(dest);
-    auto val = values[destName];
-    if (val.type != Value::Constant)
-      return inst;
-    ++modificationCnt;
-    return std::make_shared<ir::Assign>(
-        dest, std::make_shared<ir::IntLiteral>(val.val));
+    if (dest) {
+      auto destName = ir::getLocalRegIdentifier(dest);
+      auto val = values[destName];
+      if (val.type == Value::Constant) {
+        // All the insts that use this value will be rewrite so that they use
+        // the constant directly. This inst can therefore be deleted.
+        ++modificationCnt;
+        return std::make_shared<ir::Deleted>();
+      }
+    }
+
+    // Rewrite the operands
+    auto newInst = inst;
+    auto operandRefs = ir::getOperandUsedRef(newInst);
+    for (auto &operand : operandRefs) {
+      auto reg = dyc<ir::LocalReg>(operand.get());
+      if (!reg)
+        continue;
+      auto name = ir::getLocalRegIdentifier(reg);
+      auto val = values[name];
+      if (val.type == Value::Constant) {
+        ++modificationCnt;
+        operand.get() = std::make_shared<ir::IntLiteral>(val.val);
+      }
+    }
+
+    return newInst;
   };
 
   for (auto &bb : func.getMutableBBs()) {

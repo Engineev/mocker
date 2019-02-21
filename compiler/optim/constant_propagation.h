@@ -1,9 +1,9 @@
 #ifndef MOCKER_CONSTANT_PROPAGATION_H
 #define MOCKER_CONSTANT_PROPAGATION_H
 
+#include <cassert>
 #include <queue>
 #include <unordered_map>
-#include <cassert>
 
 #include "opt_pass.h"
 
@@ -11,17 +11,6 @@ namespace mocker {
 
 // An implementation of the algorithm described in Sec. 9.3.6, EaC, 2nd.
 class SparseSimpleConstantPropagation : public FuncPass {
-public:
-  static const std::string &PassID() {
-    static const std::string res = "SparseSimpleConstantPropagation";
-    return res;
-  }
-
-  static const std::vector<std::string> &Prerequisites() {
-    static const std::vector<std::string> res = {"ConstructSSA"};
-    return res;
-  }
-
 public:
   explicit SparseSimpleConstantPropagation(ir::FunctionModule &func);
 

@@ -36,12 +36,7 @@ template <class Pass> void runOptPassImpl(OptContext &ctx, FuncPass *) {
 } // namespace detail
 
 template <class Pass> void runOptPasses(OptContext &ctx) {
-  if (!ctx.checkPrerequisites<Pass>())
-    std::terminate();
-
   detail::runOptPassImpl<Pass>(ctx, (Pass *)(nullptr));
-
-  ctx.updateContext<Pass>();
 }
 
 } // namespace mocker

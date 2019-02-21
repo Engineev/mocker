@@ -13,22 +13,8 @@ public:
 
   ir::Module &getModule() { return module; }
 
-  template <class Pass> bool checkPrerequisites() const {
-    auto &Prerequisites = Pass::Prerequisites();
-    for (auto &p : Prerequisites) {
-      if (executedPass.find(p) == executedPass.end())
-        return false;
-    }
-    return true;
-  }
-
-  template <class Pass> void updateContext() {
-    executedPass.emplace(Pass::PassID());
-  }
-
 private:
   ir::Module &module;
-  std::unordered_set<std::string> executedPass;
 };
 
 } // namespace mocker

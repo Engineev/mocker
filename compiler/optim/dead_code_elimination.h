@@ -11,17 +11,6 @@ namespace mocker {
 
 class DeadCodeElimination : public FuncPass {
 public:
-  static const std::string &PassID() {
-    static const std::string res = "DeadCodeElimination";
-    return res;
-  }
-
-  static const std::vector<std::string> &Prerequisites() {
-    static const std::vector<std::string> res = {"ConstructSSA"};
-    return res;
-  }
-
-public:
   explicit DeadCodeElimination(ir::FunctionModule &func);
 
   void operator()() override;

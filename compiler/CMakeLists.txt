@@ -17,7 +17,7 @@ set(HEADERS
   optim/opt_context.h
   optim/opt_pass.h
   optim/optimizer.h
-  optim/remove_dead_blocks.h
+  optim/simplify_cfg.h
   optim/ssa.h
 
   parse/lexer.h
@@ -37,7 +37,8 @@ set(SOURCES
 
   optim/constant_propagation.cpp
   optim/dead_code_elimination.cpp
-  optim/remove_dead_blocks.cpp
+  optim/helper.cpp
+  optim/simplify_cfg.cpp
   optim/ssa.cpp
 
   parse/lexer.cpp

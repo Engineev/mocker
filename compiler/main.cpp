@@ -9,10 +9,10 @@
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
 #include "optim/constant_propagation.h"
+#include "optim/dead_code_elimination.h"
 #include "optim/opt_context.h"
 #include "optim/optimizer.h"
-#include "optim/remove_dead_blocks.h"
-#include "optim/dead_code_elimination.h"
+#include "optim/simplify_cfg.h"
 #include "optim/ssa.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
@@ -68,9 +68,8 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
-  runOptPasses<RemoveDeadBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<ConstructSSA>(optCtx);
-  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
 
   if (argc == 3) {
     std::string irPath = argv[2];
@@ -78,10 +77,27 @@ int main(int argc, char **argv) {
     ir::Printer(module, dumpIR)();
   }
 
-  std::cerr << "\nBefore dead code elimination:\n";
-  printIRStats(stats);
-
+  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
+  runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<MergeBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
+  runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<MergeBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<DeadCodeElimination>(optCtx);
+
+  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
+  runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<MergeBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
+  runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<MergeBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
+  runOptPasses<DeadCodeElimination>(optCtx);
+
+  runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<MergeBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
 
   std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);
