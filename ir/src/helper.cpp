@@ -1,6 +1,7 @@
 #include "helper.h"
 
 #include <cassert>
+#include <helper.h>
 #include <string>
 
 #define MOCKER_IR_GET_DEST(TYPE)                                               \
@@ -32,6 +33,18 @@ const std::string &getLocalRegIdentifier(const std::shared_ptr<Addr> &addr) {
 
 std::vector<std::shared_ptr<Addr>>
 getOperandsUsed(const std::shared_ptr<IRInst> &inst) {
+  std::vector<std::shared_ptr<Addr>> res;
+  auto refs = getOperandUsedRef(inst);
+  res.reserve(refs.size());
+  for (auto &ref : refs)
+    res.emplace_back(ref.get());
+  return res;
+}
+
+std::vector<std::reference_wrapper<std::shared_ptr<Addr>>>
+getOperandUsedRef(const std::shared_ptr<IRInst> &inst) {
+  using ResType = std::vector<std::reference_wrapper<std::shared_ptr<Addr>>>;
+
   if (auto p = std::dynamic_pointer_cast<Assign>(inst))
     return {p->operand};
   if (auto p = std::dynamic_pointer_cast<ArithUnaryInst>(inst))
@@ -55,10 +68,14 @@ getOperandsUsed(const std::shared_ptr<IRInst> &inst) {
       return {p->val};
     return {};
   }
-  if (auto p = std::dynamic_pointer_cast<Call>(inst))
-    return p->args;
+  if (auto p = std::dynamic_pointer_cast<Call>(inst)) {
+    ResType res;
+    for (auto &arg : p->args)
+      res.emplace_back(arg);
+    return res;
+  }
   if (auto p = std::dynamic_pointer_cast<Phi>(inst)) {
-    std::vector<std::shared_ptr<Addr>> res;
+    ResType res;
     for (auto &option : p->options)
       res.emplace_back(option.first);
     return res;
