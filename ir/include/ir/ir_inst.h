@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <utility>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace mocker {
