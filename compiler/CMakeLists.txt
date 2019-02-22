@@ -17,6 +17,7 @@ set(HEADERS
   optim/opt_context.h
   optim/opt_pass.h
   optim/optimizer.h
+  optim/promote_global_variables.h
   optim/simplify_cfg.h
   optim/ssa.h
 
@@ -38,6 +39,7 @@ set(SOURCES
   optim/constant_propagation.cpp
   optim/dead_code_elimination.cpp
   optim/helper.cpp
+  optim/promote_global_variables.cpp
   optim/simplify_cfg.cpp
   optim/ssa.cpp
 

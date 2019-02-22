@@ -30,6 +30,16 @@ protected:
   ir::BasicBlock &bb;
 };
 
+class ModulePass : public OptPass {
+public:
+  explicit ModulePass(ir::Module &module) : module(module) {}
+
+  virtual void operator()() = 0;
+
+protected:
+  ir::Module &module;
+};
+
 } // namespace mocker
 
 #endif // MOCKER_OPT_PASS_H

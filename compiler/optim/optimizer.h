@@ -33,6 +33,10 @@ template <class Pass> void runOptPassImpl(OptContext &ctx, FuncPass *) {
   }
 }
 
+template <class Pass> void runOptPassImpl(OptContext &ctx, ModulePass *) {
+  Pass{ctx.getModule()}();
+}
+
 } // namespace detail
 
 template <class Pass> void runOptPasses(OptContext &ctx) {

@@ -12,6 +12,7 @@
 #include "optim/dead_code_elimination.h"
 #include "optim/opt_context.h"
 #include "optim/optimizer.h"
+#include "optim/promote_global_variables.h"
 #include "optim/simplify_cfg.h"
 #include "optim/ssa.h"
 #include "parse/lexer.h"
@@ -68,6 +69,7 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
+  runOptPasses<PromoteGlobalVariables>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<ConstructSSA>(optCtx);
 
