@@ -18,6 +18,8 @@ public:
 private:
   void promoteGlobalVariables(ir::FunctionModule &func);
 
+  void buildGlobalVarUsedImpl(const ir::FunctionModule & func);
+
 private:
   std::unordered_map<std::string, std::unordered_set<std::string>>
       globalVarUsed;

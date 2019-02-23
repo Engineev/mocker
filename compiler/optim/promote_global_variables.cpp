@@ -12,16 +12,7 @@ PromoteGlobalVariables::PromoteGlobalVariables(ir::Module &module)
   for (auto &kv : module.getFuncs()) {
     if (kv.second.isExternalFunc())
       continue;
-    for (auto &bb : kv.second.getBBs()) {
-      for (auto &inst : bb.getInsts()) {
-        auto operands = ir::getOperandsUsed(inst);
-        for (auto &operand : operands) {
-          auto reg = dyc<ir::GlobalReg>(operand);
-          if (reg && reg->identifier != "@null")
-            globalVarUsed[kv.first].emplace(reg->identifier);
-        }
-      }
-    }
+    buildGlobalVarUsedImpl(kv.second);
   }
 }
 
@@ -29,6 +20,33 @@ void PromoteGlobalVariables::operator()() {
   for (auto &kv : module.getFuncs())
     if (!kv.second.isExternalFunc())
       promoteGlobalVariables(kv.second);
+}
+
+void PromoteGlobalVariables::buildGlobalVarUsedImpl(
+    const ir::FunctionModule &func) {
+  if (globalVarUsed.find(func.getIdentifier()) != globalVarUsed.end())
+    return;
+
+  auto &used = globalVarUsed[func.getIdentifier()];
+  for (auto &bb : func.getBBs()) {
+    for (auto &inst : bb.getInsts()) {
+      if (auto call = dyc<ir::Call>(inst)) {
+        auto &callee = module.getFuncs().at(call->funcName);
+        if (!callee.isExternalFunc()) {
+          buildGlobalVarUsedImpl(callee);
+          for (auto &ident : globalVarUsed.at(callee.getIdentifier()))
+            used.emplace(ident);
+        }
+      }
+
+      auto operands = ir::getOperandsUsed(inst);
+      for (auto &operand : operands) {
+        auto reg = dyc<ir::GlobalReg>(operand);
+        if (reg && reg->identifier != "@null")
+          used.insert(reg->identifier);
+      }
+    }
+  }
 }
 
 void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
