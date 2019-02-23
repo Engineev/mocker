@@ -28,7 +28,7 @@ struct SemanticContext {
   std::unordered_map<ast::NodeID, ScopeID> scopeIntroduced;
 
   std::unordered_map<ast::NodeID, ScopeID> scopeResiding;
-  // Map the declarations to the scope they reside
+  // Map the declarations (including VarDeclStmt's) to the scope they reside
 
   std::unordered_map<ast::NodeID, std::shared_ptr<ast::Declaration>>
       associatedDecl;

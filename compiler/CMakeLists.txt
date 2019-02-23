@@ -5,11 +5,13 @@ set(HEADERS
   ast/helper.h
 
   common/defs.h
-  common/position.h
   common/error.h
+  common/position.h
 
+  ir_builder/build.h
   ir_builder/builder.h
   ir_builder/builder_context.h
+  ir_builder/preprocessor.h
 
   optim/constant_propagation.h
   optim/dead_code_elimination.h
@@ -35,6 +37,7 @@ set(HEADERS
 set(SOURCES
   ir_builder/builder.cpp
   ir_builder/builder_context.cpp
+  ir_builder/preprocessor.cpp
 
   optim/constant_propagation.cpp
   optim/dead_code_elimination.cpp

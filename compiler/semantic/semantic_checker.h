@@ -20,12 +20,10 @@ public:
   // Throw if a semantic error occurs.
   void check();
 
-  void renameIdentifiers();
-
-  const auto &getExprType() const {
+  const SemanticContext &getContext() const {
     if (ctx.state != SemanticContext::State::Completed)
       std::terminate();
-    return ctx.exprType;
+    return ctx;
   }
 
 private:

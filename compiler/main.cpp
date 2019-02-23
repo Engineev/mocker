@@ -6,6 +6,7 @@
 #include "ast/ast_node.h"
 #include "ir/printer.h"
 #include "ir/stats.h"
+#include "ir_builder/build.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
 #include "optim/constant_propagation.h"
@@ -53,13 +54,8 @@ int main(int argc, char **argv) {
   assert(root);
   SemanticChecker semantic(root, pos);
   semantic.check();
-  semantic.renameIdentifiers();
 
-  ir::BuilderContext IRCtx;
-  IRCtx.setExprType(semantic.getExprType());
-  root->accept(ir::Builder(IRCtx));
-
-  auto &module = IRCtx.getResult();
+  auto module = buildIR(root, semantic.getContext());
   for (auto &func : module.getFuncs())
     func.second.buildContext();
 
@@ -69,15 +65,15 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
-  runOptPasses<PromoteGlobalVariables>(optCtx);
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
-  runOptPasses<ConstructSSA>(optCtx);
-
   if (argc == 3) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath + "2.ll");
     ir::Printer(module, dumpIR)();
   }
+
+  runOptPasses<PromoteGlobalVariables>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(optCtx);
+  runOptPasses<ConstructSSA>(optCtx);
 
   runOptPasses<SparseSimpleConstantPropagation>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);

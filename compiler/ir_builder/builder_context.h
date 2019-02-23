@@ -19,6 +19,9 @@ class BuilderContext {
   template <class V> using InstIDMap = std::unordered_map<InstID, V>;
 
 public:
+  explicit BuilderContext(
+      const ASTIDMap<std::shared_ptr<mocker::ast::Type>> &exprType);
+
   Module &getResult();
 
   // If the expression is a bool literal or int literal, then the return value
@@ -81,9 +84,6 @@ public:
   std::size_t getOffset(const std::string &className,
                         const std::string &varName) const;
 
-  void setExprType(
-      std::unordered_map<ast::NodeID, std::shared_ptr<ast::Type>> exprType_);
-
   const std::shared_ptr<ast::Type> getExprType(ast::NodeID id) const;
 
   void initFuncCtx(std::size_t paramNum);
@@ -94,7 +94,7 @@ public:
 
 private:
   ASTIDMap<std::shared_ptr<Addr>> exprAddr;
-  ASTIDMap<std::shared_ptr<ast::Type>> exprType;
+  const ASTIDMap<std::shared_ptr<ast::Type>> &exprType;
   InstIDMap<BBLIter> bbReside;
   std::stack<std::shared_ptr<Label>> loopEntry, loopSuccessor;
   // The key is <class name> + '_' + <variable name>

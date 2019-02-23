@@ -5,6 +5,11 @@
 namespace mocker {
 namespace ir {
 
+BuilderContext::BuilderContext(
+    const BuilderContext::ASTIDMap<std::shared_ptr<mocker::ast::Type>>
+        &exprType)
+    : exprType(exprType) {}
+
 std::shared_ptr<LocalReg>
 BuilderContext::makeTempLocalReg(const std::string &hint) {
   return curFunc->makeTempLocalReg(hint);
@@ -78,11 +83,6 @@ std::size_t BuilderContext::getClassSize(const std::string &className) const {
 std::size_t BuilderContext::getOffset(const std::string &className,
                                       const std::string &varName) const {
   return classLayout.at(className).offset.at(varName);
-}
-
-void BuilderContext::setExprType(
-    std::unordered_map<ast::NodeID, std::shared_ptr<ast::Type>> exprType_) {
-  exprType = std::move(exprType_);
 }
 
 const std::shared_ptr<ast::Type>
