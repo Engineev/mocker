@@ -1,5 +1,6 @@
 #include "copy_propagation.h"
 
+#include <cassert>
 #include <functional>
 #include <unordered_set>
 
