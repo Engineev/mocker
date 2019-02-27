@@ -226,8 +226,7 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
           return Value(Value::Bottom);
       }
     }
-    assert(lastVal);
-    return Value(lastVal.value());
+    return Value((bool)lastVal ? lastVal.value() : 0);
   }
   // Store, StrCpy, Branch, Jump, Ret,
   assert(false);

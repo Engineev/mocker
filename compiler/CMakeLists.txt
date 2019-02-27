@@ -14,6 +14,7 @@ set(HEADERS
   ir_builder/preprocessor.h
 
   optim/constant_propagation.h
+  optim/copy_propagation.h
   optim/dead_code_elimination.h
   optim/function_inline.h
   optim/helper.h
@@ -42,6 +43,7 @@ set(SOURCES
   ir_builder/preprocessor.cpp
 
   optim/constant_propagation.cpp
+  optim/copy_propagation.cpp
   optim/dead_code_elimination.cpp
   optim/function_inline.cpp
   optim/helper.cpp

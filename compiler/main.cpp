@@ -10,6 +10,7 @@
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
 #include "optim/constant_propagation.h"
+#include "optim/copy_propagation.h"
 #include "optim/dead_code_elimination.h"
 #include "optim/function_inline.h"
 #include "optim/opt_context.h"
@@ -67,12 +68,6 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
-  if (argc == 3) {
-    std::string irPath = argv[2];
-    std::ofstream dumpIR(irPath + "2.ll");
-    ir::printModule(module, dumpIR);
-  }
-
   runOptPasses<FunctionInline>(optCtx);
   runOptPasses<PromoteGlobalVariables>(optCtx);
 
@@ -80,10 +75,19 @@ int main(int argc, char **argv) {
   printIRStats(stats);
 
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
-  runOptPasses<ConstructSSA>(optCtx);
 
+  if (argc == 3) {
+    std::string irPath = argv[2];
+    std::ofstream dumpIR(irPath + "2.ll");
+    ir::printModule(module, dumpIR);
+  }
+
+  runOptPasses<ConstructSSA>(optCtx);
   runOptPasses<LocalValueNumbering>(optCtx);
+  runOptPasses<CopyPropagation>(optCtx);
+
   runOptPasses<SparseSimpleConstantPropagation>(optCtx);
+  runOptPasses<CopyPropagation>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
 
   runOptPasses<MergeBlocks>(optCtx);
