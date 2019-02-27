@@ -3,19 +3,20 @@
 #include <cassert>
 #include <sstream>
 
+#include "helper.h"
 #include "small_map.h"
 
 namespace mocker {
 namespace ir {
 
-std::string fmtAddr(const std::shared_ptr<Addr> &addr) {
-  if (auto p = std::dynamic_pointer_cast<IntLiteral>(addr))
+std::string fmtAddr(const std::shared_ptr<const Addr> &addr) {
+  if (auto p = cdyc<IntLiteral>(addr))
     return std::to_string(p->val);
-  if (auto p = std::dynamic_pointer_cast<LocalReg>(addr))
+  if (auto p = cdyc<LocalReg>(addr))
     return "%" + p->identifier;
-  if (auto p = std::dynamic_pointer_cast<GlobalReg>(addr))
+  if (auto p = cdyc<GlobalReg>(addr))
     return p->identifier;
-  if (auto p = std::dynamic_pointer_cast<Label>(addr))
+  if (auto p = cdyc<Label>(addr))
     return "<" + std::to_string(p->id) + ">";
   assert(false);
 }
@@ -23,44 +24,44 @@ std::string fmtAddr(const std::shared_ptr<Addr> &addr) {
 std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
   using namespace std::string_literals;
 
-  if (std::dynamic_pointer_cast<Deleted>(inst)) {
+  if (dyc<Deleted>(inst)) {
     return "";
   }
-  if (auto p = std::dynamic_pointer_cast<Assign>(inst)) {
-    return fmtAddr(p->dest) + " = assign " + fmtAddr(p->operand);
+  if (auto p = dyc<Assign>(inst)) {
+    return fmtAddr(p->getDest()) + " = assign " + fmtAddr(p->getOperand());
   }
-  if (auto p = std::dynamic_pointer_cast<ArithUnaryInst>(inst)) {
-    auto res = fmtAddr(p->dest) + " = ";
-    res += (p->op == ArithUnaryInst::Neg ? "neg" : "bitnot");
-    res += " " + fmtAddr(p->operand);
+  if (auto p = dyc<ArithUnaryInst>(inst)) {
+    auto res = fmtAddr(p->getDest()) + " = ";
+    res += (p->getOp() == ArithUnaryInst::Neg ? "neg" : "bitnot");
+    res += " " + fmtAddr(p->getOperand());
     return res;
   }
-  if (auto p = std::dynamic_pointer_cast<Alloca>(inst)) {
-    return fmtAddr(p->dest) + " = alloca " + std::to_string(p->size);
+  if (auto p = dyc<Alloca>(inst)) {
+    return fmtAddr(p->getDest()) + " = alloca " + std::to_string(p->getSize());
   }
-  if (auto p = std::dynamic_pointer_cast<Malloc>(inst)) {
-    return fmtAddr(p->dest) + " = malloc " + fmtAddr(p->size);
+  if (auto p = dyc<Malloc>(inst)) {
+    return fmtAddr(p->getDest()) + " = malloc " + fmtAddr(p->getSize());
   }
-  if (auto p = std::dynamic_pointer_cast<SAlloc>(inst)) {
-    return fmtAddr(p->dest) + " = salloc " + std::to_string(p->size);
+  if (auto p = dyc<SAlloc>(inst)) {
+    return fmtAddr(p->getDest()) + " = salloc " + std::to_string(p->getSize());
   }
-  if (auto p = std::dynamic_pointer_cast<Store>(inst)) {
-    return "store " + fmtAddr(p->dest) + " " + fmtAddr(p->operand);
+  if (auto p = dyc<Store>(inst)) {
+    return "store " + fmtAddr(p->getAddr()) + " " + fmtAddr(p->getVal());
   }
-  if (auto p = std::dynamic_pointer_cast<Load>(inst)) {
-    return fmtAddr(p->dest) + " = load " + fmtAddr(p->addr);
+  if (auto p = dyc<Load>(inst)) {
+    return fmtAddr(p->getDest()) + " = load " + fmtAddr(p->getAddr());
   }
-  if (auto p = std::dynamic_pointer_cast<Branch>(inst)) {
-    return "br " + fmtAddr(p->condition) + " " + fmtAddr(p->then) + " " +
-           fmtAddr(p->else_);
+  if (auto p = dyc<Branch>(inst)) {
+    return "br " + fmtAddr(p->getCondition()) + " " + fmtAddr(p->getThen()) +
+           " " + fmtAddr(p->getElse());
   }
-  if (auto p = std::dynamic_pointer_cast<Jump>(inst)) {
-    return "jump " + fmtAddr(p->dest);
+  if (auto p = dyc<Jump>(inst)) {
+    return "jump " + fmtAddr(p->getLabel());
   }
-  if (auto p = std::dynamic_pointer_cast<Ret>(inst)) {
-    return "ret " + (p->val ? fmtAddr(p->val) : "void"s);
+  if (auto p = dyc<Ret>(inst)) {
+    return "ret " + (p->getVal() ? fmtAddr(p->getVal()) : "void"s);
   }
-  if (auto p = std::dynamic_pointer_cast<ArithBinaryInst>(inst)) {
+  if (auto p = dyc<ArithBinaryInst>(inst)) {
     static SmallMap<ArithBinaryInst::OpType, std::string> opName{
         {ArithBinaryInst::BitOr, "bitor"s},
         {ArithBinaryInst::BitAnd, "bitand"s},
@@ -73,27 +74,27 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
         {ArithBinaryInst::Div, "div"s},
         {ArithBinaryInst::Mod, "mod"s},
     };
-    return fmtAddr(p->dest) + " = " + opName.at(p->op) + " " + fmtAddr(p->lhs) +
-           " " + fmtAddr(p->rhs);
+    return fmtAddr(p->getDest()) + " = " + opName.at(p->getOp()) + " " +
+           fmtAddr(p->getLhs()) + " " + fmtAddr(p->getRhs());
   }
-  if (auto p = std::dynamic_pointer_cast<Comment>(inst)) {
-    return "; " + p->str;
+  if (auto p = dyc<Comment>(inst)) {
+    return "; " + p->getContent();
   }
-  if (auto p = std::dynamic_pointer_cast<AttachedComment>(inst)) {
-    return "; " + p->str;
+  if (auto p = dyc<AttachedComment>(inst)) {
+    return "; " + p->getContent();
   }
-  if (auto p = std::dynamic_pointer_cast<Call>(inst)) {
+  if (auto p = dyc<Call>(inst)) {
     std::string res;
-    if (p->dest)
-      res = fmtAddr(p->dest) + " = ";
-    res += "call " + p->funcName;
-    for (auto &addr : p->args)
+    if (p->getDest())
+      res = fmtAddr(p->getDest()) + " = ";
+    res += "call " + p->getFuncName();
+    for (auto &addr : p->getArgs())
       res += " " + fmtAddr(addr);
     return res;
   }
-  if (auto p = std::dynamic_pointer_cast<StrCpy>(inst)) {
+  if (auto p = dyc<StrCpy>(inst)) {
     std::string fmtStr;
-    for (auto &ch : p->data) {
+    for (auto &ch : p->getData()) {
       if (ch == '\n') {
         fmtStr += "\\n";
         continue;
@@ -108,21 +109,21 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
       }
       fmtStr.push_back(ch);
     }
-    return "strcpy " + fmtAddr(p->dest) + " \"" + fmtStr + "\"";
+    return "strcpy " + fmtAddr(p->getAddr()) + " \"" + fmtStr + "\"";
   }
-  if (auto p = std::dynamic_pointer_cast<Phi>(inst)) {
-    std::string res = fmtAddr(p->dest) + " = phi ";
-    for (auto &kv : p->options)
+  if (auto p = dyc<Phi>(inst)) {
+    std::string res = fmtAddr(p->getDest()) + " = phi ";
+    for (auto &kv : p->getOptions())
       res += "[ " + fmtAddr(kv.first) + " " + fmtAddr(kv.second) + " ] ";
     return res;
   }
-  if (auto p = std::dynamic_pointer_cast<RelationInst>(inst)) {
+  if (auto p = dyc<RelationInst>(inst)) {
     static SmallMap<RelationInst::OpType, std::string> opName{
         {RelationInst::OpType::Ne, "ne"s}, {RelationInst::OpType::Eq, "eq"s},
         {RelationInst::OpType::Lt, "lt"s}, {RelationInst::OpType::Le, "le"s},
         {RelationInst::OpType::Gt, "gt"s}, {RelationInst::OpType::Ge, "ge"s}};
-    return fmtAddr(p->dest) + " = " + opName.at(p->op) + " " + fmtAddr(p->lhs) +
-           " " + fmtAddr(p->rhs);
+    return fmtAddr(p->getDest()) + " = " + opName.at(p->getOp()) + " " +
+           fmtAddr(p->getLhs()) + " " + fmtAddr(p->getRhs());
   }
   assert(false);
 }
@@ -137,24 +138,10 @@ std::string fmtGlobalVarDef(const GlobalVarModule &var) {
   return res;
 }
 
-void Printer::operator()(bool printExternal) const {
-  for (auto &var : module.getGlobalVars()) {
-    out << fmtGlobalVarDef(var) << std::endl;
-  }
-
-  for (auto &kv : module.getFuncs()) {
-    if (printExternal || !kv.second.isExternalFunc()) {
-      printFunc(kv.first, kv.second);
-      out << std::endl;
-    }
-  }
-}
-
-void Printer::printFunc(const std::string &name,
-                        const FunctionModule &func) const {
+void printFunc(const FunctionModule &func, std::ostream &out) {
   std::string attachedComment;
 
-  out << "define " << name << " ( ";
+  out << "define " << func.getIdentifier() << " ( ";
   for (std::size_t i = 0; i < func.getArgs().size(); ++i) {
     if (i != 0)
       out << " ";
@@ -169,8 +156,8 @@ void Printer::printFunc(const std::string &name,
   for (const auto &bb : func.getBBs()) {
     out << "<" << bb.getLabelID() << ">:\n";
     for (const auto &inst : bb.getInsts()) {
-      if (auto p = std::dynamic_pointer_cast<AttachedComment>(inst)) {
-        attachedComment = p->str;
+      if (auto p = dyc<AttachedComment>(inst)) {
+        attachedComment = p->getContent();
         continue;
       }
 
@@ -183,6 +170,16 @@ void Printer::printFunc(const std::string &name,
     }
   }
   out << "}" << std::endl;
+}
+
+void printModule(const Module &module, std::ostream &out) {
+  for (auto &var : module.getGlobalVars())
+    out << fmtGlobalVarDef(var) << std::endl;
+
+  for (auto &kv : module.getFuncs()) {
+    printFunc(kv.second, out);
+    out << std::endl;
+  }
 }
 
 } // namespace ir

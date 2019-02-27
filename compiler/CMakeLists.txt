@@ -15,6 +15,7 @@ set(HEADERS
 
   optim/constant_propagation.h
   optim/dead_code_elimination.h
+  optim/function_inline.h
   optim/helper.h
   optim/opt_context.h
   optim/opt_pass.h
@@ -41,6 +42,7 @@ set(SOURCES
 
   optim/constant_propagation.cpp
   optim/dead_code_elimination.cpp
+  optim/function_inline.cpp
   optim/helper.cpp
   optim/promote_global_variables.cpp
   optim/simplify_cfg.cpp

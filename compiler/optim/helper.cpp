@@ -13,7 +13,7 @@ buildInstDefine(const ir::FunctionModule &func) {
       auto dest = ir::getDest(inst);
       if (!dest)
         continue;
-      auto p = std::dynamic_pointer_cast<ir::LocalReg>(dest);
+      auto p = ir::cdyc<ir::LocalReg>(dest);
       assert(p);
       res[p->identifier] = inst;
     }
@@ -50,7 +50,7 @@ void removeInstIf(
 
 void removeDeletedInsts(ir::FunctionModule &func) {
   removeInstIf(func, [](const std::shared_ptr<ir::IRInst> &inst) {
-    return (bool)dyc<ir::Deleted>(inst);
+    return (bool)ir::dyc<ir::Deleted>(inst);
   });
 }
 
@@ -58,25 +58,31 @@ std::shared_ptr<ir::IRInst> deletePhiOption(const std::shared_ptr<ir::Phi> &phi,
                                             std::size_t bbLabel) {
   std::vector<ir::Phi::Option> newOptions;
 
-  for (auto &option : phi->options)
-    if (option.second->id != bbLabel)
-      newOptions.emplace_back(option);
+  for (auto &option : phi->getOptions())
+    if (option.second->id != bbLabel) {
+      newOptions.emplace_back(std::make_pair(
+          ir::copy(option.first), ir::dyc<ir::Label>(ir::copy(option.second))));
+    }
 
   if (newOptions.size() == 1)
-    return std::make_shared<ir::Assign>(phi->dest, newOptions.at(0).first);
-  return std::make_shared<ir::Phi>(phi->dest, std::move(newOptions));
+    return std::make_shared<ir::Assign>(ir::copy(phi->getDest()),
+                                        ir::copy(newOptions.at(0).first));
+  return std::make_shared<ir::Phi>(ir::copy(phi->getDest()),
+                                   std::move(newOptions));
 }
 
 std::shared_ptr<ir::IRInst>
 replacePhiOption(const std::shared_ptr<ir::Phi> &phi, std::size_t oldLabel,
                  std::size_t newLabel) {
-  auto res = phi;
-  for (auto &option : res->options)
-    if (option.second->id == oldLabel) {
-      option.second->id = newLabel;
-      break;
-    }
-  return res;
+  std::vector<ir::Phi::Option> newOptions;
+  for (auto &option : phi->getOptions()) {
+    newOptions.emplace_back(std::make_pair(
+        ir::copy(option.first),
+        std::make_shared<ir::Label>(
+            option.second->id == oldLabel ? newLabel : option.second->id)));
+  }
+  return std::make_shared<ir::Phi>(ir::copy(phi->getDest()),
+                                   std::move(newOptions));
 }
 
 } // namespace mocker

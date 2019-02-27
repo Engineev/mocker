@@ -30,8 +30,8 @@ void PromoteGlobalVariables::buildGlobalVarUsedImpl(
   auto &used = globalVarUsed[func.getIdentifier()];
   for (auto &bb : func.getBBs()) {
     for (auto &inst : bb.getInsts()) {
-      if (auto call = dyc<ir::Call>(inst)) {
-        auto &callee = module.getFuncs().at(call->funcName);
+      if (auto call = ir::dyc<ir::Call>(inst)) {
+        auto &callee = module.getFuncs().at(call->getFuncName());
         if (!callee.isExternalFunc()) {
           buildGlobalVarUsedImpl(callee);
           for (auto &ident : globalVarUsed.at(callee.getIdentifier()))
@@ -41,7 +41,7 @@ void PromoteGlobalVariables::buildGlobalVarUsedImpl(
 
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = dyc<ir::GlobalReg>(operand);
+        auto reg = ir::cdyc<ir::GlobalReg>(operand);
         if (reg && reg->identifier != "@null")
           used.insert(reg->identifier);
       }
@@ -60,12 +60,13 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
   // Rename the use
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
-      auto operandRefs = ir::getOperandUsedRef(inst);
-      for (auto &operandRef : operandRefs) {
-        auto p = dyc<ir::GlobalReg>(operandRef.get());
+      auto operands = ir::getOperandsUsed(inst);
+      for (auto &operand : operands) {
+        auto p = ir::cdyc<ir::GlobalReg>(operand);
         if (p && p->identifier != "@null")
-          operandRef.get() = aliasReg.at(p->identifier);
+          operand = aliasReg.at(p->identifier);
       }
+      inst = ir::copyWithReplacedOperands(inst, operands);
     }
   }
 
@@ -92,7 +93,7 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
       auto tmp = func.makeTempLocalReg();
       insts.insert(iter, std::make_shared<ir::Load>(tmp, alias));
       insts.insert(iter, std::make_shared<ir::Store>(gReg, tmp));
-      if (dyc<ir::Ret>(*iter))
+      if (ir::dyc<ir::Ret>(*iter))
         return;
       ++iter;
       auto tmp2 = func.makeTempLocalReg();
@@ -101,14 +102,14 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
     };
 
     for (auto iter = insts.begin(); iter != insts.end(); ++iter) {
-      if (dyc<ir::Ret>(*iter)) {
+      if (ir::dyc<ir::Ret>(*iter)) {
         for (auto &toBeStored : globalVars)
           insert(iter, toBeStored);
         continue;
       }
 
-      if (auto call = dyc<ir::Call>(*iter)) {
-        auto &usedByCallee = globalVarUsed[call->funcName];
+      if (auto call = ir::dyc<ir::Call>(*iter)) {
+        auto &usedByCallee = globalVarUsed[call->getFuncName()];
         for (auto &toBeStored : usedByCallee) {
           if (globalVars.find(toBeStored) == globalVars.end())
             continue;

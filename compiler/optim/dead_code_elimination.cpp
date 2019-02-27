@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "helper.h"
+#include "ir/helper.h"
 
 namespace mocker {
 
@@ -33,15 +34,15 @@ void DeadCodeElimination::updateWorkList(
     const std::shared_ptr<ir::IRInst> &inst) {
   auto operands = ir::getOperandsUsed(inst);
   for (auto &operand : operands) {
-    if (auto p = dyc<ir::LocalReg>(operand))
+    if (auto p = ir::cdyc<ir::LocalReg>(operand))
       workList.emplace(p->identifier);
   }
 }
 
 void DeadCodeElimination::init() {
   auto isUseful = [](const std::shared_ptr<ir::IRInst> &inst) -> bool {
-    return dyc<ir::Terminator>(inst) || dyc<ir::Store>(inst) ||
-           dyc<ir::StrCpy>(inst) || dyc<ir::Call>(inst);
+    return ir::dyc<ir::Terminator>(inst) || ir::dyc<ir::Store>(inst) ||
+           ir::dyc<ir::StrCpy>(inst) || ir::dyc<ir::Call>(inst);
   };
 
   for (auto &bb : func.getBBs()) {

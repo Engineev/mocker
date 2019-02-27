@@ -34,10 +34,6 @@ private:
     std::int64_t val;
   };
 
-  template <class T, class V> decltype(auto) dyc(V &&v) const {
-    return std::dynamic_pointer_cast<T>(v);
-  }
-
   void buildInstDefineAndInstsUse();
 
   void initialize();
@@ -49,7 +45,7 @@ private:
 private:
   Value computeValue(const std::string &destName);
 
-  Value getValue(const std::shared_ptr<ir::Addr> &addr);
+  Value getValue(const std::shared_ptr<const ir::Addr> &addr);
 
 private:
   std::unordered_map<std::string, std::shared_ptr<ir::IRInst>> instDefine;

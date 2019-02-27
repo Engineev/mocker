@@ -42,11 +42,11 @@ private:
     std::vector<std::shared_ptr<DTNode>> children;
   };
   struct Definition {
-    Definition(size_t blockLabel, std::shared_ptr<ir::Addr> val)
+    Definition(size_t blockLabel, std::shared_ptr<const ir::Addr> val)
         : blockLabel(blockLabel), val(std::move(val)) {}
 
     std::size_t blockLabel;
-    std::shared_ptr<ir::Addr> val;
+    std::shared_ptr<const ir::Addr> val;
   };
 
   std::unordered_set<std::string> varNames;

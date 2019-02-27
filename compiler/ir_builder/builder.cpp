@@ -116,13 +116,20 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
     auto originLabel = getBBLabel(originBB);
     FunctionModule &func = ctx.getCurFunc();
 
+    auto boolExpAddr = ctx.makeTempLocalReg("boolExpAddr");
+    ctx.appendInstFront(func.getFirstBB(),
+                        std::make_shared<Alloca>(boolExpAddr, 8));
+
     auto rhsFirstBB = func.insertBBAfter(originBB);
     auto rhsFirstLabel = getBBLabel(rhsFirstBB);
     auto successorBB = func.insertBBAfter(rhsFirstBB);
     auto successorLabel = getBBLabel(successorBB);
 
     visit(*node.lhs);
-    auto lhsLastBB = ctx.getCurBasicBlock();
+    auto lhsVal = ctx.getExprAddr(node.lhs->getID());
+    ctx.emplaceInst<Store>(boolExpAddr, lhsVal);
+
+    //    auto lhsLastBB = ctx.getCurBasicBlock();
     if (node.op == ast::BinaryExpr::LogicalAnd) {
       ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()), rhsFirstLabel,
                               successorLabel);
@@ -133,20 +140,24 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
 
     ctx.setCurBasicBlock(rhsFirstBB);
     visit(*node.rhs);
-    auto rhsLastBB = ctx.getCurBasicBlock();
+    auto rhsVal = ctx.getExprAddr(node.rhs->getID());
+    ctx.emplaceInst<Store>(boolExpAddr, rhsVal);
+
+    //    auto rhsLastBB = ctx.getCurBasicBlock();
     ctx.emplaceInst<Jump>(successorLabel);
 
     ctx.setCurBasicBlock(successorBB);
     auto val = ctx.makeTempLocalReg("v");
     ctx.setExprAddr(node.getID(), val);
-    auto boolLit = std::make_shared<IntLiteral>(
-        (Integer)(node.op == ast::BinaryExpr::LogicalOr));
-    std::vector<std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>>
-        phiOptions = {std::make_pair(boolLit, getBBLabel(lhsLastBB)),
-                      std::make_pair(ctx.getExprAddr(node.rhs->getID()),
-                                     getBBLabel(rhsLastBB))};
 
-    ctx.emplaceInst<Phi>(val, std::move(phiOptions));
+    //    auto boolLit = std::make_shared<IntLiteral>(
+    //        (Integer)(node.op == ast::BinaryExpr::LogicalOr));
+    //    std::vector<std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>>
+    //        phiOptions = {std::make_pair(boolLit, getBBLabel(lhsLastBB)),
+    //                      std::make_pair(ctx.getExprAddr(node.rhs->getID()),
+    //                                     getBBLabel(rhsLastBB))};
+    //    ctx.emplaceInst<Phi>(val, std::move(phiOptions));
+    ctx.emplaceInst<Load>(val, boolExpAddr);
     return;
   }
   // string

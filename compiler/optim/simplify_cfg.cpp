@@ -7,11 +7,13 @@
 
 #include "helper.h"
 
+#include "ir/printer.h"
+
 namespace mocker {
 
 void deletePhiOptionInBB(ir::BasicBlock &bb, std::size_t toBeDeleted) {
   for (auto &inst : bb.getMutableInsts()) {
-    auto phi = dyc<ir::Phi>(inst);
+    auto phi = ir::dyc<ir::Phi>(inst);
     if (!phi)
       break;
     inst = deletePhiOption(phi, toBeDeleted);
@@ -21,15 +23,15 @@ void deletePhiOptionInBB(ir::BasicBlock &bb, std::size_t toBeDeleted) {
 void RewriteBranches::operator()() {
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
-      auto br = dyc<ir::Branch>(inst);
+      auto br = ir::dyc<ir::Branch>(inst);
       if (!br)
         continue;
-      auto condition = dyc<ir::IntLiteral>(br->condition);
+      auto condition = ir::cdyc<ir::IntLiteral>(br->getCondition());
       if (!condition)
         continue;
-      auto target = condition->val ? br->then : br->else_;
-      inst = std::make_shared<ir::Jump>(target);
-      auto notTarget = condition->val ? br->else_ : br->then;
+      auto target = condition->val ? br->getThen() : br->getElse();
+      inst = std::make_shared<ir::Jump>(ir::dyc<ir::Label>(copy(target)));
+      auto notTarget = condition->val ? br->getElse() : br->getThen();
       deletePhiOptionInBB(func.getMutableBasicBlock(notTarget->id),
                           bb.getLabelID());
     }
@@ -72,11 +74,18 @@ void MergeBlocks::operator()() {
       mergeable.emplace_back(kv.first);
   }
 
+  //  std::cerr << "mergeable: ";
+  //  for (auto i : mergeable)
+  //    std::cerr << i << ", ";
+  //  std::cerr << std::endl;
+
   auto toBeMerged = findFurthest(mergeable);
   auto isMergeable = [&preds, this](std::size_t u) -> bool {
     auto pred = preds[u];
-    return pred.size() == 1 &&
-           func.getBasicBlock(pred.at(0)).getSuccessors().size() == 1;
+    if (pred.size() != 1)
+      return false;
+    const auto &predBB = func.getBasicBlock(pred.at(0));
+    return predBB.isCompleted() && predBB.getSuccessors().size() == 1;
   };
   auto merge = [this](std::size_t pred, std::size_t bbLabel) {
     auto &predBB = func.getMutableBasicBlock(pred);
@@ -84,7 +93,7 @@ void MergeBlocks::operator()() {
     for (auto succ : bb.getSuccessors()) {
       auto &succBB = func.getMutableBasicBlock(succ);
       for (auto &inst : succBB.getMutableInsts()) {
-        auto phi = dyc<ir::Phi>(inst);
+        auto phi = ir::dyc<ir::Phi>(inst);
         if (!phi)
           break;
         inst = replacePhiOption(phi, bbLabel, pred);
@@ -96,10 +105,14 @@ void MergeBlocks::operator()() {
   };
 
   for (auto u : toBeMerged) {
+    //    std::cerr << "merge " << u;
+    std::cerr.flush();
     while (isMergeable(u)) {
       auto pred = preds.at(u).at(0);
+      //      std::cerr << " into " << pred << std::endl;
       merge(pred, u);
       u = pred;
+      //      ir::printFunc(func, std::cerr);
     }
   }
 

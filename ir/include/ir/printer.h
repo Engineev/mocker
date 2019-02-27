@@ -9,25 +9,15 @@
 namespace mocker {
 namespace ir {
 
-std::string fmtAddr(const std::shared_ptr<Addr> &addr);
+std::string fmtAddr(const std::shared_ptr<const Addr> &addr);
 
 std::string fmtInst(const std::shared_ptr<IRInst> &inst);
 
 std::string fmtGlobalVarDef(const GlobalVarModule &var);
 
-class Printer {
-public:
-  explicit Printer(const Module &module, std::ostream &out = std::cout)
-      : module(module), out(out) {}
+void printFunc(const FunctionModule &func, std::ostream &out = std::cout);
 
-  void operator()(bool printExternal = true) const;
-
-private:
-  void printFunc(const std::string &name, const FunctionModule &func) const;
-
-  const Module &module;
-  std::ostream &out;
-};
+void printModule(const Module &module, std::ostream &out = std::cout);
 
 } // namespace ir
 } // namespace mocker

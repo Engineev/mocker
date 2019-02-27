@@ -5,6 +5,8 @@
 #include <iostream>
 #include <queue>
 
+#include "ir/helper.h"
+
 namespace mocker {
 
 ConstructSSA::ConstructSSA(ir::FunctionModule &func) : FuncPass(func) {}
@@ -176,8 +178,8 @@ void ConstructSSA::buildDominatingFrontier() {
 void ConstructSSA::insertPhiFunctions() {
   const auto &firstBB = *func.getFirstBB();
   for (const auto &inst : firstBB.getInsts()) {
-    if (auto p = std::dynamic_pointer_cast<ir::Alloca>(inst)) {
-      auto reg = std::dynamic_pointer_cast<ir::LocalReg>(p->dest);
+    if (auto p = ir::dyc<ir::Alloca>(inst)) {
+      auto reg = ir::cdyc<ir::LocalReg>(p->getDest());
       assert(reg);
       varNames.emplace(reg->identifier);
     }
@@ -224,17 +226,17 @@ ConstructSSA::collectAndReplaceDefs(const std::string &name) {
   std::vector<Definition> res;
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
-      auto p = std::dynamic_pointer_cast<ir::Store>(inst);
+      auto p = ir::dyc<ir::Store>(inst);
       if (!p)
         continue;
-      auto reg = std::dynamic_pointer_cast<ir::LocalReg>(p->dest);
+      auto reg = ir::cdyc<ir::LocalReg>(p->getAddr());
       if (!reg)
         continue;
       if (reg->identifier != name)
         continue;
       auto dest = func.makeTempLocalReg(name);
       res.emplace_back(bb.getLabelID(), reg);
-      auto assign = std::make_shared<ir::Assign>(dest, p->operand);
+      auto assign = std::make_shared<ir::Assign>(dest, ir::copy(p->getVal()));
       inst = assign;
       varDefined[assign->getID()] = reg->identifier;
       bbDefined[dest->identifier] = bb.getLabelID();
@@ -256,21 +258,20 @@ void ConstructSSA::renameVariablesImpl(
   auto &bb = curNode->content.get();
 
   for (auto &inst : bb.getMutableInsts()) {
-    if (auto p = std::dynamic_pointer_cast<ir::Phi>(inst)) {
+    if (auto p = ir::dyc<ir::Phi>(inst)) {
       auto iter = varDefined.find(p->getID());
       if (iter == varDefined.end())
         continue;
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
 
-      auto newVarName =
-          std::dynamic_pointer_cast<ir::LocalReg>(p->dest)->identifier;
+      auto newVarName = ir::cdyc<ir::LocalReg>(p->getDest())->identifier;
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
       continue;
     }
-    if (auto p = std::dynamic_pointer_cast<ir::Load>(inst)) {
-      auto var = std::dynamic_pointer_cast<ir::LocalReg>(p->addr);
+    if (auto p = ir::dyc<ir::Load>(inst)) {
+      auto var = ir::cdyc<ir::LocalReg>(p->getAddr());
       if (!var) // is a global variable
         continue;
       if (!isIn(var->identifier, varNames))
@@ -278,19 +279,18 @@ void ConstructSSA::renameVariablesImpl(
       // I think that the corresponding line in the SSA book is wrong.
       updateReachingDef(var->identifier, bb.getLabelID());
       inst = std::make_shared<ir::Assign>(
-          p->dest,
+          ir::copy(p->getDest()),
           std::make_shared<ir::LocalReg>(reachingDef.at(var->identifier)));
       continue;
     }
-    if (auto p = std::dynamic_pointer_cast<ir::Assign>(inst)) {
+    if (auto p = ir::dyc<ir::Assign>(inst)) {
       auto iter = varDefined.find(p->getID());
       if (iter == varDefined.end())
         continue;
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
 
-      auto newVarName =
-          std::dynamic_pointer_cast<ir::LocalReg>(p->dest)->identifier;
+      auto newVarName = ir::cdyc<ir::LocalReg>(p->getDest())->identifier;
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
     }
@@ -298,11 +298,17 @@ void ConstructSSA::renameVariablesImpl(
 
   // Update the option lists of the phi-functions in the successors
   for (const auto &sucLabel : bb.getSuccessors()) {
-    auto sucBB = func.getMutableBasicBlock(sucLabel);
+    auto &sucBB = func.getMutableBasicBlock(sucLabel);
     for (auto &inst : sucBB.getMutableInsts()) {
-      auto phi = std::dynamic_pointer_cast<ir::Phi>(inst);
+      auto phi = ir::dyc<ir::Phi>(inst);
       if (!phi)
         break;
+
+      std::vector<ir::Phi::Option> options;
+      for (auto &oldOption : phi->getOptions())
+        options.emplace_back(
+            std::make_pair(ir::copy(oldOption.first),
+                           ir::dyc<ir::Label>(copy(oldOption.second))));
 
       auto iter = varDefined.find(phi->getID());
       if (iter == varDefined.end())
@@ -310,8 +316,11 @@ void ConstructSSA::renameVariablesImpl(
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
       auto reachingDefOfV = reachingDef.at(varName);
-      phi->options.emplace_back(std::make_shared<ir::LocalReg>(reachingDefOfV),
-                                std::make_shared<ir::Label>(bb.getLabelID()));
+      options.emplace_back(std::make_shared<ir::LocalReg>(reachingDefOfV),
+                           std::make_shared<ir::Label>(bb.getLabelID()));
+      inst = std::make_shared<ir::Phi>(ir::copy(phi->getDest()),
+                                       std::move(options));
+      varDefined[inst->getID()] = varName;
     }
   }
 

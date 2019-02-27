@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "ir/helper.h"
 #include "ir/printer.h"
 #include "small_map.h"
 
@@ -465,9 +466,9 @@ std::int64_t Interpreter::executeFunc(const FuncModule &func,
 
 void Interpreter::executePhis(const std::vector<std::shared_ptr<Phi>> &phis) {
   struct Change {
-    Change(std::shared_ptr<Addr> reg, int64_t val)
+    Change(std::shared_ptr<const Addr> reg, int64_t val)
         : reg(std::move(reg)), val(val) {}
-    std::shared_ptr<Addr> reg;
+    std::shared_ptr<const Addr> reg;
     std::int64_t val;
   };
   std::vector<Change> changes;
@@ -475,10 +476,10 @@ void Interpreter::executePhis(const std::vector<std::shared_ptr<Phi>> &phis) {
 
   for (const auto &p : phis) {
     bool found = false;
-    for (auto &option : p->options) {
+    for (auto &option : p->getOptions()) {
       if (option.second->id == ar.lastBB) {
         auto val = readVal(option.first);
-        changes.emplace_back(p->dest, (std::int64_t)val);
+        changes.emplace_back(p->getDest(), (std::int64_t)val);
         found = true;
         break;
       }
@@ -507,59 +508,59 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
   std::cerr << fmtInst(inst) << std::endl;
 #endif
   auto &func = ar.curFunc;
-  if (auto p = std::dynamic_pointer_cast<Assign>(inst)) {
-    auto operand = readVal(p->operand);
-    writeReg(p->dest, operand);
+  if (auto p = dyc<Assign>(inst)) {
+    auto operand = readVal(p->getOperand());
+    writeReg(p->getDest(), operand);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<ArithUnaryInst>(inst)) {
-    auto operand = readVal(p->operand);
-    writeReg(p->dest,
-             p->op == ArithUnaryInst::OpType::Neg ? -operand : ~operand);
+  if (auto p = dyc<ArithUnaryInst>(inst)) {
+    auto operand = readVal(p->getOperand());
+    writeReg(p->getDest(),
+             p->getOp() == ArithUnaryInst::OpType::Neg ? -operand : ~operand);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<ArithBinaryInst>(inst)) {
-    auto lhs = readVal(p->lhs), rhs = readVal(p->rhs);
-    switch (p->op) {
+  if (auto p = dyc<ArithBinaryInst>(inst)) {
+    auto lhs = readVal(p->getLhs()), rhs = readVal(p->getRhs());
+    switch (p->getOp()) {
     case ArithBinaryInst::BitOr:
-      writeReg(p->dest, lhs | rhs);
+      writeReg(p->getDest(), lhs | rhs);
       break;
     case ArithBinaryInst::BitAnd:
-      writeReg(p->dest, lhs & rhs);
+      writeReg(p->getDest(), lhs & rhs);
       break;
     case ArithBinaryInst::Xor:
-      writeReg(p->dest, lhs ^ rhs);
+      writeReg(p->getDest(), lhs ^ rhs);
       break;
     case ArithBinaryInst::Shl:
-      writeReg(p->dest, lhs << rhs);
+      writeReg(p->getDest(), lhs << rhs);
       break;
     case ArithBinaryInst::Shr:
-      writeReg(p->dest, lhs >> rhs);
+      writeReg(p->getDest(), lhs >> rhs);
       break;
     case ArithBinaryInst::Add:
-      writeReg(p->dest, lhs + rhs);
+      writeReg(p->getDest(), lhs + rhs);
       break;
     case ArithBinaryInst::Sub:
-      writeReg(p->dest, lhs - rhs);
+      writeReg(p->getDest(), lhs - rhs);
       break;
     case ArithBinaryInst::Mul:
-      writeReg(p->dest, lhs * rhs);
+      writeReg(p->getDest(), lhs * rhs);
       break;
     case ArithBinaryInst::Div:
-      writeReg(p->dest, lhs / rhs);
+      writeReg(p->getDest(), lhs / rhs);
       break;
     case ArithBinaryInst::Mod:
-      writeReg(p->dest, lhs % rhs);
+      writeReg(p->getDest(), lhs % rhs);
       break;
     default:
       assert(false);
     }
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<RelationInst>(inst)) {
-    auto lhs = readVal(p->lhs), rhs = readVal(p->rhs);
+  if (auto p = dyc<RelationInst>(inst)) {
+    auto lhs = readVal(p->getLhs()), rhs = readVal(p->getRhs());
     std::int64_t res;
-    switch (p->op) {
+    switch (p->getOp()) {
     case RelationInst::Eq:
       res = lhs == rhs;
       break;
@@ -581,73 +582,73 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
     default:
       assert(false);
     }
-    writeReg(p->dest, res);
+    writeReg(p->getDest(), res);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<Load>(inst)) {
-    auto addr = reinterpret_cast<std::int64_t *>(readVal(p->addr));
+  if (auto p = dyc<Load>(inst)) {
+    auto addr = reinterpret_cast<std::int64_t *>(readVal(p->getAddr()));
     auto val = *addr;
-    writeReg(p->dest, val);
+    writeReg(p->getDest(), val);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<Store>(inst)) {
-    std::int64_t val = readVal(p->operand);
-    auto addr = reinterpret_cast<std::int64_t *>(readVal(p->dest));
+  if (auto p = dyc<Store>(inst)) {
+    std::int64_t val = readVal(p->getVal());
+    auto addr = reinterpret_cast<std::int64_t *>(readVal(p->getAddr()));
     *addr = val;
     printLog((std::int64_t)addr, val);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<StrCpy>(inst)) {
-    auto dest = (void *)readVal(p->dest);
-    std::memcpy(dest, p->data.c_str(), p->data.size());
+  if (auto p = dyc<StrCpy>(inst)) {
+    auto dest = (void *)readVal(p->getAddr());
+    std::memcpy(dest, p->getData().c_str(), p->getData().size());
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<Alloca>(inst)) {
-    auto res = fastMalloc(p->size);
-    writeReg(p->dest, res);
+  if (auto p = dyc<Alloca>(inst)) {
+    auto res = fastMalloc(p->getSize());
+    writeReg(p->getDest(), res);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<SAlloc>(inst)) {
-    auto res = fastMalloc(p->size);
-    writeReg(p->dest, res);
+  if (auto p = dyc<SAlloc>(inst)) {
+    auto res = fastMalloc(p->getSize());
+    writeReg(p->getDest(), res);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<Malloc>(inst)) {
-    auto sz = (std::size_t)readVal(p->size);
+  if (auto p = dyc<Malloc>(inst)) {
+    auto sz = (std::size_t)readVal(p->getSize());
     auto res = fastMalloc(sz);
-    writeReg(p->dest, res);
+    writeReg(p->getDest(), res);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<Branch>(inst)) {
-    auto condition = readVal(p->condition);
-    auto nxtLabel = condition ? p->then : p->else_;
+  if (auto p = dyc<Branch>(inst)) {
+    auto condition = readVal(p->getCondition());
+    auto nxtLabel = condition ? p->getThen() : p->getElse();
     ar.lastBB = ar.curBB;
     ar.curBB = nxtLabel->id;
     return func.get().label2idx.at(nxtLabel->id);
   }
-  if (auto p = std::dynamic_pointer_cast<Jump>(inst)) {
+  if (auto p = dyc<Jump>(inst)) {
     ar.lastBB = ar.curBB;
-    ar.curBB = p->dest->id;
-    return func.get().label2idx.at(p->dest->id);
+    ar.curBB = p->getLabel()->id;
+    return func.get().label2idx.at(p->getLabel()->id);
   }
-  if (auto p = std::dynamic_pointer_cast<Ret>(inst)) {
-    if (p->val)
-      ars.top().retVal = readVal(p->val);
+  if (auto p = dyc<Ret>(inst)) {
+    if (p->getVal())
+      ars.top().retVal = readVal(p->getVal());
     return func.get().insts.size();
   }
-  if (auto p = std::dynamic_pointer_cast<Call>(inst)) {
+  if (auto p = dyc<Call>(inst)) {
     std::vector<std::int64_t> args;
-    for (auto &argReg : p->args)
+    for (auto &argReg : p->getArgs())
       args.emplace_back(readVal(argReg));
-    auto val = executeFunc(p->funcName, args);
-    if (p->dest)
-      writeReg(p->dest, val);
+    auto val = executeFunc(p->getFuncName(), args);
+    if (p->getDest())
+      writeReg(p->getDest(), val);
     return idx + 1;
   }
-  if (auto p = std::dynamic_pointer_cast<Phi>(inst)) {
+  if (auto p = dyc<Phi>(inst)) {
     std::vector<std::shared_ptr<Phi>> phis;
     while (true) {
-      auto phi = std::dynamic_pointer_cast<Phi>(ar.curFunc.get().insts.at(idx));
+      auto phi = dyc<Phi>(ar.curFunc.get().insts.at(idx));
       if (!phi) {
         executePhis(phis);
         return idx;
@@ -659,16 +660,17 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
   assert(false);
 }
 
-std::int64_t Interpreter::readVal(const std::shared_ptr<Addr> &reg) const {
-  if (auto p = std::dynamic_pointer_cast<LocalReg>(reg)) {
+std::int64_t
+Interpreter::readVal(const std::shared_ptr<const Addr> &reg) const {
+  if (auto p = cdyc<LocalReg>(reg)) {
     if (p->identifier == ".phi_nan")
       return -123;
     return ars.top().localReg.at(p->identifier);
   }
-  if (auto p = std::dynamic_pointer_cast<GlobalReg>(reg)) {
+  if (auto p = cdyc<GlobalReg>(reg)) {
     return globalReg.at(p->identifier);
   }
-  if (auto p = std::dynamic_pointer_cast<IntLiteral>(reg)) {
+  if (auto p = cdyc<IntLiteral>(reg)) {
     return p->val;
   }
   assert(false);
@@ -686,14 +688,14 @@ void *Interpreter::fastMalloc(std::size_t sz) {
   return res;
 }
 
-void Interpreter::printLog(const std::shared_ptr<Addr> &addr,
+void Interpreter::printLog(const std::shared_ptr<const Addr> &addr,
                            std::int64_t val) {
 #ifdef PRINT_LOG
-  if (auto p = std::dynamic_pointer_cast<LocalReg>(addr)) {
+  if (auto p = dyc<LocalReg>(addr)) {
     std::cerr << p->identifier << " <- " << val << std::endl;
     return;
   }
-  if (auto p = std::dynamic_pointer_cast<GlobalReg>(addr)) {
+  if (auto p = dyc<GlobalReg>(addr)) {
     std::cerr << p->identifier << " <- " << val << std::endl;
     return;
   }

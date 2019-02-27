@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "ir/helper.h"
 #include "ir/ir_inst.h"
 
 namespace mocker {
@@ -58,16 +59,17 @@ private:
 
   std::size_t executeInst(std::size_t idx);
 
-  std::int64_t readVal(const std::shared_ptr<Addr> &reg) const;
+  std::int64_t readVal(const std::shared_ptr<const Addr> &reg) const;
 
-  template <class T> void writeReg(const std::shared_ptr<Addr> &reg, T val_) {
+  template <class T>
+  void writeReg(const std::shared_ptr<const Addr> &reg, T val_) {
     auto val = reinterpret_cast<std::int64_t>(val_);
     printLog(reg, val);
-    if (auto p = std::dynamic_pointer_cast<LocalReg>(reg)) {
+    if (auto p = cdyc<LocalReg>(reg)) {
       ars.top().localReg[p->identifier] = val;
       return;
     }
-    if (auto p = std::dynamic_pointer_cast<GlobalReg>(reg)) {
+    if (auto p = cdyc<GlobalReg>(reg)) {
       globalReg[p->identifier] = val;
       return;
     }
@@ -76,7 +78,7 @@ private:
 
   void *fastMalloc(std::size_t sz);
 
-  void printLog(const std::shared_ptr<Addr> &addr, std::int64_t val);
+  void printLog(const std::shared_ptr<const Addr> &addr, std::int64_t val);
 
   void printLog(std::int64_t addr, std::int64_t val);
 

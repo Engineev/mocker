@@ -16,10 +16,6 @@ buildInstDefine(const ir::FunctionModule &func);
 std::unordered_map<std::size_t, std::vector<std::size_t>>
 buildBlockPredecessors(const ir::FunctionModule &func);
 
-template <class T, class V> decltype(auto) dyc(V &&v) {
-  return std::dynamic_pointer_cast<T>(v);
-}
-
 void removeInstIf(
     ir::FunctionModule &func,
     std::function<bool(const std::shared_ptr<ir::IRInst> &)> condition);

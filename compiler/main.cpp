@@ -11,6 +11,7 @@
 #include "ir_builder/builder_context.h"
 #include "optim/constant_propagation.h"
 #include "optim/dead_code_elimination.h"
+#include "optim/function_inline.h"
 #include "optim/opt_context.h"
 #include "optim/optimizer.h"
 #include "optim/promote_global_variables.h"
@@ -65,18 +66,30 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
-  if (argc == 3) {
-    std::string irPath = argv[2];
-    std::ofstream dumpIR(irPath + "2.ll");
-    ir::Printer(module, dumpIR)();
-  }
+  //  if (argc == 3) {
+  //    std::string irPath = argv[2];
+  //    std::ofstream dumpIR(irPath + "2.ll");
+  //    ir::printModule(module, dumpIR);
+  //  }
 
+  runOptPasses<FunctionInline>(optCtx);
   runOptPasses<PromoteGlobalVariables>(optCtx);
+
+  std::cerr << "After inline and promotion of global variables:\n";
+  printIRStats(stats);
+
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<ConstructSSA>(optCtx);
 
   runOptPasses<SparseSimpleConstantPropagation>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
+
+  if (argc == 3) {
+    std::string irPath = argv[2];
+    std::ofstream dumpIR(irPath + "2.ll");
+    ir::printModule(module, dumpIR);
+  }
+
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
@@ -103,9 +116,9 @@ int main(int argc, char **argv) {
   if (argc == 3) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath);
-    ir::Printer(module, dumpIR)();
+    ir::printModule(module, dumpIR);
   } else {
-    ir::Printer{module}();
+    ir::printModule(module);
   }
 
   return 0;

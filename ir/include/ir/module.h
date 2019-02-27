@@ -20,6 +20,10 @@ class FunctionModule;
 class BasicBlock {
 public:
   explicit BasicBlock(size_t labelID);
+  BasicBlock(const BasicBlock &) = default;
+  BasicBlock(BasicBlock &&) = default;
+  BasicBlock &operator=(const BasicBlock &) = default;
+  BasicBlock &operator=(BasicBlock &&) = default;
 
   std::size_t getLabelID() const { return labelID; }
 
@@ -48,8 +52,9 @@ class FunctionModule {
 public:
   FunctionModule(std::string identifier, std::vector<std::string> args,
                  bool isExternal = false);
-
+  FunctionModule(const FunctionModule &) = default;
   FunctionModule(FunctionModule &&) = default;
+  FunctionModule &operator=(const FunctionModule &) = default;
   FunctionModule &operator=(FunctionModule &&) = default;
 
   BBLIter pushBackBB();

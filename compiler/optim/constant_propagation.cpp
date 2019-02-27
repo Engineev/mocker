@@ -27,7 +27,7 @@ void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {
   auto updateInstsUse = [&](const std::shared_ptr<ir::IRInst> &inst) {
     auto operands = ir::getOperandsUsed(inst);
     for (auto &operand : operands) {
-      if (auto p = dyc<ir::LocalReg>(operand))
+      if (auto p = ir::cdyc<ir::LocalReg>(operand))
         instsUse[p->identifier].emplace_back(inst);
     }
   };
@@ -78,7 +78,7 @@ void SparseSimpleConstantPropagation::propagate() {
 void SparseSimpleConstantPropagation::rewrite() {
   auto rewriteIfPossible = [&](const std::shared_ptr<ir::IRInst> &inst)
       -> std::shared_ptr<ir::IRInst> {
-    auto dest = dyc<ir::LocalReg>(ir::getDest(inst));
+    auto dest = ir::cdyc<ir::LocalReg>(ir::getDest(inst));
     if (dest) {
       auto destName = ir::getLocalRegIdentifier(dest);
       auto val = values[destName];
@@ -91,21 +91,19 @@ void SparseSimpleConstantPropagation::rewrite() {
     }
 
     // Rewrite the operands
-    auto newInst = inst;
-    auto operandRefs = ir::getOperandUsedRef(newInst);
-    for (auto &operand : operandRefs) {
-      auto reg = dyc<ir::LocalReg>(operand.get());
+    auto operands = ir::getOperandsUsed(inst);
+    for (auto &operand : operands) {
+      auto reg = ir::cdyc<ir::LocalReg>(operand);
       if (!reg)
         continue;
       auto name = ir::getLocalRegIdentifier(reg);
       auto val = values[name];
       if (val.type == Value::Constant) {
         ++modificationCnt;
-        operand.get() = std::make_shared<ir::IntLiteral>(val.val);
+        operand = std::make_shared<ir::IntLiteral>(val.val);
       }
     }
-
-    return newInst;
+    return ir::copyWithReplacedOperands(inst, operands);
   };
 
   for (auto &bb : func.getMutableBBs()) {
@@ -117,21 +115,22 @@ void SparseSimpleConstantPropagation::rewrite() {
 SparseSimpleConstantPropagation::Value
 SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
   auto inst = instDefine.at(destName);
-  if (auto p = dyc<ir::Assign>(inst)) {
-    return getValue(p->operand);
+  if (auto p = ir::dyc<ir::Assign>(inst)) {
+    return getValue(p->getOperand());
   }
-  if (auto p = dyc<ir::ArithUnaryInst>(inst)) {
-    if (auto v = dyc<ir::IntLiteral>(p->operand))
-      return Value(p->op == ir::ArithUnaryInst::BitNot ? ~v->val : -v->val);
-    if (!dyc<ir::LocalReg>(p->operand))
+  if (auto p = ir::dyc<ir::ArithUnaryInst>(inst)) {
+    if (auto v = ir::cdyc<ir::IntLiteral>(p->getOperand()))
+      return Value(p->getOp() == ir::ArithUnaryInst::BitNot ? ~v->val
+                                                            : -v->val);
+    if (!ir::cdyc<ir::LocalReg>(p->getOperand()))
       return Value(Value::Bottom);
-    auto operandV = values[ir::getLocalRegIdentifier(p->operand)];
+    auto operandV = values[ir::getLocalRegIdentifier(p->getOperand())];
     if (operandV.type == Value::Constant)
-      return Value(p->op == ir::ArithUnaryInst::BitNot ? ~operandV.val
-                                                       : -operandV.val);
+      return Value(p->getOp() == ir::ArithUnaryInst::BitNot ? ~operandV.val
+                                                            : -operandV.val);
     return operandV;
   }
-  if (auto p = dyc<ir::ArithBinaryInst>(inst)) {
+  if (auto p = ir::dyc<ir::ArithBinaryInst>(inst)) {
     auto compute = [](ir::ArithBinaryInst::OpType op, std::int64_t lhs,
                       std::int64_t rhs) -> std::int64_t {
       switch (op) {
@@ -159,9 +158,9 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
         assert(false);
       }
     };
-    auto lhsV = getValue(p->lhs), rhsV = getValue(p->rhs);
-    if ((p->op == ir::ArithBinaryInst::Mul ||
-         p->op == ir::ArithBinaryInst::BitAnd) &&
+    auto lhsV = getValue(p->getLhs()), rhsV = getValue(p->getRhs());
+    if ((p->getOp() == ir::ArithBinaryInst::Mul ||
+         p->getOp() == ir::ArithBinaryInst::BitAnd) &&
         ((lhsV.type == Value::Constant && lhsV.val == 0) ||
          (rhsV.type == Value::Constant && rhsV.val == 0)))
       return Value(0);
@@ -169,15 +168,15 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
     if (lhsV.type == Value::Bottom || rhsV.type == Value::Bottom)
       return Value(Value::Bottom);
     if (lhsV.type == Value::Constant && rhsV.type == Value::Constant) {
-      if ((p->op == ir::ArithBinaryInst::Div ||
-           p->op == ir::ArithBinaryInst::Mod) &&
+      if ((p->getOp() == ir::ArithBinaryInst::Div ||
+           p->getOp() == ir::ArithBinaryInst::Mod) &&
           rhsV.val == 0)
         return Value(Value::Bottom);
-      return Value(compute(p->op, lhsV.val, rhsV.val));
+      return Value(compute(p->getOp(), lhsV.val, rhsV.val));
     }
     return Value(Value::Top);
   }
-  if (auto p = dyc<ir::RelationInst>(inst)) {
+  if (auto p = ir::dyc<ir::RelationInst>(inst)) {
     auto compute = [](ir::RelationInst::OpType op, std::int64_t lhs,
                       std::int64_t rhs) -> std::int64_t {
       switch (op) {
@@ -197,20 +196,21 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
         assert(false);
       }
     };
-    auto lhsV = getValue(p->lhs), rhsV = getValue(p->rhs);
+    auto lhsV = getValue(p->getLhs()), rhsV = getValue(p->getRhs());
     if (lhsV.type == Value::Bottom || rhsV.type == Value::Bottom)
       return Value(Value::Bottom);
     if (lhsV.type == Value::Constant && rhsV.type == Value::Constant)
-      return Value(compute(p->op, lhsV.val, rhsV.val));
+      return Value(compute(p->getOp(), lhsV.val, rhsV.val));
     return Value(Value::Top);
   }
-  if (dyc<ir::Load>(inst) || dyc<ir::Alloca>(inst) || dyc<ir::Malloc>(inst) ||
-      dyc<ir::SAlloc>(inst) || dyc<ir::Call>(inst))
+  if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::Alloca>(inst) ||
+      ir::dyc<ir::Malloc>(inst) || ir::dyc<ir::SAlloc>(inst) ||
+      ir::dyc<ir::Call>(inst))
     return Value(Value::Bottom);
-  if (auto p = dyc<ir::Phi>(inst)) {
+  if (auto p = ir::dyc<ir::Phi>(inst)) {
     Optional<std::int64_t> lastVal;
-    for (auto &option : p->options) {
-      if (auto reg = dyc<ir::LocalReg>(option.first)) {
+    for (auto &option : p->getOptions()) {
+      if (auto reg = ir::cdyc<ir::LocalReg>(option.first)) {
         if (reg->identifier == ".phi_nan")
           continue;
       }
@@ -235,13 +235,13 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
 
 SparseSimpleConstantPropagation::Value
 SparseSimpleConstantPropagation::getValue(
-    const std::shared_ptr<ir::Addr> &addr) {
-  assert(!dyc<ir::Label>(addr));
-  if (dyc<ir::GlobalReg>(addr))
+    const std::shared_ptr<const ir::Addr> &addr) {
+  assert(!ir::cdyc<ir::Label>(addr));
+  if (ir::cdyc<ir::GlobalReg>(addr))
     return Value(Value::Bottom);
-  if (auto p = dyc<ir::IntLiteral>(addr))
+  if (auto p = ir::cdyc<ir::IntLiteral>(addr))
     return Value(p->val);
-  assert(dyc<ir::LocalReg>(addr));
+  assert(ir::cdyc<ir::LocalReg>(addr));
   return values[ir::getLocalRegIdentifier(addr)];
 }
 

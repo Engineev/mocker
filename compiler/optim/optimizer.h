@@ -29,7 +29,6 @@ template <class Pass> void runOptPassImpl(OptContext &ctx, FuncPass *) {
     if (func.second.isExternalFunc())
       continue;
     Pass{func.second}();
-    func.second.buildContext();
   }
 }
 
@@ -40,7 +39,11 @@ template <class Pass> void runOptPassImpl(OptContext &ctx, ModulePass *) {
 } // namespace detail
 
 template <class Pass> void runOptPasses(OptContext &ctx) {
+  for (auto &func : ctx.getModule().getFuncs())
+    func.second.buildContext();
   detail::runOptPassImpl<Pass>(ctx, (Pass *)(nullptr));
+  for (auto &func : ctx.getModule().getFuncs())
+    func.second.buildContext();
 }
 
 } // namespace mocker

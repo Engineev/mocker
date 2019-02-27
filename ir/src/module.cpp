@@ -34,9 +34,9 @@ std::vector<std::size_t> BasicBlock::getSuccessors() const {
   if (std::dynamic_pointer_cast<Ret>(lastInst))
     return {};
   if (auto p = std::dynamic_pointer_cast<Jump>(lastInst))
-    return {p->dest->id};
+    return {p->getLabel()->id};
   if (auto p = std::dynamic_pointer_cast<Branch>(lastInst))
-    return {p->then->id, p->else_->id};
+    return {p->getThen()->id, p->getElse()->id};
   assert(false);
 }
 
@@ -77,7 +77,8 @@ BasicBlock &FunctionModule::getMutableBasicBlock(std::size_t labelID) {
 
 std::shared_ptr<LocalReg>
 FunctionModule::makeTempLocalReg(const std::string &hint) {
-  return std::make_shared<LocalReg>(hint + std::to_string(tempRegCounter++));
+  return std::make_shared<LocalReg>(hint + "_" +
+                                    std::to_string(tempRegCounter++));
 }
 
 FunctionModule &Module::addFunc(std::string ident, FunctionModule func) {
