@@ -17,6 +17,7 @@
 #include "optim/promote_global_variables.h"
 #include "optim/simplify_cfg.h"
 #include "optim/ssa.h"
+#include "optim/value_numbering.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
@@ -66,11 +67,11 @@ int main(int argc, char **argv) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
-  //  if (argc == 3) {
-  //    std::string irPath = argv[2];
-  //    std::ofstream dumpIR(irPath + "2.ll");
-  //    ir::printModule(module, dumpIR);
-  //  }
+  if (argc == 3) {
+    std::string irPath = argv[2];
+    std::ofstream dumpIR(irPath + "2.ll");
+    ir::printModule(module, dumpIR);
+  }
 
   runOptPasses<FunctionInline>(optCtx);
   runOptPasses<PromoteGlobalVariables>(optCtx);
@@ -81,14 +82,9 @@ int main(int argc, char **argv) {
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<ConstructSSA>(optCtx);
 
+  runOptPasses<LocalValueNumbering>(optCtx);
   runOptPasses<SparseSimpleConstantPropagation>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
-
-  if (argc == 3) {
-    std::string irPath = argv[2];
-    std::ofstream dumpIR(irPath + "2.ll");
-    ir::printModule(module, dumpIR);
-  }
 
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
@@ -97,7 +93,9 @@ int main(int argc, char **argv) {
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<DeadCodeElimination>(optCtx);
 
+  runOptPasses<LocalValueNumbering>(optCtx);
   runOptPasses<SparseSimpleConstantPropagation>(optCtx);
+  runOptPasses<LocalValueNumbering>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);

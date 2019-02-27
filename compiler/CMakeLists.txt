@@ -23,6 +23,7 @@ set(HEADERS
   optim/promote_global_variables.h
   optim/simplify_cfg.h
   optim/ssa.h
+  optim/value_numbering.h
 
   parse/lexer.h
   parse/parser.h
@@ -47,6 +48,7 @@ set(SOURCES
   optim/promote_global_variables.cpp
   optim/simplify_cfg.cpp
   optim/ssa.cpp
+  optim/value_numbering.cpp
 
   parse/lexer.cpp
   parse/parser.cpp
