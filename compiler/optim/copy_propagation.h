@@ -11,7 +11,7 @@ class CopyPropagation : public FuncPass {
 public:
   explicit CopyPropagation(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   void buildValue();
@@ -21,6 +21,7 @@ private:
 private:
   // The value to propagate
   std::unordered_map<std::string, std::shared_ptr<ir::Addr>> value;
+  std::size_t cnt = 0;
 };
 
 } // namespace mocker

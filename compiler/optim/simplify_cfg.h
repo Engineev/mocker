@@ -9,26 +9,32 @@ namespace mocker {
 // and modify the phi-functions in its successors correspondingly.
 class RewriteBranches : public FuncPass {
 public:
-  explicit RewriteBranches(ir::FunctionModule &func) : FuncPass(func) {}
+  explicit RewriteBranches(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
+
+private:
+  std::size_t cnt = 0;
 };
 
 // Remove a basic block if it is not connected to the entry.
 class RemoveUnreachableBlocks : public FuncPass {
 public:
-  explicit RemoveUnreachableBlocks(ir::FunctionModule &func) : FuncPass(func) {}
+  explicit RemoveUnreachableBlocks(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
+
+private:
+  std::size_t cnt = 0;
 };
 
 // Merge a basic block into its predecessor if it has only one predecessor and
 // it is the only successor of its predecessor.
 class MergeBlocks : public FuncPass {
 public:
-  explicit MergeBlocks(ir::FunctionModule &func) : FuncPass(func) {}
+  explicit MergeBlocks(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   std::vector<std::size_t>

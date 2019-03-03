@@ -13,14 +13,15 @@ SparseSimpleConstantPropagation::SparseSimpleConstantPropagation(
     ir::FunctionModule &func)
     : FuncPass(func) {}
 
-void SparseSimpleConstantPropagation::operator()() {
+bool SparseSimpleConstantPropagation::operator()() {
   buildInstDefineAndInstsUse();
   initialize();
   propagate();
   rewrite();
   removeDeletedInsts(func);
-  std::cerr << "SSCP: Modify " << modificationCnt << " insts in "
-            << func.getIdentifier() << std::endl;
+  //  std::cerr << "SSCP: Modify " << modificationCnt << " insts in "
+  //            << func.getIdentifier() << std::endl;
+  return modificationCnt != 0;
 }
 
 void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {

@@ -16,10 +16,11 @@ PromoteGlobalVariables::PromoteGlobalVariables(ir::Module &module)
   }
 }
 
-void PromoteGlobalVariables::operator()() {
+bool PromoteGlobalVariables::operator()() {
   for (auto &kv : module.getFuncs())
     if (!kv.second.isExternalFunc())
       promoteGlobalVariables(kv.second);
+  return false;
 }
 
 void PromoteGlobalVariables::buildGlobalVarUsedImpl(

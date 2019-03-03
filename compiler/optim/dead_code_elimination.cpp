@@ -13,10 +13,11 @@ DeadCodeElimination::DeadCodeElimination(ir::FunctionModule &func)
   instDefine = buildInstDefine(func);
 }
 
-void DeadCodeElimination::operator()() {
+bool DeadCodeElimination::operator()() {
   init();
   mark();
   sweep();
+  return cnt != 0;
 }
 
 bool DeadCodeElimination::isParameter(const std::string &identifier) {
@@ -71,8 +72,6 @@ void DeadCodeElimination::mark() {
 }
 
 void DeadCodeElimination::sweep() {
-  std::size_t cnt = 0;
-
   for (auto &bb : func.getMutableBBs()) {
     ir::InstList newInsts;
     for (auto &inst : bb.getInsts())
@@ -82,8 +81,8 @@ void DeadCodeElimination::sweep() {
     bb.getMutableInsts() = std::move(newInsts);
   }
 
-  std::cerr << "DeadCodeElimination: eliminate " << cnt << " insts in "
-            << func.getIdentifier() << std::endl;
+  //  std::cerr << "DeadCodeElimination: eliminate " << cnt << " insts in "
+  //            << func.getIdentifier() << std::endl;
 }
 
 } // namespace mocker

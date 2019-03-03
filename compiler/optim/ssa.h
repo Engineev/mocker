@@ -18,7 +18,7 @@ class SSAConstruction : public FuncPass {
 public:
   explicit SSAConstruction(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   template <class T>
@@ -120,11 +120,10 @@ class SimplifyPhiFunctions : public FuncPass {
 public:
   explicit SimplifyPhiFunctions(ir::FunctionModule &func);
 
-  void operator()() override;
-
+  bool operator()() override;
 };
 
-}
+} // namespace mocker
 
 namespace mocker {
 
@@ -132,7 +131,7 @@ class SSADestruction : public FuncPass {
 public:
   explicit SSADestruction(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   void insertAllocas();
@@ -159,6 +158,6 @@ private:
   std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> addresses;
 };
 
-}
+} // namespace mocker
 
 #endif // MOCKER_SSA_H

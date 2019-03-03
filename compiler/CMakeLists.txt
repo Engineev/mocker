@@ -18,7 +18,6 @@ set(HEADERS
   optim/dead_code_elimination.h
   optim/function_inline.h
   optim/helper.h
-  optim/opt_context.h
   optim/opt_pass.h
   optim/optimizer.h
   optim/promote_global_variables.h

@@ -1,5 +1,6 @@
 #include "function_inline.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cctype>
 #include <list>
@@ -9,9 +10,11 @@
 
 namespace mocker {
 
-FunctionInline::FunctionInline(ir::Module &module) : ModulePass(module) {}
+FunctionInline::FunctionInline(ir::Module &module) : ModulePass(module) {
+  buildInlineable();
+}
 
-void FunctionInline::operator()() {
+bool FunctionInline::operator()() {
   auto funcsCopy = module.getFuncs();
 
   for (auto &kv : funcsCopy) {
@@ -20,20 +23,43 @@ void FunctionInline::operator()() {
       continue;
     auto bbIter = func.getMutableBBs().begin();
     while (bbIter != func.getMutableBBs().end()) {
-      auto callIter = bbIter->getMutableInsts().begin();
-      while (callIter != bbIter->getMutableInsts().end() &&
-             !ir::dyc<ir::Call>(*callIter)) {
-        ++callIter;
-      }
+      auto callIter = std::find_if(
+          bbIter->getMutableInsts().begin(), bbIter->getMutableInsts().end(),
+          [this](const std::shared_ptr<ir::IRInst> &inst) {
+            auto call = ir::dyc<ir::Call>(inst);
+            if (!call)
+              return false;
+            return inlineable.find(call->getFuncName()) != inlineable.end();
+          });
+
       if (callIter == bbIter->getMutableInsts().end()) {
         ++bbIter;
         continue;
       }
+
       bbIter = inlineFunction(func, bbIter, callIter);
     }
   }
 
   module.getFuncs() = funcsCopy;
+
+  return false;
+}
+
+void FunctionInline::buildInlineable() {
+  auto countInsts = [](const ir::FunctionModule &func) {
+    std::size_t cnt = 0;
+    for (auto &bb : func.getBBs())
+      cnt += bb.getInsts().size();
+    return cnt;
+  };
+
+  for (auto &kv : module.getFuncs()) {
+    if (kv.second.isExternalFunc())
+      continue;
+    if (countInsts(kv.second) <= 100)
+      inlineable.emplace(kv.first);
+  }
 }
 
 bool FunctionInline::isParameter(const ir::FunctionModule &func,

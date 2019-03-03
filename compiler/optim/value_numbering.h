@@ -13,7 +13,7 @@ class LocalValueNumbering : public BasicBlockPass {
 public:
   explicit LocalValueNumbering(ir::BasicBlock &bb);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   std::string hash(const std::shared_ptr<const ir::Addr> &addr);

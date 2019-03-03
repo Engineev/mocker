@@ -30,8 +30,8 @@ replacePhiOption(const std::shared_ptr<ir::Phi> &phi, std::size_t oldLabel,
                  std::size_t newLabel);
 
 std::shared_ptr<ir::IRInst>
-replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst, std::size_t oldLabel,
-                 std::size_t newLabel);
+replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
+                       std::size_t oldLabel, std::size_t newLabel);
 
 } // namespace mocker
 

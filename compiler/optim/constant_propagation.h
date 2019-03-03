@@ -14,7 +14,7 @@ class SparseSimpleConstantPropagation : public FuncPass {
 public:
   explicit SparseSimpleConstantPropagation(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   struct Value {

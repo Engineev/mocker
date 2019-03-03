@@ -13,7 +13,7 @@ class PromoteGlobalVariables : public ModulePass {
 public:
   explicit PromoteGlobalVariables(ir::Module &module);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   void promoteGlobalVariables(ir::FunctionModule &func);

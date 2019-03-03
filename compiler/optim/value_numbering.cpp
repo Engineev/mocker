@@ -12,7 +12,7 @@ namespace mocker {
 LocalValueNumbering::LocalValueNumbering(ir::BasicBlock &bb)
     : BasicBlockPass(bb) {}
 
-void LocalValueNumbering::operator()() {
+bool LocalValueNumbering::operator()() {
   std::size_t cnt = 0;
   for (auto &inst : bb.getMutableInsts()) {
     auto dest = ir::getDest(inst);
@@ -45,7 +45,8 @@ void LocalValueNumbering::operator()() {
     key2ValueNumber[lhsKey] = key2ValueNumber[rhsKey] = newValueNumber;
   }
 
-  std::cerr << "LVN: modified " << cnt << " insts\n";
+  //  std::cerr << "LVN: modified " << cnt << " insts\n";
+  return cnt != 0;
 }
 
 std::string

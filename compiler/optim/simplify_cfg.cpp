@@ -20,7 +20,9 @@ void deletePhiOptionInBB(ir::BasicBlock &bb, std::size_t toBeDeleted) {
   }
 }
 
-void RewriteBranches::operator()() {
+RewriteBranches::RewriteBranches(ir::FunctionModule &func) : FuncPass(func) {}
+
+bool RewriteBranches::operator()() {
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
       auto br = ir::dyc<ir::Branch>(inst);
@@ -29,6 +31,7 @@ void RewriteBranches::operator()() {
       auto condition = ir::cdyc<ir::IntLiteral>(br->getCondition());
       if (!condition)
         continue;
+      ++cnt;
       auto target = condition->val ? br->getThen() : br->getElse();
       inst = std::make_shared<ir::Jump>(ir::dyc<ir::Label>(copy(target)));
       auto notTarget = condition->val ? br->getElse() : br->getThen();
@@ -36,9 +39,14 @@ void RewriteBranches::operator()() {
                           bb.getLabelID());
     }
   }
+
+  return cnt != 0;
 }
 
-void RemoveUnreachableBlocks::operator()() {
+RemoveUnreachableBlocks::RemoveUnreachableBlocks(ir::FunctionModule &func)
+    : FuncPass(func) {}
+
+bool RemoveUnreachableBlocks::operator()() {
   std::unordered_set<std::size_t> reachable;
   std::function<void(std::size_t cur)> visit = [&visit, &reachable,
                                                 this](std::size_t cur) {
@@ -58,12 +66,16 @@ void RemoveUnreachableBlocks::operator()() {
     }
   }
 
+  cnt = func.getBBs().size() - reachable.size();
   func.getMutableBBs().remove_if([&reachable](const ir::BasicBlock &bb) {
     return reachable.find(bb.getLabelID()) == reachable.end();
   });
+  return cnt != 0;
 }
 
-void MergeBlocks::operator()() {
+MergeBlocks::MergeBlocks(ir::FunctionModule &func) : FuncPass(func) {}
+
+bool MergeBlocks::operator()() {
   auto preds = buildBlockPredecessors(func);
   std::vector<std::size_t> mergeable;
   for (auto &kv : preds) {
@@ -73,11 +85,6 @@ void MergeBlocks::operator()() {
     if (pred.getSuccessors().size() == 1)
       mergeable.emplace_back(kv.first);
   }
-
-  //  std::cerr << "mergeable: ";
-  //  for (auto i : mergeable)
-  //    std::cerr << i << ", ";
-  //  std::cerr << std::endl;
 
   auto toBeMerged = findFurthest(mergeable);
   auto isMergeable = [&preds, this](std::size_t u) -> bool {
@@ -105,22 +112,20 @@ void MergeBlocks::operator()() {
   };
 
   for (auto u : toBeMerged) {
-    //    std::cerr << "merge " << u;
     std::cerr.flush();
     while (isMergeable(u)) {
       auto pred = preds.at(u).at(0);
-      //      std::cerr << " into " << pred << std::endl;
       merge(pred, u);
       u = pred;
-      //      ir::printFunc(func, std::cerr);
     }
   }
 
   func.getMutableBBs().remove_if(
       [](const ir::BasicBlock &bb) { return bb.getInsts().empty(); });
 
-  std::cerr << "MergeBlocks: Merged " << mergeable.size() << " BBs in "
-            << func.getIdentifier() << std::endl;
+  //  std::cerr << "MergeBlocks: Merged " << mergeable.size() << " BBs in "
+  //            << func.getIdentifier() << std::endl;
+  return mergeable.size() != 0;
 }
 
 std::vector<std::size_t>
@@ -138,4 +143,5 @@ MergeBlocks::findFurthest(const std::vector<std::size_t> &mergeable) const {
 
   return res;
 }
+
 } // namespace mocker

@@ -14,10 +14,11 @@ namespace mocker {
 
 SSAConstruction::SSAConstruction(ir::FunctionModule &func) : FuncPass(func) {}
 
-void SSAConstruction::operator()() {
+bool SSAConstruction::operator()() {
   computeAuxiliaryInfo();
   insertPhiFunctions();
   renameVariables();
+  return false;
 }
 
 void SSAConstruction::computeAuxiliaryInfo() {
@@ -346,10 +347,12 @@ void SSAConstruction::updateReachingDef(const std::string &varName,
 
 namespace mocker {
 
-SimplifyPhiFunctions::SimplifyPhiFunctions(ir::FunctionModule &func) : FuncPass(func) {}
+SimplifyPhiFunctions::SimplifyPhiFunctions(ir::FunctionModule &func)
+    : FuncPass(func) {}
 
-void SimplifyPhiFunctions::operator()() {
-  for (auto & bb : func.getMutableBBs()) {
+bool SimplifyPhiFunctions::operator()() {
+  std::size_t cnt = 0;
+  for (auto &bb : func.getMutableBBs()) {
     // find the insertion point
     auto insertionPoint = bb.getMutableInsts().begin();
     while (ir::dyc<ir::Phi>(*insertionPoint))
@@ -361,25 +364,30 @@ void SimplifyPhiFunctions::operator()() {
         break;
 
       if (phi->getOptions().size() == 1) {
-        auto assign = std::make_shared<ir::Assign>(ir::copy(phi->getDest()), ir::copy(phi->getOptions()[0].first));
+        ++cnt;
+        auto assign = std::make_shared<ir::Assign>(
+            ir::copy(phi->getDest()), ir::copy(phi->getOptions()[0].first));
         inst = std::make_shared<ir::Deleted>();
         bb.getMutableInsts().emplace(insertionPoint, std::move(assign));
       }
     }
   }
   removeDeletedInsts(func);
+  return cnt != 0;
 }
-}
+} // namespace mocker
+
 namespace mocker {
 
 SSADestruction::SSADestruction(ir::FunctionModule &func) : FuncPass(func) {}
 
-void SSADestruction::operator()() {
+bool SSADestruction::operator()() {
   insertAllocas();
   splitCriticalEdges();
-//  ir::printFunc(func, std::cerr);
+  //  ir::printFunc(func, std::cerr);
   replacePhisWithParallelCopies();
   sequentializeParallelCopies();
+  return false;
 }
 
 void SSADestruction::insertAllocas() {
@@ -421,7 +429,8 @@ void SSADestruction::splitCriticalEdges() {
 
       // split this critical edge
       auto &newBB = *func.pushBackBB();
-      newBB.appendInst(std::make_shared<ir::Jump>(std::make_shared<ir::Label>(bb.getLabelID())));
+      newBB.appendInst(std::make_shared<ir::Jump>(
+          std::make_shared<ir::Label>(bb.getLabelID())));
       // rewrite the phi-functions in [bb]
       for (auto &inst : bb.getMutableInsts()) {
         auto phi = ir::dyc<ir::Phi>(inst);
@@ -447,8 +456,8 @@ void SSADestruction::replacePhisWithParallelCopies() {
 
       auto dest = ir::cdyc<ir::LocalReg>(phi->getDest());
       for (auto &option : phi->getOptions())
-        parallelCopies[option.second->id].emplace_back(ir::dyc<ir::LocalReg>(ir::copy(dest)),
-                                                       ir::copy(option.first));
+        parallelCopies[option.second->id].emplace_back(
+            ir::dyc<ir::LocalReg>(ir::copy(dest)), ir::copy(option.first));
       inst = std::make_shared<ir::Load>(ir::copy(dest),
                                         addresses.at(dest->identifier));
     }
@@ -461,11 +470,13 @@ void SSADestruction::sequentializeParallelCopies() {
   // Store.
   // Redundant Loads can be eliminate in later passes.
 
-  for (auto & bb : func.getMutableBBs()) {
-    std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> regHoldingOldValue;
-    const auto & pcopies = parallelCopies[bb.getLabelID()];
-    for (auto & pcopy : pcopies) {
-      auto oldVal = regHoldingOldValue[pcopy.dest->identifier] = func.makeTempLocalReg();
+  for (auto &bb : func.getMutableBBs()) {
+    std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>>
+        regHoldingOldValue;
+    const auto &pcopies = parallelCopies[bb.getLabelID()];
+    for (auto &pcopy : pcopies) {
+      auto oldVal = regHoldingOldValue[pcopy.dest->identifier] =
+          func.makeTempLocalReg();
       auto addr = addresses.at(pcopy.dest->identifier);
       bb.appendInstBeforeTerminator(std::make_shared<ir::Load>(oldVal, addr));
       std::shared_ptr<ir::Addr> newVal = pcopy.val;

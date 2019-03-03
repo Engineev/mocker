@@ -13,7 +13,7 @@ class DeadCodeElimination : public FuncPass {
 public:
   explicit DeadCodeElimination(ir::FunctionModule &func);
 
-  void operator()() override;
+  bool operator()() override;
 
 private:
   bool isParameter(const std::string &identifier);
@@ -30,6 +30,7 @@ private:
   std::queue<std::string> workList;
   std::unordered_set<ir::InstID> useful;
   std::unordered_map<std::string, std::shared_ptr<ir::IRInst>> instDefine;
+  std::size_t cnt = 0;
 };
 
 } // namespace mocker

@@ -10,9 +10,10 @@ namespace mocker {
 
 CopyPropagation::CopyPropagation(ir::FunctionModule &func) : FuncPass(func) {}
 
-void CopyPropagation::operator()() {
+bool CopyPropagation::operator()() {
   buildValue();
   rewrite();
+  return cnt != 0;
 }
 
 void CopyPropagation::buildValue() {
@@ -67,6 +68,7 @@ void CopyPropagation::rewrite() {
         if (iter == value.end())
           continue;
         operand = iter->second;
+        ++cnt;
       }
       inst = ir::copyWithReplacedOperands(inst, operands);
     }

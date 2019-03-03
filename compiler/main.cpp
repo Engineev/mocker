@@ -4,9 +4,9 @@
 #include <sstream>
 
 #include "ast/ast_node.h"
+#include "ir/helper.h"
 #include "ir/printer.h"
 #include "ir/stats.h"
-#include "ir/helper.h"
 #include "ir_builder/build.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
@@ -14,7 +14,6 @@
 #include "optim/copy_propagation.h"
 #include "optim/dead_code_elimination.h"
 #include "optim/function_inline.h"
-#include "optim/opt_context.h"
 #include "optim/optimizer.h"
 #include "optim/promote_global_variables.h"
 #include "optim/simplify_cfg.h"
@@ -34,6 +33,24 @@ void printIRStats(const mocker::ir::Stats &stats) {
             << stats.countInsts<Store>() + stats.countInsts<Load>()
             << std::endl;
 };
+
+void runOptsUntilFixedPoint(mocker::ir::Module &module) {
+  using namespace mocker;
+
+  bool optimizable = true;
+  while (optimizable) {
+    optimizable = false;
+    optimizable |= runOptPasses<LocalValueNumbering>(module);
+    optimizable |= runOptPasses<CopyPropagation>(module);
+    optimizable |= runOptPasses<SparseSimpleConstantPropagation>(module);
+    optimizable |= runOptPasses<CopyPropagation>(module);
+    optimizable |= runOptPasses<RewriteBranches>(module);
+    optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
+    optimizable |= runOptPasses<MergeBlocks>(module);
+    optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
+    optimizable |= runOptPasses<DeadCodeElimination>(module);
+  }
+}
 
 int main(int argc, char **argv) {
   using namespace mocker;
@@ -63,64 +80,38 @@ int main(int argc, char **argv) {
   for (auto &func : module.getFuncs())
     func.second.buildContext();
 
-  OptContext optCtx(module);
   ir::Stats stats(module);
 
   std::cerr << "Original:\n";
   printIRStats(stats);
   assert(stats.countInsts<ir::Phi>() == 0);
 
-  runOptPasses<FunctionInline>(optCtx);
-  runOptPasses<PromoteGlobalVariables>(optCtx);
+  runOptPasses<FunctionInline>(module);
+  runOptPasses<FunctionInline>(module);
+  runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);
 
-  std::cerr << "After inline and promotion of global variables:\n";
+  std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
+  runOptPasses<RemoveUnreachableBlocks>(module);
+  runOptPasses<SSAConstruction>(module);
 
-  runOptPasses<SSAConstruction>(optCtx);
-  runOptPasses<LocalValueNumbering>(optCtx);
-  runOptPasses<CopyPropagation>(optCtx);
+  runOptsUntilFixedPoint(module);
 
-  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
-  runOptPasses<CopyPropagation>(optCtx);
-  runOptPasses<RewriteBranches>(optCtx);
-  runOptPasses<SimplifyPhiFunctions>(optCtx);
+  std::cerr << "\nBefore SSA destruction:\n";
+  printIRStats(stats);
 
   if (argc == 3) {
     std::string irPath = argv[2];
-    std::ofstream dumpIR(irPath + "2.ll");
+    std::ofstream dumpIR(irPath);
     ir::printModule(module, dumpIR);
   }
 
-  runOptPasses<MergeBlocks>(optCtx);
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
-  runOptPasses<RewriteBranches>(optCtx);
-  runOptPasses<SimplifyPhiFunctions>(optCtx);
-  runOptPasses<MergeBlocks>(optCtx);
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
-  runOptPasses<DeadCodeElimination>(optCtx);
-
-  runOptPasses<LocalValueNumbering>(optCtx);
-  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
-  runOptPasses<LocalValueNumbering>(optCtx);
-  runOptPasses<RewriteBranches>(optCtx);
-  runOptPasses<SimplifyPhiFunctions>(optCtx);
-  runOptPasses<MergeBlocks>(optCtx);
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
-  runOptPasses<RewriteBranches>(optCtx);
-  runOptPasses<SimplifyPhiFunctions>(optCtx);
-  runOptPasses<MergeBlocks>(optCtx);
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
-  runOptPasses<DeadCodeElimination>(optCtx);
-
-  runOptPasses<RewriteBranches>(optCtx);
-  runOptPasses<MergeBlocks>(optCtx);
-  runOptPasses<RemoveUnreachableBlocks>(optCtx);
-
-  runOptPasses<SSADestruction>(optCtx);
+  runOptPasses<SSADestruction>(module);
   assert(stats.countInsts<ir::Phi>() == 0);
+
+  runOptsUntilFixedPoint(module);
 
   std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);

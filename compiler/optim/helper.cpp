@@ -82,20 +82,23 @@ replacePhiOption(const std::shared_ptr<ir::Phi> &phi, std::size_t oldLabel,
                                    std::move(newOptions));
 }
 
-std::shared_ptr<ir::IRInst> replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
-                                                   std::size_t oldLabel,
-                                                   std::size_t newLabel) {
+std::shared_ptr<ir::IRInst>
+replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
+                       std::size_t oldLabel, std::size_t newLabel) {
   if (auto p = ir::dyc<ir::Jump>(inst)) {
     assert(p->getLabel()->id == oldLabel);
     return std::make_shared<ir::Jump>(std::make_shared<ir::Label>(newLabel));
   }
   if (auto p = ir::dyc<ir::Branch>(inst)) {
     if (p->getThen()->id == oldLabel)
-      return std::make_shared<ir::Branch>(ir::copy(p->getCondition()), std::make_shared<ir::Label>(newLabel),
+      return std::make_shared<ir::Branch>(
+          ir::copy(p->getCondition()), std::make_shared<ir::Label>(newLabel),
           std::make_shared<ir::Label>(p->getElse()->id));
     if (p->getElse()->id == oldLabel)
-      return std::make_shared<ir::Branch>(ir::copy(p->getCondition()),
-          std::make_shared<ir::Label>(p->getThen()->id), std::make_shared<ir::Label>(newLabel));
+      return std::make_shared<ir::Branch>(
+          ir::copy(p->getCondition()),
+          std::make_shared<ir::Label>(p->getThen()->id),
+          std::make_shared<ir::Label>(newLabel));
     assert(false);
   }
   assert(false);

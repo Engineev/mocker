@@ -2,7 +2,6 @@
 #define MOCKER_OPTIMIZER_H
 
 #include "ir/module.h"
-#include "opt_context.h"
 #include "opt_pass.h"
 
 #include <cassert>
@@ -14,37 +13,43 @@
 namespace mocker {
 namespace detail {
 
-template <class Pass> void runOptPassImpl(OptContext &ctx, BasicBlockPass *) {
-  for (auto &func : ctx.getModule().getFuncs()) {
+template <class Pass>
+bool runOptPassImpl(ir::Module &module, BasicBlockPass *) {
+  auto res = false;
+  for (auto &func : module.getFuncs()) {
     if (func.second.isExternalFunc())
       continue;
     for (auto &bb : func.second.getMutableBBs()) {
-      Pass{bb}();
+      res |= Pass{bb}();
     }
   }
+  return res;
 }
 
-template <class Pass> void runOptPassImpl(OptContext &ctx, FuncPass *) {
-  for (auto &func : ctx.getModule().getFuncs()) {
+template <class Pass> bool runOptPassImpl(ir::Module &module, FuncPass *) {
+  auto res = false;
+  for (auto &func : module.getFuncs()) {
     if (func.second.isExternalFunc())
       continue;
-    Pass{func.second}();
+    res |= Pass{func.second}();
   }
+  return res;
 }
 
-template <class Pass> void runOptPassImpl(OptContext &ctx, ModulePass *) {
-  Pass{ctx.getModule()}();
+template <class Pass> bool runOptPassImpl(ir::Module &module, ModulePass *) {
+  return Pass{module}();
 }
 
 } // namespace detail
 
-template <class Pass> void runOptPasses(OptContext &ctx) {
-  for (auto &func : ctx.getModule().getFuncs())
+template <class Pass> bool runOptPasses(ir::Module &module) {
+  for (auto &func : module.getFuncs())
     func.second.buildContext();
-  detail::runOptPassImpl<Pass>(ctx, (Pass *)(nullptr));
-  for (auto &func : ctx.getModule().getFuncs())
+  auto res = detail::runOptPassImpl<Pass>(module, (Pass *)(nullptr));
+  for (auto &func : module.getFuncs())
     func.second.buildContext();
-  ir::verifyModule(ctx.getModule());
+  ir::verifyModule(module);
+  return res;
 }
 
 } // namespace mocker
