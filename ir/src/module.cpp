@@ -22,6 +22,12 @@ void BasicBlock::appendInstFront(std::shared_ptr<IRInst> inst) {
   insts.emplace_front(std::move(inst));
 }
 
+void BasicBlock::appendInstBeforeTerminator(std::shared_ptr<IRInst> inst) {
+  assert(isCompleted());
+  auto pos = --insts.end();
+  insts.emplace(pos, std::move(inst));
+}
+
 bool BasicBlock::isCompleted() const {
   if (insts.empty())
     return false;
@@ -62,17 +68,25 @@ void FunctionModule::buildContext() {
   bbMap.reserve(bbs.size());
   for (auto &bb : bbs)
     bbMap.emplace(bb.getLabelID(), bb);
-  contextBuilt = true;
+
+  for (auto &bb : bbs)
+    predecessors[bb.getLabelID()] = {};
+  for (auto &bb : bbs) {
+    for (auto succ : bb.getSuccessors())
+      predecessors[succ].emplace_back(bb.getLabelID());
+  }
 }
 
 const BasicBlock &FunctionModule::getBasicBlock(std::size_t labelID) const {
-  assert(contextBuilt);
   return bbMap.at(labelID);
 }
 
 BasicBlock &FunctionModule::getMutableBasicBlock(std::size_t labelID) {
-  assert(contextBuilt);
   return bbMap.at(labelID);
+}
+
+std::vector<std::size_t> FunctionModule::getPredcessors(std::size_t bb) const {
+  return predecessors.at(bb);
 }
 
 std::shared_ptr<LocalReg>

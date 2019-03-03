@@ -44,6 +44,8 @@ copyWithReplacedDest(const std::shared_ptr<ir::IRInst> &inst,
 // terminate if an error occurs
 void verifyFuncModule(const ir::FunctionModule &func);
 
+void verifyModule(const ir::Module &module);
+
 } // namespace ir
 } // namespace mocker
 

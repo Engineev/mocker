@@ -35,6 +35,8 @@ public:
 
   void appendInstFront(std::shared_ptr<IRInst> inst);
 
+  void appendInstBeforeTerminator(std::shared_ptr<IRInst> inst);
+
   // check whether the last instruction is a terminator
   bool isCompleted() const;
 
@@ -82,6 +84,8 @@ public:
 
   BBLIter getFirstBB() { return bbs.begin(); }
 
+  std::vector<std::size_t> getPredcessors(std::size_t bb) const;
+
 private:
   std::string identifier;
   std::vector<std::string> args;
@@ -91,8 +95,8 @@ private:
   bool isExternal = false;
 
 private: // context
-  bool contextBuilt = false;
   std::unordered_map<std::size_t, std::reference_wrapper<BasicBlock>> bbMap;
+  std::unordered_map<std::size_t, std::vector<std::size_t>> predecessors;
 };
 
 class GlobalVarModule {

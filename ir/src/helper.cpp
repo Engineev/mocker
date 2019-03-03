@@ -1,7 +1,7 @@
 #include "helper.h"
 
+#include <algorithm>
 #include <cassert>
-#include <helper.h>
 #include <string>
 
 namespace mocker {
@@ -274,10 +274,46 @@ copyWithReplacedDest(const std::shared_ptr<ir::IRInst> &inst,
 }
 
 void verifyFuncModule(const ir::FunctionModule &func) {
+  // check whether all blocks are terminated
   for (const auto &bb : func.getBBs())
     if (!bb.isCompleted())
       std::terminate();
-  // TODO
+
+  // check whether there exists phi-functions that are in the middle of a block
+  for (const auto &bb : func.getBBs()) {
+    auto iter = bb.getInsts().begin();
+    while (ir::dyc<ir::Phi>(*iter))
+      ++iter;
+    if (!ir::dyc<ir::Terminator>(*iter)) {
+      if (ir::dyc<ir::Phi>(*iter))
+        std::terminate();
+      ++iter;
+    }
+  }
+
+  // check the validation of phi-functions
+  for (const auto &bb : func.getBBs()) {
+    auto preds = func.getPredcessors(bb.getLabelID());
+    std::sort(preds.begin(), preds.end());
+
+    for (auto &inst : bb.getInsts()) {
+      auto phi = dyc<ir::Phi>(inst);
+      if (!phi)
+        break;
+
+      std::vector<std::size_t> sources;
+      for (auto &option : phi->getOptions())
+        sources.emplace_back(option.second->id);
+      std::sort(sources.begin(), sources.end());
+      if (preds != sources)
+        std::terminate();
+    }
+  }
+}
+
+void verifyModule(const ir::Module &module) {
+  for (auto &kv : module.getFuncs())
+    verifyFuncModule(kv.second);
 }
 
 } // namespace ir
