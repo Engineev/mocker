@@ -44,6 +44,7 @@ template <class Pass> void runOptPasses(OptContext &ctx) {
   detail::runOptPassImpl<Pass>(ctx, (Pass *)(nullptr));
   for (auto &func : ctx.getModule().getFuncs())
     func.second.buildContext();
+  ir::verifyModule(ctx.getModule());
 }
 
 } // namespace mocker

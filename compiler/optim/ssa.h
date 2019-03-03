@@ -14,9 +14,9 @@ namespace mocker {
 
 // Promote memory references to register references. An implementation of the
 // standard SSA construction algorithm.
-class ConstructSSA : public FuncPass {
+class SSAConstruction : public FuncPass {
 public:
-  explicit ConstructSSA(ir::FunctionModule &func);
+  explicit SSAConstruction(ir::FunctionModule &func);
 
   void operator()() override;
 
@@ -112,5 +112,53 @@ private:
 };
 
 } // namespace mocker
+
+namespace mocker {
+
+// Replace a phi-function by an Assign when possible
+class SimplifyPhiFunctions : public FuncPass {
+public:
+  explicit SimplifyPhiFunctions(ir::FunctionModule &func);
+
+  void operator()() override;
+
+};
+
+}
+
+namespace mocker {
+
+class SSADestruction : public FuncPass {
+public:
+  explicit SSADestruction(ir::FunctionModule &func);
+
+  void operator()() override;
+
+private:
+  void insertAllocas();
+
+  // Split all critical edges by inserting dummy basic blocks.
+  void splitCriticalEdges();
+
+  struct Copy {
+    Copy(std::shared_ptr<ir::LocalReg> dest, std::shared_ptr<ir::Addr> val)
+        : dest(std::move(dest)), val(std::move(val)) {}
+
+    std::shared_ptr<ir::LocalReg> dest;
+    std::shared_ptr<ir::Addr> val;
+  };
+
+  void replacePhisWithParallelCopies();
+
+  void sequentializeParallelCopies();
+
+private:
+  std::unordered_map<std::size_t, std::list<Copy>> parallelCopies;
+  // For each phi-function a=phi(...), we create an Alloca instruction for a,
+  // and [address] is the mapping from the identifiers to the Alloca's
+  std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> addresses;
+};
+
+}
 
 #endif // MOCKER_SSA_H

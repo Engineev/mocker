@@ -5,19 +5,22 @@
 #include <iostream>
 #include <queue>
 
+#include "helper.h"
 #include "ir/helper.h"
+
+#include "ir/printer.h"
 
 namespace mocker {
 
-ConstructSSA::ConstructSSA(ir::FunctionModule &func) : FuncPass(func) {}
+SSAConstruction::SSAConstruction(ir::FunctionModule &func) : FuncPass(func) {}
 
-void ConstructSSA::operator()() {
+void SSAConstruction::operator()() {
   computeAuxiliaryInfo();
   insertPhiFunctions();
   renameVariables();
 }
 
-void ConstructSSA::computeAuxiliaryInfo() {
+void SSAConstruction::computeAuxiliaryInfo() {
   buildDominating();
   buildDominators();
   buildImmediateDominator();
@@ -27,7 +30,7 @@ void ConstructSSA::computeAuxiliaryInfo() {
   //  printAuxiliaryInfo();
 }
 
-void ConstructSSA::printAuxiliaryInfo() {
+void SSAConstruction::printAuxiliaryInfo() {
   std::cerr << "ImmediateDominator:\n";
   for (auto &kv : bbInfo) {
     if (kv.first == func.getFirstBB()->getLabelID())
@@ -49,12 +52,12 @@ void ConstructSSA::printAuxiliaryInfo() {
   printDTChildren(root);
 }
 
-void ConstructSSA::buildDominating() {
+void SSAConstruction::buildDominating() {
   for (const auto &bb : func.getBBs())
     buildDominatingImpl(bb.getLabelID());
 }
 
-void ConstructSSA::buildDominatingImpl(std::size_t node) {
+void SSAConstruction::buildDominatingImpl(std::size_t node) {
   // Construct the set [avoidable] of nodes which are reachable from the entry
   // without passing [node]. The nodes dominated by [node] are just the nodes
   // which are not in [avoidable].
@@ -76,16 +79,16 @@ void ConstructSSA::buildDominatingImpl(std::size_t node) {
   }
 }
 
-bool ConstructSSA::isDominating(std::size_t u, std::size_t v) const {
+bool SSAConstruction::isDominating(std::size_t u, std::size_t v) const {
   const auto &d = bbInfo.at(u).dominating;
   return d.find(v) != d.end();
 }
 
-bool ConstructSSA::isStrictlyDominating(std::size_t u, std::size_t v) const {
+bool SSAConstruction::isStrictlyDominating(std::size_t u, std::size_t v) const {
   return u != v && isDominating(u, v);
 }
 
-void ConstructSSA::buildDominators() {
+void SSAConstruction::buildDominators() {
   for (const auto &infoPair : bbInfo) {
     auto u = infoPair.first;
     const auto &info = infoPair.second;
@@ -94,7 +97,7 @@ void ConstructSSA::buildDominators() {
   }
 }
 
-void ConstructSSA::buildImmediateDominator() {
+void SSAConstruction::buildImmediateDominator() {
   // For a faster algorithm, see [Lengauer, Tarjan, 1979]
 
   for (const auto &bb : func.getBBs())
@@ -102,7 +105,7 @@ void ConstructSSA::buildImmediateDominator() {
       buildImmediateDominatorImpl(bb.getLabelID());
 }
 
-void ConstructSSA::buildImmediateDominatorImpl(std::size_t node) {
+void SSAConstruction::buildImmediateDominatorImpl(std::size_t node) {
   auto &info = bbInfo.at(node);
 
   for (auto dominator : info.dominators) {
@@ -125,7 +128,7 @@ void ConstructSSA::buildImmediateDominatorImpl(std::size_t node) {
   assert(false); // The immediate dominator of a node must exist.
 }
 
-void ConstructSSA::buildDominatorTree() {
+void SSAConstruction::buildDominatorTree() {
   LabelMap<std::shared_ptr<DTNode>> nodePool;
   for (auto &bb : func.getMutableBBs())
     nodePool.emplace(bb.getLabelID(), std::make_shared<DTNode>(bb));
@@ -152,7 +155,7 @@ void ConstructSSA::buildDominatorTree() {
   //    visit(root);
 }
 
-void ConstructSSA::buildDominatingFrontier() {
+void SSAConstruction::buildDominatingFrontier() {
   auto collectCFGEdge = [this] {
     std::vector<std::pair<std::size_t, std::size_t>> res;
     for (const auto &bb : func.getBBs()) {
@@ -175,7 +178,7 @@ void ConstructSSA::buildDominatingFrontier() {
   }
 }
 
-void ConstructSSA::insertPhiFunctions() {
+void SSAConstruction::insertPhiFunctions() {
   const auto &firstBB = *func.getFirstBB();
   for (const auto &inst : firstBB.getInsts()) {
     if (auto p = ir::dyc<ir::Alloca>(inst)) {
@@ -189,7 +192,7 @@ void ConstructSSA::insertPhiFunctions() {
     insertPhiFunctions(v);
 }
 
-void ConstructSSA::insertPhiFunctions(const std::string &varName) {
+void SSAConstruction::insertPhiFunctions(const std::string &varName) {
   LabelSet originalDefs, added;
   std::queue<Definition> remaining;
   auto defs = collectAndReplaceDefs(varName);
@@ -221,8 +224,8 @@ void ConstructSSA::insertPhiFunctions(const std::string &varName) {
   }
 }
 
-std::vector<ConstructSSA::Definition>
-ConstructSSA::collectAndReplaceDefs(const std::string &name) {
+std::vector<SSAConstruction::Definition>
+SSAConstruction::collectAndReplaceDefs(const std::string &name) {
   std::vector<Definition> res;
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
@@ -245,7 +248,7 @@ ConstructSSA::collectAndReplaceDefs(const std::string &name) {
   return res;
 }
 
-void ConstructSSA::renameVariables() {
+void SSAConstruction::renameVariables() {
   for (const auto &name : varNames)
     reachingDef[name] = ".phi_nan";
   bbDefined[".phi_nan"] = func.getFirstBB()->getLabelID();
@@ -253,8 +256,8 @@ void ConstructSSA::renameVariables() {
   renameVariablesImpl(root);
 }
 
-void ConstructSSA::renameVariablesImpl(
-    const std::shared_ptr<ConstructSSA::DTNode> &curNode) {
+void SSAConstruction::renameVariablesImpl(
+    const std::shared_ptr<SSAConstruction::DTNode> &curNode) {
   auto &bb = curNode->content.get();
 
   for (auto &inst : bb.getMutableInsts()) {
@@ -328,8 +331,8 @@ void ConstructSSA::renameVariablesImpl(
     renameVariablesImpl(child);
 }
 
-void ConstructSSA::updateReachingDef(const std::string &varName,
-                                     std::size_t label) {
+void SSAConstruction::updateReachingDef(const std::string &varName,
+                                        std::size_t label) {
   if (reachingDef.find(varName) == reachingDef.end())
     return;
 
@@ -337,6 +340,143 @@ void ConstructSSA::updateReachingDef(const std::string &varName,
   while (!isDominating(bbDefined.at(r), label))
     r = reachingDef.at(r);
   reachingDef.at(varName) = r;
+}
+
+} // namespace mocker
+
+namespace mocker {
+
+SimplifyPhiFunctions::SimplifyPhiFunctions(ir::FunctionModule &func) : FuncPass(func) {}
+
+void SimplifyPhiFunctions::operator()() {
+  for (auto & bb : func.getMutableBBs()) {
+    // find the insertion point
+    auto insertionPoint = bb.getMutableInsts().begin();
+    while (ir::dyc<ir::Phi>(*insertionPoint))
+      ++insertionPoint;
+
+    for (auto &inst : bb.getMutableInsts()) {
+      auto phi = ir::dyc<ir::Phi>(inst);
+      if (!phi)
+        break;
+
+      if (phi->getOptions().size() == 1) {
+        auto assign = std::make_shared<ir::Assign>(ir::copy(phi->getDest()), ir::copy(phi->getOptions()[0].first));
+        inst = std::make_shared<ir::Deleted>();
+        bb.getMutableInsts().emplace(insertionPoint, std::move(assign));
+      }
+    }
+  }
+  removeDeletedInsts(func);
+}
+}
+namespace mocker {
+
+SSADestruction::SSADestruction(ir::FunctionModule &func) : FuncPass(func) {}
+
+void SSADestruction::operator()() {
+  insertAllocas();
+  splitCriticalEdges();
+//  ir::printFunc(func, std::cerr);
+  replacePhisWithParallelCopies();
+  sequentializeParallelCopies();
+}
+
+void SSADestruction::insertAllocas() {
+  std::vector<std::string> varNames;
+
+  for (auto &bb : func.getBBs()) {
+    for (auto &inst : bb.getInsts()) {
+      auto phi = ir::dyc<ir::Phi>(inst);
+      if (!phi)
+        break;
+      varNames.emplace_back(ir::getLocalRegIdentifier(phi->getDest()));
+    }
+  }
+
+  for (auto &varName : varNames) {
+    auto addr = func.makeTempLocalReg();
+    addresses[varName] = addr;
+    func.getFirstBB()->appendInstFront(std::make_shared<ir::Alloca>(addr, 8));
+  }
+}
+
+void SSADestruction::splitCriticalEdges() {
+  auto preds = buildBlockPredecessors(func);
+  // We will insert new blocks during the iteration. Hence, record [ed] first
+  // and only append new blocks after [ed].
+  for (auto iter = func.getMutableBBs().begin(),
+            ed = func.getMutableBBs().end();
+       iter != ed; ++iter) {
+    auto &bb = *iter;
+    const auto &predsOfBB = preds[bb.getLabelID()];
+    if (predsOfBB.size() <= 1) // is not a critical edge
+      continue;
+
+    for (auto predLabel : predsOfBB) {
+      auto &pred = func.getMutableBasicBlock(predLabel);
+      auto succOfPred = pred.getSuccessors();
+      if (succOfPred.size() == 1) // is not a critical edge
+        continue;
+
+      // split this critical edge
+      auto &newBB = *func.pushBackBB();
+      newBB.appendInst(std::make_shared<ir::Jump>(std::make_shared<ir::Label>(bb.getLabelID())));
+      // rewrite the phi-functions in [bb]
+      for (auto &inst : bb.getMutableInsts()) {
+        auto phi = ir::dyc<ir::Phi>(inst);
+        if (!phi)
+          break;
+        inst = replacePhiOption(phi, bb.getLabelID(), newBB.getLabelID());
+      }
+
+      pred.getMutableInsts().back() = replaceTerminatorLabel(
+          pred.getInsts().back(), bb.getLabelID(), newBB.getLabelID());
+    }
+  }
+}
+
+void SSADestruction::replacePhisWithParallelCopies() {
+  auto preds = buildBlockPredecessors(func);
+
+  for (auto &bb : func.getMutableBBs()) {
+    for (auto &inst : bb.getMutableInsts()) {
+      auto phi = ir::dyc<ir::Phi>(inst);
+      if (!phi)
+        break;
+
+      auto dest = ir::cdyc<ir::LocalReg>(phi->getDest());
+      for (auto &option : phi->getOptions())
+        parallelCopies[option.second->id].emplace_back(ir::dyc<ir::LocalReg>(ir::copy(dest)),
+                                                       ir::copy(option.first));
+      inst = std::make_shared<ir::Load>(ir::copy(dest),
+                                        addresses.at(dest->identifier));
+    }
+  }
+}
+
+void SSADestruction::sequentializeParallelCopies() {
+  // We adopt a naive approach here: we first load the old values to temporary
+  // registers and rename the later use. Then, for each Copy, we simply put a
+  // Store.
+  // Redundant Loads can be eliminate in later passes.
+
+  for (auto & bb : func.getMutableBBs()) {
+    std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> regHoldingOldValue;
+    const auto & pcopies = parallelCopies[bb.getLabelID()];
+    for (auto & pcopy : pcopies) {
+      auto oldVal = regHoldingOldValue[pcopy.dest->identifier] = func.makeTempLocalReg();
+      auto addr = addresses.at(pcopy.dest->identifier);
+      bb.appendInstBeforeTerminator(std::make_shared<ir::Load>(oldVal, addr));
+      std::shared_ptr<ir::Addr> newVal = pcopy.val;
+      if (auto p = ir::dyc<ir::LocalReg>(pcopy.val)) {
+        auto iter = regHoldingOldValue.find(p->identifier);
+        if (iter != regHoldingOldValue.end())
+          newVal = iter->second;
+      }
+      bb.appendInstBeforeTerminator(std::make_shared<ir::Store>(addr, newVal));
+    }
+  }
 }
 
 } // namespace mocker

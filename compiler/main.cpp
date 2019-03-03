@@ -6,6 +6,7 @@
 #include "ast/ast_node.h"
 #include "ir/printer.h"
 #include "ir/stats.h"
+#include "ir/helper.h"
 #include "ir_builder/build.h"
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
@@ -67,14 +68,25 @@ int main(int argc, char **argv) {
 
   std::cerr << "Original:\n";
   printIRStats(stats);
+  assert(stats.countInsts<ir::Phi>() == 0);
 
   runOptPasses<FunctionInline>(optCtx);
   runOptPasses<PromoteGlobalVariables>(optCtx);
+  ir::verifyModule(module);
 
   std::cerr << "After inline and promotion of global variables:\n";
   printIRStats(stats);
 
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
+
+  runOptPasses<SSAConstruction>(optCtx);
+  runOptPasses<LocalValueNumbering>(optCtx);
+  runOptPasses<CopyPropagation>(optCtx);
+
+  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
+  runOptPasses<CopyPropagation>(optCtx);
+  runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<SimplifyPhiFunctions>(optCtx);
 
   if (argc == 3) {
     std::string irPath = argv[2];
@@ -82,17 +94,10 @@ int main(int argc, char **argv) {
     ir::printModule(module, dumpIR);
   }
 
-  runOptPasses<ConstructSSA>(optCtx);
-  runOptPasses<LocalValueNumbering>(optCtx);
-  runOptPasses<CopyPropagation>(optCtx);
-
-  runOptPasses<SparseSimpleConstantPropagation>(optCtx);
-  runOptPasses<CopyPropagation>(optCtx);
-  runOptPasses<RewriteBranches>(optCtx);
-
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<SimplifyPhiFunctions>(optCtx);
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<DeadCodeElimination>(optCtx);
@@ -101,9 +106,11 @@ int main(int argc, char **argv) {
   runOptPasses<SparseSimpleConstantPropagation>(optCtx);
   runOptPasses<LocalValueNumbering>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<SimplifyPhiFunctions>(optCtx);
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<RewriteBranches>(optCtx);
+  runOptPasses<SimplifyPhiFunctions>(optCtx);
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
   runOptPasses<DeadCodeElimination>(optCtx);
@@ -111,6 +118,9 @@ int main(int argc, char **argv) {
   runOptPasses<RewriteBranches>(optCtx);
   runOptPasses<MergeBlocks>(optCtx);
   runOptPasses<RemoveUnreachableBlocks>(optCtx);
+
+  runOptPasses<SSADestruction>(optCtx);
+  assert(stats.countInsts<ir::Phi>() == 0);
 
   std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);

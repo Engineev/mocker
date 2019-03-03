@@ -29,6 +29,10 @@ std::shared_ptr<ir::IRInst>
 replacePhiOption(const std::shared_ptr<ir::Phi> &phi, std::size_t oldLabel,
                  std::size_t newLabel);
 
+std::shared_ptr<ir::IRInst>
+replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst, std::size_t oldLabel,
+                 std::size_t newLabel);
+
 } // namespace mocker
 
 #endif // MOCKER_OPTIM_HELPER_H
