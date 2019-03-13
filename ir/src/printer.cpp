@@ -36,14 +36,11 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
     res += " " + fmtAddr(p->getOperand());
     return res;
   }
-  if (auto p = dyc<Alloca>(inst)) {
-    return fmtAddr(p->getDest()) + " = alloca " + std::to_string(p->getSize());
+  if (auto p = dyc<AllocVar>(inst)) {
+    return fmtAddr(p->getDest()) + " = allocvar";
   }
   if (auto p = dyc<Malloc>(inst)) {
     return fmtAddr(p->getDest()) + " = malloc " + fmtAddr(p->getSize());
-  }
-  if (auto p = dyc<SAlloc>(inst)) {
-    return fmtAddr(p->getDest()) + " = salloc " + std::to_string(p->getSize());
   }
   if (auto p = dyc<Store>(inst)) {
     return "store " + fmtAddr(p->getAddr()) + " " + fmtAddr(p->getVal());

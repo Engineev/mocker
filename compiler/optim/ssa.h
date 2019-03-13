@@ -153,8 +153,8 @@ private:
 
 private:
   std::unordered_map<std::size_t, std::list<Copy>> parallelCopies;
-  // For each phi-function a=phi(...), we create an Alloca instruction for a,
-  // and [address] is the mapping from the identifiers to the Alloca's
+  // For each phi-function a=phi(...), we create an AllocVar instruction for a,
+  // and [address] is the mapping from the identifiers to the AllocVar's
   std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> addresses;
 };
 

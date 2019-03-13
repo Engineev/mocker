@@ -204,9 +204,8 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
       return Value(compute(p->getOp(), lhsV.val, rhsV.val));
     return Value(Value::Top);
   }
-  if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::Alloca>(inst) ||
-      ir::dyc<ir::Malloc>(inst) || ir::dyc<ir::SAlloc>(inst) ||
-      ir::dyc<ir::Call>(inst))
+  if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::AllocVar>(inst) ||
+      ir::dyc<ir::Malloc>(inst) || ir::dyc<ir::Call>(inst))
     return Value(Value::Bottom);
   if (auto p = ir::dyc<ir::Phi>(inst)) {
     Optional<std::int64_t> lastVal;

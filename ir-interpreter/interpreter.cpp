@@ -227,15 +227,10 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
   if (buffer == "call") {
     return parseCallRHS(std::move(dest));
   }
-  if (buffer == "alloca") {
+  if (buffer == "allocvar") {
     std::size_t size;
     lineSS >> size;
-    return std::make_shared<Alloca>(dest, size);
-  }
-  if (buffer == "salloc") {
-    std::size_t size;
-    lineSS >> size;
-    return std::make_shared<SAlloc>(dest, size);
+    return std::make_shared<AllocVar>(dest);
   }
   if (buffer == "malloc") {
     lineSS >> buffer;
@@ -603,13 +598,8 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
     std::memcpy(dest, p->getData().c_str(), p->getData().size());
     return idx + 1;
   }
-  if (auto p = dyc<Alloca>(inst)) {
-    auto res = fastMalloc(p->getSize());
-    writeReg(p->getDest(), res);
-    return idx + 1;
-  }
-  if (auto p = dyc<SAlloc>(inst)) {
-    auto res = fastMalloc(p->getSize());
+  if (auto p = dyc<AllocVar>(inst)) {
+    auto res = fastMalloc(8);
     writeReg(p->getDest(), res);
     return idx + 1;
   }

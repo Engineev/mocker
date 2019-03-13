@@ -119,7 +119,7 @@ BuilderContext::addStringLiteral(const std::string &literal) {
 
   // init
   auto strInstPtrPtr = std::make_shared<GlobalReg>(ident);
-  var.emplaceInst<SAlloc>(strInstPtrPtr, 8);
+  var.emplaceInst<AllocVar>(strInstPtrPtr);
   auto strInstPtr = makeTempLocalReg("strInstPtr");
   var.emplaceInst<Malloc>(strInstPtr, std::make_shared<IntLiteral>(16));
   var.emplaceInst<Store>(strInstPtrPtr, strInstPtr);

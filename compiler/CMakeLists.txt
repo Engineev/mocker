@@ -33,8 +33,6 @@ set(HEADERS
   semantic/semantic_checker.h
   semantic/semantic_context.h
   semantic/sym_tbl.h
-
-  compiler.h
 )
 set(SOURCES
   ir_builder/builder.cpp
@@ -58,7 +56,6 @@ set(SOURCES
   semantic/semantic_checker.cpp
   semantic/sym_tbl.cpp
 
-  compiler.cpp
   main.cpp
 )
 

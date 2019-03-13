@@ -199,15 +199,9 @@ private:
   std::shared_ptr<Addr> addr;
 };
 
-class Alloca : public IRInst, public Definition {
+class AllocVar : public IRInst, public Definition {
 public:
-  Alloca(std::shared_ptr<Addr> dest, size_t size)
-      : Definition(std::move(dest)), size(size) {}
-
-  size_t getSize() const { return size; }
-
-private:
-  std::size_t size;
+  explicit AllocVar(std::shared_ptr<Addr> dest) : Definition(std::move(dest)) {}
 };
 
 class Malloc : public IRInst, public Definition {
@@ -219,17 +213,6 @@ public:
 
 private:
   std::shared_ptr<Addr> size;
-};
-
-class SAlloc : public IRInst, public Definition {
-public:
-  SAlloc(std::shared_ptr<Addr> dest, size_t size)
-      : Definition(std::move(dest)), size(size) {}
-
-  size_t getSize() const { return size; }
-
-private:
-  std::size_t size;
 };
 
 class StrCpy : public IRInst {

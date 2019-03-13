@@ -95,13 +95,9 @@ std::shared_ptr<IRInst> copyWithReplacedDestAndOperands(
     assert(operands.empty());
     return mkS<AttachedComment>(p->getContent());
   }
-  if (auto p = dyc<Alloca>(inst)) {
+  if (auto p = dyc<AllocVar>(inst)) {
     assert(operands.empty());
-    return mkS<Alloca>(copy(dest), p->getSize());
-  }
-  if (auto p = dyc<SAlloc>(inst)) {
-    assert(operands.empty());
-    return mkS<SAlloc>(copy(dest), p->getSize());
+    return mkS<AllocVar>(copy(dest));
   }
   if (auto p = dyc<Jump>(inst)) {
     assert(operands.empty());
@@ -188,13 +184,9 @@ std::shared_ptr<IRInst> copyWithReplacedOperands(
     assert(operands.empty());
     return mkS<AttachedComment>(p->getContent());
   }
-  if (auto p = dyc<Alloca>(inst)) {
+  if (auto p = dyc<AllocVar>(inst)) {
     assert(operands.empty());
-    return mkS<Alloca>(copy(p->getDest()), p->getSize());
-  }
-  if (auto p = dyc<SAlloc>(inst)) {
-    assert(operands.empty());
-    return mkS<SAlloc>(copy(p->getDest()), p->getSize());
+    return mkS<AllocVar>(copy(p->getDest()));
   }
   if (auto p = dyc<Jump>(inst)) {
     assert(operands.empty());

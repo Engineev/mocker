@@ -182,7 +182,7 @@ void SSAConstruction::buildDominatingFrontier() {
 void SSAConstruction::insertPhiFunctions() {
   const auto &firstBB = *func.getFirstBB();
   for (const auto &inst : firstBB.getInsts()) {
-    if (auto p = ir::dyc<ir::Alloca>(inst)) {
+    if (auto p = ir::dyc<ir::AllocVar>(inst)) {
       auto reg = ir::cdyc<ir::LocalReg>(p->getDest());
       assert(reg);
       varNames.emplace(reg->identifier);
@@ -405,7 +405,7 @@ void SSADestruction::insertAllocas() {
   for (auto &varName : varNames) {
     auto addr = func.makeTempLocalReg();
     addresses[varName] = addr;
-    func.getFirstBB()->appendInstFront(std::make_shared<ir::Alloca>(addr, 8));
+    func.getFirstBB()->appendInstFront(std::make_shared<ir::AllocVar>(addr));
   }
 }
 

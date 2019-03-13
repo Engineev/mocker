@@ -18,9 +18,8 @@ bool LocalValueNumbering::operator()() {
     auto dest = ir::getDest(inst);
     if (!dest)
       continue;
-    if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::Alloca>(inst) ||
-        ir::dyc<ir::Malloc>(inst) || ir::dyc<ir::SAlloc>(inst) ||
-        ir::dyc<ir::Call>(inst))
+    if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::AllocVar>(inst) ||
+        ir::dyc<ir::Malloc>(inst) || ir::dyc<ir::Call>(inst))
       continue;
     auto operands = ir::getOperandsUsed(inst);
     std::vector<std::size_t> valueNumbers;

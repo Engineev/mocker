@@ -71,12 +71,12 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
     }
   }
 
-  // Insert Alloca's
+  // Insert AllocVar's
   auto &firstBB = *func.getFirstBB();
   for (auto &nameReg : aliasReg) {
     std::list<std::shared_ptr<ir::IRInst>> toBeInserted;
     auto gReg = std::make_shared<ir::GlobalReg>(nameReg.first);
-    toBeInserted.emplace_back(std::make_shared<ir::Alloca>(nameReg.second, 8));
+    toBeInserted.emplace_back(std::make_shared<ir::AllocVar>(nameReg.second));
     auto tmp = func.makeTempLocalReg();
     toBeInserted.emplace_back(std::make_shared<ir::Load>(tmp, gReg));
     toBeInserted.emplace_back(std::make_shared<ir::Store>(nameReg.second, tmp));
