@@ -101,8 +101,9 @@ FunctionModule &Module::addFunc(std::string ident, FunctionModule func) {
   return p.first->second;
 }
 
-void Module::appendGlobalVar(GlobalVarModule var) {
-  globalVars.emplace_back(std::move(var));
+void Module::addGlobalVar(std::string identifier) {
+  globalVars.emplace_back(std::make_shared<ir::AllocVar>(
+      std::make_shared<ir::GlobalReg>(std::move(identifier))));
 }
 
 } // namespace ir

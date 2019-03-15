@@ -683,10 +683,9 @@ void Builder::addBuiltinAndExternal() const {
   //    ctx.addClassLayout("_array_", std::move(arrayLayout));
 
   // null
-  GlobalVarModule nullModule(std::string("@null"));
-  nullModule.emplaceInst<Malloc>(std::make_shared<GlobalReg>("@null"),
-                                 makeILit(1));
-  ctx.addGlobalVar(std::move(nullModule));
+  ctx.addGlobalVar("@null");
+  //  ctx.emplaceGlobalInitInst<Malloc>(std::make_shared<GlobalReg>("@null"),
+  //                                    makeILit(1));
 
   auto add = [this](std::string name, std::vector<std::string> args) {
     ctx.addFunc(FunctionModule(std::move(name), std::move(args), true));
@@ -718,15 +717,12 @@ void Builder::addBuiltinAndExternal() const {
 void Builder::addGlobalVariable(
     const std::shared_ptr<ast::VarDecl> &decl) const {
   auto ident = decl->decl->identifier->val;
-  GlobalVarModule var(ident);
+  ctx.addGlobalVar(ident);
+
+  if (!decl->decl->initExpr)
+    return;
 
   auto reg = makeReg(ident);
-  var.emplaceInst<AllocVar>(reg);
-  if (!decl->decl->initExpr) {
-    ctx.addGlobalVar(std::move(var));
-    return;
-  }
-
   auto funcName = "_init_" + ident;
   auto &func = ctx.addFunc(FunctionModule(funcName, {}));
   ctx.initFuncCtx(0);
@@ -734,9 +730,7 @@ void Builder::addGlobalVariable(
   visit(*decl->decl->initExpr);
   ctx.emplaceInst<Store>(reg, ctx.getExprAddr(decl->decl->initExpr->getID()));
   ctx.emplaceInst<Ret>();
-
-  var.emplaceInst<Call>(funcName);
-  ctx.addGlobalVar(std::move(var));
+  ctx.emplaceGlobalInitInst<Call>(funcName);
 }
 
 std::shared_ptr<LocalReg>

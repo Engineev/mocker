@@ -90,7 +90,14 @@ public:
 
   std::shared_ptr<GlobalReg> addStringLiteral(const std::string &literal);
 
-  void addGlobalVar(GlobalVarModule var);
+  void addGlobalVar(std::string ident);
+
+  template <class Inst, class... Args>
+  void emplaceGlobalInitInst(Args &&... args) {
+    auto &func = module.getFuncs().at("_init_global_vars");
+    func.getMutableBBs().back().appendInst(
+        std::make_shared<Inst>(std::forward<Args>(args)...));
+  }
 
 private:
   ASTIDMap<std::shared_ptr<Addr>> exprAddr;

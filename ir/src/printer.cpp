@@ -125,16 +125,6 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
   assert(false);
 }
 
-std::string fmtGlobalVarDef(const GlobalVarModule &var) {
-  std::string res;
-  res += var.getIdentifier() + " = {\n";
-  for (auto &inst : var.getInit()) {
-    res += "  " + fmtInst(inst) + "\n";
-  }
-  res += "}\n";
-  return res;
-}
-
 void printFunc(const FunctionModule &func, std::ostream &out) {
   std::string attachedComment;
 
@@ -171,7 +161,8 @@ void printFunc(const FunctionModule &func, std::ostream &out) {
 
 void printModule(const Module &module, std::ostream &out) {
   for (auto &var : module.getGlobalVars())
-    out << fmtGlobalVarDef(var) << std::endl;
+    out << fmtInst(var) << std::endl;
+  out << std::endl;
 
   for (auto &kv : module.getFuncs()) {
     printFunc(kv.second, out);

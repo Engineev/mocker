@@ -99,32 +99,15 @@ private: // context
   std::unordered_map<std::size_t, std::vector<std::size_t>> predecessors;
 };
 
-class GlobalVarModule {
-public:
-  explicit GlobalVarModule(std::string identifier)
-      : identifier(std::move(identifier)) {}
-
-  const std::string &getIdentifier() const { return identifier; }
-
-  template <class InstType, class... Args> void emplaceInst(Args &&... args) {
-    auto inst = std::make_shared<InstType>(std::forward<Args>(args)...);
-    init.emplace_back(std::move(inst));
-  }
-
-  const InstList &getInit() const { return init; }
-
-private:
-  std::string identifier;
-  InstList init;
-};
-
 class Module {
 public:
-  using GlobalVarList = std::list<GlobalVarModule>;
+  using GlobalVarList = std::list<std::shared_ptr<AllocVar>>;
   using GlobalVarIter = GlobalVarList::iterator;
   using FuncsMap = std::unordered_map<std::string, FunctionModule>;
 
   const GlobalVarList &getGlobalVars() const { return globalVars; }
+
+  GlobalVarList &getGlobalVars() { return globalVars; }
 
   const FuncsMap &getFuncs() const { return funcs; }
 
@@ -132,7 +115,7 @@ public:
 
   FunctionModule &addFunc(std::string ident, FunctionModule func);
 
-  void appendGlobalVar(GlobalVarModule var);
+  void addGlobalVar(std::string identifier);
 
 private:
   GlobalVarList globalVars;

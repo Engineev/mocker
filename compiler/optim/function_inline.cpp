@@ -42,6 +42,8 @@ bool FunctionInline::operator()() {
   }
 
   module.getFuncs() = funcsCopy;
+  for (auto &func : module.getFuncs())
+    removeDeletedInsts(func.second);
 
   return false;
 }
@@ -155,7 +157,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
 
       if (auto alloca = ir::dyc<ir::AllocVar>(inst)) {
         caller.getFirstBB()->getMutableInsts().push_front(std::move(inst));
-        inst = std::make_shared<ir::Comment>("deleted");
+        inst = std::make_shared<ir::Deleted>();
       }
     }
   }

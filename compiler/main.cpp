@@ -40,15 +40,26 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
   bool optimizable = true;
   while (optimizable) {
     optimizable = false;
+    //    std::cerr << "\n=======\n";
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<LocalValueNumbering>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<SparseSimpleConstantPropagation>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<RewriteBranches>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<MergeBlocks>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
+    //    std::cerr << optimizable;
     optimizable |= runOptPasses<DeadCodeElimination>(module);
+    //    std::cerr << optimizable;
   }
 }
 
@@ -94,7 +105,11 @@ int main(int argc, char **argv) {
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
-  runOptPasses<RemoveUnreachableBlocks>(module);
+  runOptsUntilFixedPoint(module);
+
+  std::cerr << "\nAfter pre-SSA optimization:\n";
+  printIRStats(stats);
+
   runOptPasses<SSAConstruction>(module);
 
   runOptsUntilFixedPoint(module);

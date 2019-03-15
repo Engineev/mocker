@@ -76,6 +76,7 @@ private:
     assert(false);
   }
 
+  // Just for fun...
   void *fastMalloc(std::size_t sz);
 
   void printLog(const std::shared_ptr<const Addr> &addr, std::int64_t val);
@@ -104,7 +105,7 @@ private:
   using ExternalFuncType =
       std::function<std::int64_t(const std::vector<std::int64_t> &)>;
 
-  std::vector<FuncModule> globalVarInit;
+  std::vector<std::shared_ptr<AllocVar>> globalVars;
   std::unordered_map<std::string, FuncModule> funcs;
   std::unordered_map<std::string, ExternalFuncType> externalFuncs;
   std::unordered_map<std::string, Integer> globalReg;

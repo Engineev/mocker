@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <string>
+#include <unordered_set>
 
 namespace mocker {
 namespace ir {
@@ -270,6 +271,21 @@ void verifyFuncModule(const ir::FunctionModule &func) {
   for (const auto &bb : func.getBBs())
     if (!bb.isCompleted())
       std::terminate();
+
+  // check whether all register are only defined once
+  std::unordered_set<std::string> defined;
+  for (auto &bb : func.getBBs()) {
+    for (auto &inst : bb.getInsts()) {
+      auto dest = getDest(inst);
+      if (!dest)
+        continue;
+      auto reg = cdyc<ir::LocalReg>(dest);
+      assert(reg);
+      if (defined.find(reg->identifier) != defined.end())
+        std::terminate();
+      defined.emplace(reg->identifier);
+    }
+  }
 
   // check whether there exists phi-functions that are in the middle of a block
   for (const auto &bb : func.getBBs()) {

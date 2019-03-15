@@ -19,8 +19,8 @@ bool SparseSimpleConstantPropagation::operator()() {
   propagate();
   rewrite();
   removeDeletedInsts(func);
-  //  std::cerr << "SSCP: Modify " << modificationCnt << " insts in "
-  //            << func.getIdentifier() << std::endl;
+  //    std::cerr << "SSCP: Modify " << modificationCnt << " insts in "
+  //              << func.getIdentifier() << std::endl;
   return modificationCnt != 0;
 }
 
@@ -37,6 +37,8 @@ void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {
     for (auto &inst : bb.getInsts()) {
       auto dest = ir::getDest(inst);
       if (!dest)
+        continue;
+      if (ir::cdyc<ir::GlobalReg>(dest))
         continue;
       auto destName = ir::getLocalRegIdentifier(dest);
       instDefine.emplace(destName, inst);

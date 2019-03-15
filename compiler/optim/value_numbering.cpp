@@ -7,6 +7,8 @@
 #include "ir/helper.h"
 #include "small_map.h"
 
+#include "ir/printer.h"
+
 namespace mocker {
 
 LocalValueNumbering::LocalValueNumbering(ir::BasicBlock &bb)
@@ -35,6 +37,11 @@ bool LocalValueNumbering::operator()() {
     if (iter != key2ValueNumber.end()) {
       key2ValueNumber[lhsKey] = iter->second;
       auto rhsVal = valueNumber2Addr.at(iter->second);
+      if (auto p = ir::dyc<ir::LocalReg>(rhsVal)) {
+        if (p->identifier == ir::getLocalRegIdentifier(dest))
+          assert(false);
+      }
+
       inst = std::make_shared<ir::Assign>(copy(dest), rhsVal);
       ++cnt;
       continue;
@@ -44,7 +51,7 @@ bool LocalValueNumbering::operator()() {
     key2ValueNumber[lhsKey] = key2ValueNumber[rhsKey] = newValueNumber;
   }
 
-  //  std::cerr << "LVN: modified " << cnt << " insts\n";
+  //    std::cerr << "LVN: modified " << cnt << " insts\n";
   return cnt != 0;
 }
 

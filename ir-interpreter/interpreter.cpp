@@ -29,8 +29,11 @@ Interpreter::~Interpreter() {
 }
 
 std::int64_t Interpreter::run() {
-  for (auto &func : globalVarInit)
-    executeFunc(func, {});
+  for (auto &var : globalVars) {
+    auto res = fastMalloc(8);
+    writeReg(var->getDest(), res);
+  }
+
   return executeFunc("main", {});
 }
 
@@ -82,9 +85,11 @@ void Interpreter::parse(const std::string &source) {
     if (line.empty())
       continue;
     if (line.at(0) == '@') {
-      FuncModule func;
-      parseFuncBody(ss, func);
-      globalVarInit.emplace_back(std::move(func));
+      std::stringstream lineSS(line);
+      std::string ident;
+      lineSS >> ident;
+      globalVars.emplace_back(
+          std::make_shared<ir::AllocVar>(std::make_shared<GlobalReg>(ident)));
       continue;
     }
     std::stringstream lineSS(line);
@@ -228,8 +233,6 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
     return parseCallRHS(std::move(dest));
   }
   if (buffer == "allocvar") {
-    std::size_t size;
-    lineSS >> size;
     return std::make_shared<AllocVar>(dest);
   }
   if (buffer == "malloc") {
