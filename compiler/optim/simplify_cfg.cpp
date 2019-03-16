@@ -1,13 +1,13 @@
 #include "simplify_cfg.h"
 
+#include <algorithm>
+#include <cassert>
 #include <functional>
 #include <iostream>
 #include <queue>
 #include <unordered_set>
 
 #include "helper.h"
-
-#include "ir/printer.h"
 
 // topoSort
 namespace mocker {
