@@ -270,7 +270,7 @@ void verifyFuncModule(const ir::FunctionModule &func) {
   // check whether all blocks are terminated
   for (const auto &bb : func.getBBs())
     if (!bb.isCompleted())
-      std::terminate();
+      assert(false && "block not being terminated");
 
   // check whether all register are only defined once
   std::unordered_set<std::string> defined;
@@ -282,7 +282,7 @@ void verifyFuncModule(const ir::FunctionModule &func) {
       auto reg = cdyc<ir::LocalReg>(dest);
       assert(reg);
       if (defined.find(reg->identifier) != defined.end())
-        std::terminate();
+        assert(false && "regsiter with multiple definitions");
       defined.emplace(reg->identifier);
     }
   }
@@ -294,7 +294,7 @@ void verifyFuncModule(const ir::FunctionModule &func) {
       ++iter;
     if (!ir::dyc<ir::Terminator>(*iter)) {
       if (ir::dyc<ir::Phi>(*iter))
-        std::terminate();
+        assert(false && "misplaced phi-function");
       ++iter;
     }
   }
@@ -314,7 +314,7 @@ void verifyFuncModule(const ir::FunctionModule &func) {
         sources.emplace_back(option.second->id);
       std::sort(sources.begin(), sources.end());
       if (preds != sources)
-        std::terminate();
+        assert(false && "mismatched predecessors and phi-function options");
     }
   }
 }

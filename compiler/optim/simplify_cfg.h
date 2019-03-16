@@ -35,10 +35,15 @@ public:
   explicit MergeBlocks(ir::FunctionModule &func);
 
   bool operator()() override;
+};
 
-private:
-  std::vector<std::size_t>
-  findFurthest(const std::vector<std::size_t> &mergeable) const;
+// Remove a basic block if it only contains a single Jump and there is no
+// phi-function which is related to this block in its target block
+class RemoveTrivialBlocks : public FuncPass {
+public:
+  explicit RemoveTrivialBlocks(ir::FunctionModule &func);
+
+  bool operator()() override;
 };
 
 } // namespace mocker

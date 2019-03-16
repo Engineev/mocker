@@ -40,26 +40,29 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
   bool optimizable = true;
   while (optimizable) {
     optimizable = false;
-    //    std::cerr << "\n=======\n";
-    //    std::cerr << optimizable;
+    // std::cerr << "\n=======\n";
+    // std::cerr << optimizable;
     optimizable |= runOptPasses<LocalValueNumbering>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
     optimizable |= runOptPasses<SparseSimpleConstantPropagation>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
-    //    std::cerr << optimizable;
-    optimizable |= runOptPasses<RewriteBranches>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
-    //    std::cerr << optimizable;
+    optimizable |= runOptPasses<RewriteBranches>(module);
+    // std::cerr << optimizable;
+    optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
+    optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
+    optimizable |= runOptPasses<RemoveTrivialBlocks>(module);
+    // std::cerr << optimizable;
     optimizable |= runOptPasses<DeadCodeElimination>(module);
-    //    std::cerr << optimizable;
+    // std::cerr << optimizable;
   }
 }
 
@@ -105,6 +108,12 @@ int main(int argc, char **argv) {
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
+  if (argc == 3) {
+    std::string irPath = argv[2];
+    std::ofstream dumpIR(irPath);
+    ir::printModule(module, dumpIR);
+  }
+
   runOptsUntilFixedPoint(module);
 
   std::cerr << "\nAfter pre-SSA optimization:\n";
@@ -116,12 +125,6 @@ int main(int argc, char **argv) {
 
   std::cerr << "\nBefore SSA destruction:\n";
   printIRStats(stats);
-
-  if (argc == 3) {
-    std::string irPath = argv[2];
-    std::ofstream dumpIR(irPath);
-    ir::printModule(module, dumpIR);
-  }
 
   runOptPasses<SSADestruction>(module);
   assert(stats.countInsts<ir::Phi>() == 0);

@@ -9,6 +9,71 @@
 
 #include "ir/printer.h"
 
+// topoSort
+namespace mocker {
+namespace {
+
+std::vector<std::size_t> topoSort(const std::vector<std::size_t> &nodes,
+                                  const ir::FunctionModule &func) {
+  // label -> predcessors
+  std::unordered_map<std::size_t, std::unordered_set<std::size_t>> subGraph;
+  {
+    std::unordered_set<std::size_t> nodesUsed{nodes.begin(), nodes.end()};
+    auto predGraph = buildBlockPredecessors(func);
+    for (auto node : nodesUsed) {
+      auto &preds = subGraph[node];
+      for (auto pred : predGraph.at(node))
+        if (nodesUsed.find(pred) != nodesUsed.end())
+          preds.emplace(pred);
+    }
+  }
+
+  //  std::cerr << "\nunsorted: ";
+  //  for (auto node : nodes)
+  //    std::cerr << node << ", ";
+  //  std::cerr << std::endl;
+
+  std::vector<std::size_t> res;
+  while (!subGraph.empty()) {
+    //    std::cerr << "subgraph:\n";
+    //    for (auto &kv : subGraph) {
+    //      std::cerr << kv.first << " <- ";
+    //      for (auto &node : kv.second)
+    //        std::cerr << node << ", ";
+    //      std::cerr << "\n";
+    //    }
+
+    std::vector<std::size_t> nodesWithNoPred;
+    for (auto &kv : subGraph)
+      if (kv.second.empty())
+        nodesWithNoPred.emplace_back(kv.first);
+
+    for (auto node : nodesWithNoPred) {
+      res.emplace_back(node);
+      subGraph.erase(subGraph.find(node));
+      for (auto succ : func.getBasicBlock(node).getSuccessors()) {
+        auto iter = subGraph.find(succ);
+        if (iter == subGraph.end())
+          continue;
+        iter->second.erase(iter->second.find(node));
+      }
+    }
+
+    if (nodesWithNoPred.empty()) // cyclic
+      break;
+  }
+
+  //  std::cerr << "sorted: ";
+  //  for (auto node : res)
+  //    std::cerr << node << ", ";
+  //  std::cerr << "\n";
+
+  return res;
+}
+
+} // namespace
+} // namespace mocker
+
 namespace mocker {
 
 void deletePhiOptionInBB(ir::BasicBlock &bb, std::size_t toBeDeleted) {
@@ -86,14 +151,9 @@ bool MergeBlocks::operator()() {
       mergeable.emplace_back(kv.first);
   }
 
-  auto toBeMerged = findFurthest(mergeable);
-  auto isMergeable = [&preds, this](std::size_t u) -> bool {
-    auto pred = preds[u];
-    if (pred.size() != 1)
-      return false;
-    const auto &predBB = func.getBasicBlock(pred.at(0));
-    return predBB.isCompleted() && predBB.getSuccessors().size() == 1;
-  };
+  mergeable = topoSort(mergeable, func);
+  std::reverse(mergeable.begin(), mergeable.end());
+
   auto merge = [this](std::size_t pred, std::size_t bbLabel) {
     auto &predBB = func.getMutableBasicBlock(pred);
     auto &bb = func.getMutableBasicBlock(bbLabel);
@@ -111,13 +171,8 @@ bool MergeBlocks::operator()() {
                                     bb.getMutableInsts());
   };
 
-  for (auto u : toBeMerged) {
-    std::cerr.flush();
-    while (isMergeable(u)) {
-      auto pred = preds.at(u).at(0);
-      merge(pred, u);
-      u = pred;
-    }
+  for (auto u : mergeable) {
+    merge(preds.at(u).at(0), u);
   }
 
   func.getMutableBBs().remove_if(
@@ -125,23 +180,99 @@ bool MergeBlocks::operator()() {
 
   //  std::cerr << "MergeBlocks: Merged " << mergeable.size() << " BBs in "
   //            << func.getIdentifier() << std::endl;
-  return mergeable.size() != 0;
+  return !mergeable.empty();
 }
 
-std::vector<std::size_t>
-MergeBlocks::findFurthest(const std::vector<std::size_t> &mergeable) const {
-  std::vector<std::size_t> res;
-  std::unordered_set<std::size_t> isMergeable(mergeable.begin(),
-                                              mergeable.end());
+RemoveTrivialBlocks::RemoveTrivialBlocks(ir::FunctionModule &func)
+    : FuncPass(func) {}
 
-  for (auto bb : mergeable) {
-    auto succ = func.getBasicBlock(bb).getSuccessors();
-    if (succ.size() == 1 && isMergeable.find(succ.at(0)) != isMergeable.end())
-      continue;
-    res.emplace_back(bb);
+bool RemoveTrivialBlocks::operator()() {
+  std::vector<std::size_t> toBeRemoved;
+  {
+    for (auto &bb : func.getMutableBBs()) {
+      if (func.getFirstBB()->getLabelID() == bb.getLabelID())
+        continue;
+      auto jump = ir::dyc<ir::Jump>(bb.getInsts().front());
+      if (!jump)
+        continue;
+      bool ok = true;
+      for (auto &inst : func.getBasicBlock(jump->getLabel()->id).getInsts()) {
+        auto phi = ir::dyc<ir::Phi>(inst);
+        if (!phi)
+          break;
+        for (auto &option : phi->getOptions()) {
+          if (option.second->id == bb.getLabelID()) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok)
+          break;
+      }
+      if (!ok)
+        continue;
+      toBeRemoved.emplace_back(bb.getLabelID());
+    }
+  }
+  toBeRemoved = topoSort(toBeRemoved, func);
+  std::reverse(toBeRemoved.begin(), toBeRemoved.end());
+
+  auto predMap = buildBlockPredecessors(func);
+
+  for (auto &bbLabel : toBeRemoved) {
+    auto &bb = func.getMutableBasicBlock(bbLabel);
+    auto jump = ir::dyc<ir::Jump>(bb.getInsts().front());
+    assert(jump);
+    auto targetLabel = jump->getLabel()->id;
+    auto curLabel = bb.getLabelID();
+    const auto &preds = predMap.at(curLabel);
+    assert(!preds.empty());
+
+    for (auto predLabel : preds) {
+      auto &pred = func.getMutableBasicBlock(predLabel);
+      auto &terminator = pred.getMutableInsts().back();
+      terminator = replaceTerminatorLabel(terminator, curLabel, targetLabel);
+    }
+
+    auto newPhi = [&preds, curLabel](const std::shared_ptr<ir::Phi> &old) {
+      auto dest = ir::copy(old->getDest());
+      auto oldOptions = old->getOptions();
+      std::vector<ir::Phi::Option> options;
+      std::shared_ptr<ir::Addr> val;
+      for (auto &option : oldOptions) {
+        if (option.second->id != curLabel) {
+          options.emplace_back(
+              std::make_pair(ir::copy(option.first),
+                             ir::dyc<ir::Label>(ir::copy(option.second))));
+          continue;
+        }
+        val = ir::copy(option.first);
+      }
+      assert(val);
+      for (auto pred : preds)
+        options.emplace_back(
+            std::make_pair(val, std::make_shared<ir::Label>(pred)));
+      return std::make_shared<ir::Phi>(std::move(dest), std::move(options));
+    };
+
+    auto &succ = func.getMutableBasicBlock(targetLabel);
+    for (auto &inst : succ.getMutableInsts()) {
+      auto phi = ir::dyc<ir::Phi>(inst);
+      if (!phi)
+        break;
+      inst = newPhi(phi);
+    }
   }
 
-  return res;
+  std::unordered_set<std::size_t> removable{toBeRemoved.begin(),
+                                            toBeRemoved.end()};
+  func.getMutableBBs().remove_if([&removable](const ir::BasicBlock &bb) {
+    return removable.find(bb.getLabelID()) != removable.end();
+  });
+
+  //  std::cerr << "RemoveTrivialBlocks: removed " << toBeRemoved.size()
+  //            << " blocks\n";
+  return !toBeRemoved.empty();
 }
 
 } // namespace mocker
