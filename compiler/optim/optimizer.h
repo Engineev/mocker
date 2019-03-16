@@ -48,7 +48,9 @@ template <class Pass> bool runOptPasses(ir::Module &module) {
   auto res = detail::runOptPassImpl<Pass>(module, (Pass *)(nullptr));
   for (auto &func : module.getFuncs())
     func.second.buildContext();
+#ifndef DISABLE_VERIFICATION
   ir::verifyModule(module);
+#endif
   return res;
 }
 

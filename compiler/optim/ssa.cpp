@@ -230,9 +230,10 @@ SSAConstruction::collectAndReplaceDefs(const std::string &name) {
   std::vector<Definition> res;
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
-      auto p = ir::dyc<ir::Store>(inst);
-      if (!p)
+      if (inst->getInstType() != ir::IRInst::Store)
         continue;
+
+      auto p = std::static_pointer_cast<ir::Store>(inst);
       auto reg = ir::cdyc<ir::LocalReg>(p->getAddr());
       if (!reg)
         continue;

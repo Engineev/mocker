@@ -8,16 +8,55 @@
 #include <string>
 #include <vector>
 
+#define MOCKER_IR_DYC(TYPE)                                                    \
+  template <class V> std::shared_ptr<TYPE> dyc_impl(V &&v, TYPE *) {           \
+    if (v->getInstType() == IRInst::TYPE)                                      \
+      return std::static_pointer_cast<TYPE>(v);                                \
+    return nullptr;                                                            \
+  }
+
+// fast dynamic cast
 namespace mocker {
 namespace ir {
+namespace detail {
 
-template <class T, class V> decltype(auto) dyc(V &&v) {
+template <class T, class V> std::shared_ptr<T> dyc_impl(V &&v, T *) {
   return std::dynamic_pointer_cast<T>(v);
+}
+
+MOCKER_IR_DYC(Deleted)
+MOCKER_IR_DYC(Comment)
+MOCKER_IR_DYC(AttachedComment)
+MOCKER_IR_DYC(Assign)
+MOCKER_IR_DYC(ArithUnaryInst)
+MOCKER_IR_DYC(ArithBinaryInst)
+MOCKER_IR_DYC(RelationInst)
+MOCKER_IR_DYC(Store)
+MOCKER_IR_DYC(Load)
+MOCKER_IR_DYC(AllocVar)
+MOCKER_IR_DYC(Malloc)
+MOCKER_IR_DYC(StrCpy)
+MOCKER_IR_DYC(Branch)
+MOCKER_IR_DYC(Jump)
+MOCKER_IR_DYC(Ret)
+MOCKER_IR_DYC(Call)
+MOCKER_IR_DYC(Phi)
+
+} // namespace detail
+
+template <class T, class V> std::shared_ptr<T> dyc(V &&v) {
+  return detail::dyc_impl(std::forward<V>(v), (T *)(nullptr));
 }
 
 template <class T, class V> decltype(auto) cdyc(V &&v) {
   return std::dynamic_pointer_cast<const T>(v);
 }
+
+} // namespace ir
+} // namespace mocker
+
+namespace mocker {
+namespace ir {
 
 std::shared_ptr<const Addr> getDest(const std::shared_ptr<IRInst> &inst);
 
