@@ -42,9 +42,9 @@ void PromoteGlobalVariables::buildGlobalVarUsedImpl(
 
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = ir::cdyc<ir::GlobalReg>(operand);
-        if (reg && reg->identifier != "@null")
-          used.insert(reg->identifier);
+        auto reg = ir::dyc<ir::GlobalReg>(operand);
+        if (reg && reg->getIdentifier() != "@null")
+          used.insert(reg->getIdentifier());
       }
     }
   }
@@ -63,9 +63,9 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
     for (auto &inst : bb.getMutableInsts()) {
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto p = ir::cdyc<ir::GlobalReg>(operand);
-        if (p && p->identifier != "@null")
-          operand = aliasReg.at(p->identifier);
+        auto p = ir::dyc<ir::GlobalReg>(operand);
+        if (p && p->getIdentifier() != "@null")
+          operand = aliasReg.at(p->getIdentifier());
       }
       inst = ir::copyWithReplacedOperands(inst, operands);
     }

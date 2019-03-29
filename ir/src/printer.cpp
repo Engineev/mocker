@@ -9,15 +9,15 @@
 namespace mocker {
 namespace ir {
 
-std::string fmtAddr(const std::shared_ptr<const Addr> &addr) {
-  if (auto p = cdyc<IntLiteral>(addr))
-    return std::to_string(p->val);
-  if (auto p = cdyc<LocalReg>(addr))
-    return "%" + p->identifier;
-  if (auto p = cdyc<GlobalReg>(addr))
-    return p->identifier;
-  if (auto p = cdyc<Label>(addr))
-    return "<" + std::to_string(p->id) + ">";
+std::string fmtAddr(const std::shared_ptr<Addr> &addr) {
+  if (auto p = dyc<IntLiteral>(addr))
+    return std::to_string(p->getVal());
+  if (auto p = dyc<LocalReg>(addr))
+    return "%" + p->getIdentifier();
+  if (auto p = dyc<GlobalReg>(addr))
+    return p->getIdentifier();
+  if (auto p = dyc<Label>(addr))
+    return "<" + std::to_string(p->getID()) + ">";
   assert(false);
 }
 

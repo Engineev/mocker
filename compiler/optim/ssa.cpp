@@ -183,9 +183,9 @@ void SSAConstruction::insertPhiFunctions() {
   const auto &firstBB = *func.getFirstBB();
   for (const auto &inst : firstBB.getInsts()) {
     if (auto p = ir::dyc<ir::AllocVar>(inst)) {
-      auto reg = ir::cdyc<ir::LocalReg>(p->getDest());
+      auto reg = ir::dyc<ir::LocalReg>(p->getDest());
       assert(reg);
-      varNames.emplace(reg->identifier);
+      varNames.emplace(reg->getIdentifier());
     }
   }
 
@@ -214,7 +214,7 @@ void SSAConstruction::insertPhiFunctions(const std::string &varName) {
       auto phi =
           std::make_shared<ir::Phi>(dest, std::vector<ir::Phi::Option>());
       varDefined[phi->getID()] = varName;
-      bbDefined[dest->identifier] = frontierBB;
+      bbDefined[dest->getIdentifier()] = frontierBB;
       auto &bbInst = func.getMutableBasicBlock(frontierBB);
       bbInst.appendInstFront(phi);
 
@@ -234,17 +234,17 @@ SSAConstruction::collectAndReplaceDefs(const std::string &name) {
         continue;
 
       auto p = std::static_pointer_cast<ir::Store>(inst);
-      auto reg = ir::cdyc<ir::LocalReg>(p->getAddr());
+      auto reg = ir::dyc<ir::LocalReg>(p->getAddr());
       if (!reg)
         continue;
-      if (reg->identifier != name)
+      if (reg->getIdentifier() != name)
         continue;
       auto dest = func.makeTempLocalReg(name);
       res.emplace_back(bb.getLabelID(), reg);
-      auto assign = std::make_shared<ir::Assign>(dest, ir::copy(p->getVal()));
+      auto assign = std::make_shared<ir::Assign>(dest, p->getVal());
       inst = assign;
-      varDefined[assign->getID()] = reg->identifier;
-      bbDefined[dest->identifier] = bb.getLabelID();
+      varDefined[assign->getID()] = reg->getIdentifier();
+      bbDefined[dest->getIdentifier()] = bb.getLabelID();
     }
   }
   return res;
@@ -270,22 +270,22 @@ void SSAConstruction::renameVariablesImpl(
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
 
-      auto newVarName = ir::cdyc<ir::LocalReg>(p->getDest())->identifier;
+      auto newVarName = ir::dyc<ir::LocalReg>(p->getDest())->getIdentifier();
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
       continue;
     }
     if (auto p = ir::dyc<ir::Load>(inst)) {
-      auto var = ir::cdyc<ir::LocalReg>(p->getAddr());
+      auto var = ir::dyc<ir::LocalReg>(p->getAddr());
       if (!var) // is a global variable
         continue;
-      if (!isIn(var->identifier, varNames))
+      if (!isIn(var->getIdentifier(), varNames))
         continue;
       // I think that the corresponding line in the SSA book is wrong.
-      updateReachingDef(var->identifier, bb.getLabelID());
+      updateReachingDef(var->getIdentifier(), bb.getLabelID());
       inst = std::make_shared<ir::Assign>(
-          ir::copy(p->getDest()),
-          std::make_shared<ir::LocalReg>(reachingDef.at(var->identifier)));
+          p->getDest(),
+          std::make_shared<ir::LocalReg>(reachingDef.at(var->getIdentifier())));
       continue;
     }
     if (auto p = ir::dyc<ir::Assign>(inst)) {
@@ -295,7 +295,7 @@ void SSAConstruction::renameVariablesImpl(
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
 
-      auto newVarName = ir::cdyc<ir::LocalReg>(p->getDest())->identifier;
+      auto newVarName = ir::dyc<ir::LocalReg>(p->getDest())->getIdentifier();
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
     }
@@ -311,9 +311,7 @@ void SSAConstruction::renameVariablesImpl(
 
       std::vector<ir::Phi::Option> options;
       for (auto &oldOption : phi->getOptions())
-        options.emplace_back(
-            std::make_pair(ir::copy(oldOption.first),
-                           ir::dyc<ir::Label>(copy(oldOption.second))));
+        options.emplace_back(std::make_pair(oldOption.first, oldOption.second));
 
       auto iter = varDefined.find(phi->getID());
       if (iter == varDefined.end())
@@ -323,8 +321,7 @@ void SSAConstruction::renameVariablesImpl(
       auto reachingDefOfV = reachingDef.at(varName);
       options.emplace_back(std::make_shared<ir::LocalReg>(reachingDefOfV),
                            std::make_shared<ir::Label>(bb.getLabelID()));
-      inst = std::make_shared<ir::Phi>(ir::copy(phi->getDest()),
-                                       std::move(options));
+      inst = std::make_shared<ir::Phi>(phi->getDest(), std::move(options));
       varDefined[inst->getID()] = varName;
     }
   }
@@ -366,8 +363,8 @@ bool SimplifyPhiFunctions::operator()() {
 
       if (phi->getOptions().size() == 1) {
         ++cnt;
-        auto assign = std::make_shared<ir::Assign>(
-            ir::copy(phi->getDest()), ir::copy(phi->getOptions()[0].first));
+        auto assign = std::make_shared<ir::Assign>(phi->getDest(),
+                                                   phi->getOptions()[0].first);
         inst = std::make_shared<ir::Deleted>();
         bb.getMutableInsts().emplace(insertionPoint, std::move(assign));
       }
@@ -455,12 +452,12 @@ void SSADestruction::replacePhisWithParallelCopies() {
       if (!phi)
         break;
 
-      auto dest = ir::cdyc<ir::LocalReg>(phi->getDest());
+      auto dest = ir::dyc<ir::LocalReg>(phi->getDest());
       for (auto &option : phi->getOptions())
-        parallelCopies[option.second->id].emplace_back(
-            ir::dyc<ir::LocalReg>(ir::copy(dest)), ir::copy(option.first));
-      inst = std::make_shared<ir::Load>(ir::copy(dest),
-                                        addresses.at(dest->identifier));
+        parallelCopies[option.second->getID()].emplace_back(
+            ir::dyc<ir::LocalReg>(dest), option.first);
+      inst =
+          std::make_shared<ir::Load>(dest, addresses.at(dest->getIdentifier()));
     }
   }
 }
@@ -476,13 +473,13 @@ void SSADestruction::sequentializeParallelCopies() {
         regHoldingOldValue;
     const auto &pcopies = parallelCopies[bb.getLabelID()];
     for (auto &pcopy : pcopies) {
-      auto oldVal = regHoldingOldValue[pcopy.dest->identifier] =
+      auto oldVal = regHoldingOldValue[pcopy.dest->getIdentifier()] =
           func.makeTempLocalReg();
-      auto addr = addresses.at(pcopy.dest->identifier);
+      auto addr = addresses.at(pcopy.dest->getIdentifier());
       bb.appendInstBeforeTerminator(std::make_shared<ir::Load>(oldVal, addr));
       std::shared_ptr<ir::Addr> newVal = pcopy.val;
       if (auto p = ir::dyc<ir::LocalReg>(pcopy.val)) {
-        auto iter = regHoldingOldValue.find(p->identifier);
+        auto iter = regHoldingOldValue.find(p->getIdentifier());
         if (iter != regHoldingOldValue.end())
           newVal = iter->second;
       }

@@ -464,9 +464,9 @@ std::int64_t Interpreter::executeFunc(const FuncModule &func,
 
 void Interpreter::executePhis(const std::vector<std::shared_ptr<Phi>> &phis) {
   struct Change {
-    Change(std::shared_ptr<const Addr> reg, int64_t val)
+    Change(std::shared_ptr<Addr> reg, int64_t val)
         : reg(std::move(reg)), val(val) {}
-    std::shared_ptr<const Addr> reg;
+    std::shared_ptr<Addr> reg;
     std::int64_t val;
   };
   std::vector<Change> changes;
@@ -475,7 +475,7 @@ void Interpreter::executePhis(const std::vector<std::shared_ptr<Phi>> &phis) {
   for (const auto &p : phis) {
     bool found = false;
     for (auto &option : p->getOptions()) {
-      if (option.second->id == ar.lastBB) {
+      if (option.second->getID() == ar.lastBB) {
         auto val = readVal(option.first);
         changes.emplace_back(p->getDest(), (std::int64_t)val);
         found = true;
@@ -616,13 +616,13 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
     auto condition = readVal(p->getCondition());
     auto nxtLabel = condition ? p->getThen() : p->getElse();
     ar.lastBB = ar.curBB;
-    ar.curBB = nxtLabel->id;
-    return func.get().label2idx.at(nxtLabel->id);
+    ar.curBB = nxtLabel->getID();
+    return func.get().label2idx.at(nxtLabel->getID());
   }
   if (auto p = dyc<Jump>(inst)) {
     ar.lastBB = ar.curBB;
-    ar.curBB = p->getLabel()->id;
-    return func.get().label2idx.at(p->getLabel()->id);
+    ar.curBB = p->getLabel()->getID();
+    return func.get().label2idx.at(p->getLabel()->getID());
   }
   if (auto p = dyc<Ret>(inst)) {
     if (p->getVal())
@@ -653,18 +653,17 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
   assert(false);
 }
 
-std::int64_t
-Interpreter::readVal(const std::shared_ptr<const Addr> &reg) const {
-  if (auto p = cdyc<LocalReg>(reg)) {
-    if (p->identifier == ".phi_nan")
+std::int64_t Interpreter::readVal(const std::shared_ptr<Addr> &reg) const {
+  if (auto p = dyc<LocalReg>(reg)) {
+    if (p->getIdentifier() == ".phi_nan")
       return -123;
-    return ars.top().localReg.at(p->identifier);
+    return ars.top().localReg.at(p->getIdentifier());
   }
-  if (auto p = cdyc<GlobalReg>(reg)) {
-    return globalReg.at(p->identifier);
+  if (auto p = dyc<GlobalReg>(reg)) {
+    return globalReg.at(p->getIdentifier());
   }
-  if (auto p = cdyc<IntLiteral>(reg)) {
-    return p->val;
+  if (auto p = dyc<IntLiteral>(reg)) {
+    return p->getVal();
   }
   assert(false);
 }
@@ -681,7 +680,7 @@ void *Interpreter::fastMalloc(std::size_t sz) {
   return res;
 }
 
-void Interpreter::printLog(const std::shared_ptr<const Addr> &addr,
+void Interpreter::printLog(const std::shared_ptr<Addr> &addr,
                            std::int64_t val) {
 #ifdef PRINT_LOG
   if (auto p = dyc<LocalReg>(addr)) {

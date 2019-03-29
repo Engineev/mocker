@@ -30,20 +30,20 @@ void CopyPropagation::buildValue() {
       auto assign = ir::dyc<ir::Assign>(inst);
       if (!assign)
         continue;
-      auto destName = ir::cdyc<ir::LocalReg>(assign->getDest())->identifier;
+      auto destName = ir::dyc<ir::LocalReg>(assign->getDest())->getIdentifier();
       auto val = assign->getOperand();
-      if (ir::cdyc<ir::IntLiteral>(val) || ir::cdyc<ir::GlobalReg>(val)) {
-        value[destName] = ir::copy(val);
+      if (ir::dyc<ir::IntLiteral>(val) || ir::dyc<ir::GlobalReg>(val)) {
+        value[destName] = val;
         continue;
       }
-      if (auto reg = ir::cdyc<ir::LocalReg>(val)) {
-        auto iter = value.find(reg->identifier);
+      if (auto reg = ir::dyc<ir::LocalReg>(val)) {
+        auto iter = value.find(reg->getIdentifier());
         if (iter != value.end()) {
           value[destName] = iter->second;
           continue;
         }
         auto &tmp = value[destName];
-        tmp = ir::copy(val);
+        tmp = val;
         continue;
       }
       assert(false);
@@ -61,10 +61,10 @@ void CopyPropagation::rewrite() {
     for (auto &inst : bb.getMutableInsts()) {
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = ir::cdyc<ir::LocalReg>(operand);
+        auto reg = ir::dyc<ir::LocalReg>(operand);
         if (!reg)
           continue;
-        auto iter = value.find(reg->identifier);
+        auto iter = value.find(reg->getIdentifier());
         if (iter == value.end())
           continue;
         operand = iter->second;

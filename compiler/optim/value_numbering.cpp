@@ -38,16 +38,16 @@ bool LocalValueNumbering::operator()() {
       key2ValueNumber[lhsKey] = iter->second;
       auto rhsVal = valueNumber2Addr.at(iter->second);
       if (auto p = ir::dyc<ir::LocalReg>(rhsVal)) {
-        if (p->identifier == ir::getLocalRegIdentifier(dest))
+        if (p->getIdentifier() == ir::getLocalRegIdentifier(dest))
           assert(false);
       }
 
-      inst = std::make_shared<ir::Assign>(copy(dest), rhsVal);
+      inst = std::make_shared<ir::Assign>(dest, rhsVal);
       ++cnt;
       continue;
     }
     auto newValueNumber = valueNumber2Addr.size();
-    valueNumber2Addr.emplace_back(ir::copy(dest));
+    valueNumber2Addr.emplace_back(dest);
     key2ValueNumber[lhsKey] = key2ValueNumber[rhsKey] = newValueNumber;
   }
 
@@ -55,25 +55,24 @@ bool LocalValueNumbering::operator()() {
   return cnt != 0;
 }
 
-std::string
-LocalValueNumbering::hash(const std::shared_ptr<const ir::Addr> &addr) {
-  if (auto p = ir::cdyc<ir::IntLiteral>(addr))
-    return "int:" + std::to_string(p->val);
-  if (auto p = ir::cdyc<ir::GlobalReg>(addr))
-    return "global:" + p->identifier;
-  if (auto p = ir::cdyc<ir::LocalReg>(addr))
-    return "local:" + p->identifier;
+std::string LocalValueNumbering::hash(const std::shared_ptr<ir::Addr> &addr) {
+  if (auto p = ir::dyc<ir::IntLiteral>(addr))
+    return "int:" + std::to_string(p->getVal());
+  if (auto p = ir::dyc<ir::GlobalReg>(addr))
+    return "global:" + p->getIdentifier();
+  if (auto p = ir::dyc<ir::LocalReg>(addr))
+    return "local:" + p->getIdentifier();
   assert(false);
 }
 
 void LocalValueNumbering::makeSureDefined(
-    const std::shared_ptr<const ir::Addr> &addr) {
+    const std::shared_ptr<ir::Addr> &addr) {
   auto key = hash(addr);
   auto iter = key2ValueNumber.find(key);
   if (iter != key2ValueNumber.end())
     return;
   auto newValueNumber = valueNumber2Addr.size();
-  valueNumber2Addr.emplace_back(ir::copy(addr));
+  valueNumber2Addr.emplace_back(addr);
   key2ValueNumber[key] = newValueNumber;
 }
 

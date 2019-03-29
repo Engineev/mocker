@@ -9,7 +9,7 @@
 namespace mocker {
 namespace ir {
 
-std::string fmtAddr(const std::shared_ptr<const Addr> &addr);
+std::string fmtAddr(const std::shared_ptr<Addr> &addr);
 
 std::string fmtInst(const std::shared_ptr<IRInst> &inst);
 

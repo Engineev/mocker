@@ -12,33 +12,50 @@ namespace mocker {
 // Addr
 namespace ir {
 
-struct Addr : std::enable_shared_from_this<Addr> {
+class Addr : std::enable_shared_from_this<Addr> {
+public:
   virtual ~Addr() = default;
 };
 
-struct IntLiteral : Addr {
+class IntLiteral : public Addr {
+public:
   explicit IntLiteral(std::int64_t val) : val(val) {}
 
+  const std::int64_t getVal() const { return val; }
+
+private:
   std::int64_t val;
 };
 
-struct LocalReg : Addr {
+class LocalReg : public Addr {
+public:
   explicit LocalReg(std::string identifier)
       : identifier(std::move(identifier)) {}
 
+  const std::string &getIdentifier() const { return identifier; }
+
+private:
   std::string identifier;
 };
 
-struct GlobalReg : Addr {
+class GlobalReg : public Addr {
+public:
   explicit GlobalReg(std::string identifier)
       : identifier(std::move(identifier)) {}
 
+  const std::string &getIdentifier() const { return identifier; }
+
+private:
   std::string identifier;
 };
 
-struct Label : Addr {
+class Label : public Addr {
+public:
   explicit Label(size_t id) : id(id) {}
 
+  const std::size_t getID() const { return id; }
+
+private:
   std::size_t id;
 };
 
@@ -94,7 +111,7 @@ public:
 
   virtual ~Definition() = default;
 
-  std::shared_ptr<const Addr> getDest() const { return dest; }
+  const std::shared_ptr<Addr> &getDest() const { return dest; }
 
 protected:
   std::shared_ptr<Addr> dest;
@@ -138,7 +155,7 @@ public:
       : IRInst(InstType::Assign), Definition(std::move(dest)),
         operand(std::move(operand)) {}
 
-  std::shared_ptr<const Addr> getOperand() const { return operand; }
+  const std::shared_ptr<Addr> &getOperand() const { return operand; }
 
 private:
   std::shared_ptr<Addr> operand;
@@ -153,9 +170,9 @@ public:
       : IRInst(InstType::ArithUnaryInst), Definition(std::move(dest)), op(op),
         operand(std::move(operand)) {}
 
-  OpType getOp() const { return op; }
+  const OpType getOp() const { return op; }
 
-  std::shared_ptr<const Addr> getOperand() const { return operand; }
+  const std::shared_ptr<Addr> &getOperand() const { return operand; }
 
 private:
   OpType op;
@@ -178,11 +195,11 @@ public:
       : IRInst(InstType::ArithBinaryInst), Definition(std::move(dest)), op(op),
         lhs(std::move(lhs)), rhs(std::move(rhs)) {}
 
-  OpType getOp() const { return op; }
+  const OpType getOp() const { return op; }
 
-  std::shared_ptr<const Addr> getLhs() const { return lhs; }
+  const std::shared_ptr<Addr> &getLhs() const { return lhs; }
 
-  std::shared_ptr<const Addr> getRhs() const { return rhs; }
+  const std::shared_ptr<Addr> &getRhs() const { return rhs; }
 
 private:
   OpType op;
@@ -198,11 +215,11 @@ public:
       : IRInst(InstType::RelationInst), Definition(std::move(dest)), op(op),
         lhs(std::move(lhs)), rhs(std::move(rhs)) {}
 
-  OpType getOp() const { return op; }
+  const OpType getOp() const { return op; }
 
-  std::shared_ptr<const Addr> getLhs() const { return lhs; }
+  const std::shared_ptr<Addr> &getLhs() const { return lhs; }
 
-  std::shared_ptr<const Addr> getRhs() const { return rhs; }
+  const std::shared_ptr<Addr> &getRhs() const { return rhs; }
 
 private:
   OpType op;
@@ -214,9 +231,9 @@ public:
   Store(std::shared_ptr<Addr> addr, std::shared_ptr<Addr> val)
       : IRInst(InstType::Store), addr(std::move(addr)), val(std::move(val)) {}
 
-  std::shared_ptr<const Addr> getAddr() const { return addr; }
+  const std::shared_ptr<Addr> &getAddr() const { return addr; }
 
-  std::shared_ptr<const Addr> getVal() const { return val; }
+  const std::shared_ptr<Addr> &getVal() const { return val; }
 
 private:
   std::shared_ptr<Addr> addr;
@@ -229,7 +246,7 @@ public:
       : IRInst(InstType::Load), Definition(std::move(dest)),
         addr(std::move(addr)) {}
 
-  std::shared_ptr<const Addr> getAddr() const { return addr; }
+  const std::shared_ptr<Addr> &getAddr() const { return addr; }
 
 private:
   std::shared_ptr<Addr> addr;
@@ -247,7 +264,7 @@ public:
       : IRInst(InstType::Malloc), Definition(std::move(dest)),
         size(std::move(size)) {}
 
-  std::shared_ptr<const Addr> getSize() const { return size; }
+  const std::shared_ptr<Addr> &getSize() const { return size; }
 
 private:
   std::shared_ptr<Addr> size;
@@ -259,7 +276,7 @@ public:
       : IRInst(InstType::StrCpy), addr(std::move(addr)), data(std::move(data)) {
   }
 
-  std::shared_ptr<const Addr> getAddr() const { return addr; }
+  const std::shared_ptr<Addr> &getAddr() const { return addr; }
 
   const std::string &getData() const { return data; }
 
@@ -275,11 +292,11 @@ public:
       : IRInst(InstType::Branch), condition(std::move(condition)),
         then(std::move(then)), else_(std::move(else_)) {}
 
-  std::shared_ptr<const Addr> getCondition() const { return condition; }
+  const std::shared_ptr<Addr> &getCondition() const { return condition; }
 
-  std::shared_ptr<const Label> getThen() const { return then; }
+  const std::shared_ptr<Label> &getThen() const { return then; }
 
-  std::shared_ptr<const Label> getElse() const { return else_; }
+  const std::shared_ptr<Label> &getElse() const { return else_; }
 
 private:
   std::shared_ptr<Addr> condition;
@@ -291,7 +308,7 @@ public:
   explicit Jump(std::shared_ptr<Label> label)
       : IRInst(InstType::Jump), label(std::move(label)) {}
 
-  std::shared_ptr<const Label> getLabel() const { return label; }
+  const std::shared_ptr<Label> &getLabel() const { return label; }
 
 private:
   std::shared_ptr<Label> label;
@@ -302,7 +319,7 @@ public:
   explicit Ret(std::shared_ptr<Addr> val = nullptr)
       : IRInst(InstType::Ret), val(std::move(val)) {}
 
-  std::shared_ptr<const Addr> getVal() const { return val; }
+  const std::shared_ptr<Addr> &getVal() const { return val; }
 
 private:
   std::shared_ptr<Addr> val;
@@ -327,9 +344,7 @@ public:
 
   const std::string &getFuncName() const { return funcName; }
 
-  std::vector<std::shared_ptr<const Addr>> getArgs() const {
-    return std::vector<std::shared_ptr<const Addr>>{args.begin(), args.end()};
-  }
+  const std::vector<std::shared_ptr<Addr>> &getArgs() const { return args; }
 
 private:
   std::string funcName;
@@ -344,16 +359,7 @@ public:
       : IRInst(InstType::Phi), Definition(std::move(dest)),
         options(std::move(options)) {}
 
-  std::vector<
-      std::pair<std::shared_ptr<const Addr>, std::shared_ptr<const Label>>>
-  getOptions() const {
-    std::vector<
-        std::pair<std::shared_ptr<const Addr>, std::shared_ptr<const Label>>>
-        res;
-    for (const auto &option : options)
-      res.emplace_back(option.first, option.second);
-    return res;
-  }
+  const std::vector<Option> &getOptions() const { return options; }
 
 private:
   std::vector<std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>> options;

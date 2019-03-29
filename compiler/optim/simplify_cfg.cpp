@@ -93,14 +93,14 @@ bool RewriteBranches::operator()() {
       auto br = ir::dyc<ir::Branch>(inst);
       if (!br)
         continue;
-      auto condition = ir::cdyc<ir::IntLiteral>(br->getCondition());
+      auto condition = ir::dyc<ir::IntLiteral>(br->getCondition());
       if (!condition)
         continue;
       ++cnt;
-      auto target = condition->val ? br->getThen() : br->getElse();
-      inst = std::make_shared<ir::Jump>(ir::dyc<ir::Label>(copy(target)));
-      auto notTarget = condition->val ? br->getElse() : br->getThen();
-      deletePhiOptionInBB(func.getMutableBasicBlock(notTarget->id),
+      auto target = condition->getVal() ? br->getThen() : br->getElse();
+      inst = std::make_shared<ir::Jump>(target);
+      auto notTarget = condition->getVal() ? br->getElse() : br->getThen();
+      deletePhiOptionInBB(func.getMutableBasicBlock(notTarget->getID()),
                           bb.getLabelID());
     }
   }
@@ -196,12 +196,13 @@ bool RemoveTrivialBlocks::operator()() {
       if (!jump)
         continue;
       bool ok = true;
-      for (auto &inst : func.getBasicBlock(jump->getLabel()->id).getInsts()) {
+      for (auto &inst :
+           func.getBasicBlock(jump->getLabel()->getID()).getInsts()) {
         auto phi = ir::dyc<ir::Phi>(inst);
         if (!phi)
           break;
         for (auto &option : phi->getOptions()) {
-          if (option.second->id == bb.getLabelID()) {
+          if (option.second->getID() == bb.getLabelID()) {
             ok = false;
             break;
           }
@@ -223,7 +224,7 @@ bool RemoveTrivialBlocks::operator()() {
     auto &bb = func.getMutableBasicBlock(bbLabel);
     auto jump = ir::dyc<ir::Jump>(bb.getInsts().front());
     assert(jump);
-    auto targetLabel = jump->getLabel()->id;
+    auto targetLabel = jump->getLabel()->getID();
     auto curLabel = bb.getLabelID();
     const auto &preds = predMap.at(curLabel);
     assert(!preds.empty());
@@ -235,18 +236,17 @@ bool RemoveTrivialBlocks::operator()() {
     }
 
     auto newPhi = [&preds, curLabel](const std::shared_ptr<ir::Phi> &old) {
-      auto dest = ir::copy(old->getDest());
+      auto dest = old->getDest();
       auto oldOptions = old->getOptions();
       std::vector<ir::Phi::Option> options;
       std::shared_ptr<ir::Addr> val;
       for (auto &option : oldOptions) {
-        if (option.second->id != curLabel) {
+        if (option.second->getID() != curLabel) {
           options.emplace_back(
-              std::make_pair(ir::copy(option.first),
-                             ir::dyc<ir::Label>(ir::copy(option.second))));
+              std::make_pair(option.first, ir::dyc<ir::Label>(option.second)));
           continue;
         }
-        val = ir::copy(option.first);
+        val = option.first;
       }
       assert(val);
       for (auto pred : preds)

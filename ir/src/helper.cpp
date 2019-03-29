@@ -8,21 +8,20 @@
 namespace mocker {
 namespace ir {
 
-std::shared_ptr<const Addr> getDest(const std::shared_ptr<IRInst> &inst) {
+std::shared_ptr<Addr> getDest(const std::shared_ptr<IRInst> &inst) {
   auto def = dyc<Definition>(inst);
   if (!def)
     return nullptr;
   return def->getDest();
 }
 
-const std::string &
-getLocalRegIdentifier(const std::shared_ptr<const Addr> &addr) {
-  auto p = cdyc<LocalReg>(addr);
+const std::string &getLocalRegIdentifier(const std::shared_ptr<Addr> &addr) {
+  auto p = dyc<LocalReg>(addr);
   assert(p);
-  return p->identifier;
+  return p->getIdentifier();
 }
 
-std::vector<std::shared_ptr<const Addr>>
+std::vector<std::shared_ptr<Addr>>
 getOperandsUsed(const std::shared_ptr<IRInst> &inst) {
   if (auto p = std::dynamic_pointer_cast<Assign>(inst))
     return {p->getOperand()};
@@ -51,7 +50,7 @@ getOperandsUsed(const std::shared_ptr<IRInst> &inst) {
   if (auto p = std::dynamic_pointer_cast<Call>(inst))
     return p->getArgs();
   if (auto p = std::dynamic_pointer_cast<Phi>(inst)) {
-    std::vector<std::shared_ptr<const Addr>> res;
+    std::vector<std::shared_ptr<Addr>> res;
     for (auto &option : p->getOptions())
       res.emplace_back(option.first);
     return res;
@@ -63,27 +62,11 @@ template <class T, class... Args> std::shared_ptr<T> mkS(Args &&... args) {
   return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
-std::shared_ptr<Addr> copy(const std::shared_ptr<const ir::Addr> &addr) {
-  if (auto p = cdyc<IntLiteral>(addr))
-    return mkS<IntLiteral>(p->val);
-  if (auto p = cdyc<LocalReg>(addr))
-    return mkS<LocalReg>(p->identifier);
-  if (auto p = cdyc<GlobalReg>(addr))
-    return mkS<GlobalReg>(p->identifier);
-  if (auto p = cdyc<Label>(addr))
-    return mkS<Label>(p->id);
-  return nullptr;
-}
-
-std::shared_ptr<IRInst> copy(const std::shared_ptr<ir::IRInst> &inst) {
-  return copyWithReplacedOperands(inst, getOperandsUsed(inst));
-}
-
-// local
+namespace {
 std::shared_ptr<IRInst> copyWithReplacedDestAndOperands(
     const std::shared_ptr<ir::IRInst> &inst,
-    const std::shared_ptr<const ir::Addr> &dest,
-    const std::vector<std::shared_ptr<const ir::Addr>> &operands) {
+    const std::shared_ptr<ir::Addr> &dest,
+    const std::vector<std::shared_ptr<ir::Addr>> &operands) {
   if (dyc<Deleted>(inst)) {
     assert(operands.empty());
     return mkS<Deleted>();
@@ -98,81 +81,79 @@ std::shared_ptr<IRInst> copyWithReplacedDestAndOperands(
   }
   if (auto p = dyc<AllocVar>(inst)) {
     assert(operands.empty());
-    return mkS<AllocVar>(copy(dest));
+    return mkS<AllocVar>(dest);
   }
   if (auto p = dyc<Jump>(inst)) {
     assert(operands.empty());
-    return mkS<Jump>(std::make_shared<Label>(p->getLabel()->id));
+    return mkS<Jump>(p->getLabel());
   }
 
   if (auto p = dyc<Assign>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Assign>(copy(dest), copy(operands[0]));
+    return mkS<Assign>(dest, operands[0]);
   }
   if (auto p = dyc<ArithUnaryInst>(inst)) {
     assert(operands.size() == 1);
-    return mkS<ArithUnaryInst>(copy(dest), p->getOp(), copy(operands[0]));
+    return mkS<ArithUnaryInst>(dest, p->getOp(), operands[0]);
   }
   if (auto p = dyc<ArithBinaryInst>(inst)) {
     assert(operands.size() == 2);
-    return mkS<ArithBinaryInst>(copy(dest), p->getOp(), copy(operands[0]),
-                                copy(operands[1]));
+    return mkS<ArithBinaryInst>(dest, p->getOp(), operands[0], operands[1]);
   }
   if (auto p = dyc<RelationInst>(inst)) {
     assert(operands.size() == 2);
-    return mkS<RelationInst>(copy(dest), p->getOp(), copy(operands[0]),
-                             copy(operands[1]));
+    return mkS<RelationInst>(dest, p->getOp(), operands[0], operands[1]);
   }
   if (auto p = dyc<Store>(inst)) {
     assert(operands.size() == 2);
-    return mkS<Store>(copy(operands[0]), copy(operands[1]));
+    return mkS<Store>(operands[0], operands[1]);
   }
   if (auto p = dyc<Load>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Load>(copy(dest), copy(operands[0]));
+    return mkS<Load>(dest, operands[0]);
   }
   if (auto p = dyc<Malloc>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Malloc>(copy(dest), copy(operands[0]));
+    return mkS<Malloc>(dest, operands[0]);
   }
   if (auto p = dyc<StrCpy>(inst)) {
     assert(operands.size() == 1);
-    return mkS<StrCpy>(copy(operands[0]), p->getData());
+    return mkS<StrCpy>(operands[0], p->getData());
   }
   if (auto p = dyc<Branch>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Branch>(copy(operands[0]), dyc<Label>(copy(p->getThen())),
-                       dyc<Label>(copy(p->getElse())));
+    return mkS<Branch>(operands[0], p->getThen(), p->getElse());
   }
   if (auto p = dyc<Ret>(inst)) {
     assert(operands.size() <= 1);
     return mkS<Ret>(operands.empty() ? std::shared_ptr<Addr>(nullptr)
-                                     : copy(operands[0]));
+                                     : operands[0]);
   }
   if (auto p = dyc<Call>(inst)) {
     assert(operands.size() == p->getArgs().size());
     std::vector<std::shared_ptr<Addr>> args;
     args.reserve(operands.size());
     for (auto &arg : operands)
-      args.emplace_back(copy(arg));
-    return mkS<Call>(copy(dest), p->getFuncName(), std::move(args));
+      args.emplace_back(arg);
+    return mkS<Call>(dest, p->getFuncName(), std::move(args));
   }
   if (auto p = dyc<Phi>(inst)) {
     assert(operands.size() == p->getOptions().size());
     std::vector<Phi::Option> options;
     for (std::size_t i = 0; i < operands.size(); ++i) {
-      auto val = copy(operands[i]);
-      auto label = dyc<Label>(copy(p->getOptions()[i].second));
+      auto val = operands[i];
+      auto label = dyc<Label>(p->getOptions()[i].second);
       options.emplace_back(std::make_pair(val, label));
     }
-    return mkS<Phi>(copy(dest), std::move(options));
+    return mkS<Phi>(dest, std::move(options));
   }
   assert(false);
 }
+} // namespace
 
 std::shared_ptr<IRInst> copyWithReplacedOperands(
     const std::shared_ptr<ir::IRInst> &inst,
-    const std::vector<std::shared_ptr<const ir::Addr>> &operands) {
+    const std::vector<std::shared_ptr<ir::Addr>> &operands) {
   if (dyc<Deleted>(inst)) {
     assert(operands.empty());
     return mkS<Deleted>();
@@ -187,82 +168,80 @@ std::shared_ptr<IRInst> copyWithReplacedOperands(
   }
   if (auto p = dyc<AllocVar>(inst)) {
     assert(operands.empty());
-    return mkS<AllocVar>(copy(p->getDest()));
+    return mkS<AllocVar>(p->getDest());
   }
   if (auto p = dyc<Jump>(inst)) {
     assert(operands.empty());
-    return mkS<Jump>(std::make_shared<Label>(p->getLabel()->id));
+    return mkS<Jump>(p->getLabel());
   }
 
   if (auto p = dyc<Assign>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Assign>(copy(p->getDest()), copy(operands[0]));
+    return mkS<Assign>(p->getDest(), operands[0]);
   }
   if (auto p = dyc<ArithUnaryInst>(inst)) {
     assert(operands.size() == 1);
-    return mkS<ArithUnaryInst>(copy(p->getDest()), p->getOp(),
-                               copy(operands[0]));
+    return mkS<ArithUnaryInst>(p->getDest(), p->getOp(), operands[0]);
   }
   if (auto p = dyc<ArithBinaryInst>(inst)) {
     assert(operands.size() == 2);
-    return mkS<ArithBinaryInst>(copy(p->getDest()), p->getOp(),
-                                copy(operands[0]), copy(operands[1]));
+    return mkS<ArithBinaryInst>(p->getDest(), p->getOp(), operands[0],
+                                operands[1]);
   }
   if (auto p = dyc<RelationInst>(inst)) {
     assert(operands.size() == 2);
-    return mkS<RelationInst>(copy(p->getDest()), p->getOp(), copy(operands[0]),
-                             copy(operands[1]));
+    return mkS<RelationInst>(p->getDest(), p->getOp(), operands[0],
+                             operands[1]);
   }
   if (auto p = dyc<Store>(inst)) {
     assert(operands.size() == 2);
-    return mkS<Store>(copy(operands[0]), copy(operands[1]));
+    return mkS<Store>(operands[0], operands[1]);
   }
   if (auto p = dyc<Load>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Load>(copy(p->getDest()), copy(operands[0]));
+    return mkS<Load>(p->getDest(), operands[0]);
   }
   if (auto p = dyc<Malloc>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Malloc>(copy(p->getDest()), copy(operands[0]));
+    return mkS<Malloc>(p->getDest(), operands[0]);
   }
   if (auto p = dyc<StrCpy>(inst)) {
     assert(operands.size() == 1);
-    return mkS<StrCpy>(copy(operands[0]), p->getData());
+    return mkS<StrCpy>(operands[0], p->getData());
   }
   if (auto p = dyc<Branch>(inst)) {
     assert(operands.size() == 1);
-    return mkS<Branch>(copy(operands[0]), dyc<Label>(copy(p->getThen())),
-                       dyc<Label>(copy(p->getElse())));
+    return mkS<Branch>(operands[0], p->getThen(), p->getElse());
   }
   if (auto p = dyc<Ret>(inst)) {
     assert(operands.size() <= 1);
     return mkS<Ret>(operands.empty() ? std::shared_ptr<Addr>(nullptr)
-                                     : copy(operands[0]));
+                                     : operands[0]);
   }
   if (auto p = dyc<Call>(inst)) {
     assert(operands.size() == p->getArgs().size());
     std::vector<std::shared_ptr<Addr>> args;
     args.reserve(operands.size());
     for (auto &arg : operands)
-      args.emplace_back(copy(arg));
-    return mkS<Call>(copy(p->getDest()), p->getFuncName(), std::move(args));
+      args.emplace_back(arg);
+    return mkS<Call>(p->getDest(), p->getFuncName(), std::move(args));
   }
   if (auto p = dyc<Phi>(inst)) {
     assert(operands.size() == p->getOptions().size());
     std::vector<Phi::Option> options;
     for (std::size_t i = 0; i < operands.size(); ++i) {
-      auto val = copy(operands[i]);
-      auto label = dyc<Label>(copy(p->getOptions()[i].second));
+      auto val = operands[i];
+      auto label = dyc<Label>(p->getOptions()[i].second);
       options.emplace_back(std::make_pair(val, label));
     }
-    return mkS<Phi>(copy(p->getDest()), std::move(options));
+    return mkS<Phi>(p->getDest(), std::move(options));
   }
   assert(false);
 }
 
 std::shared_ptr<IRInst>
 copyWithReplacedDest(const std::shared_ptr<ir::IRInst> &inst,
-                     const std::shared_ptr<const ir::Addr> &newDest) {
+                     const std::shared_ptr<ir::Addr> &newDest) {
   return copyWithReplacedDestAndOperands(inst, newDest, getOperandsUsed(inst));
 }
 
@@ -279,11 +258,11 @@ void verifyFuncModule(const ir::FunctionModule &func) {
       auto dest = getDest(inst);
       if (!dest)
         continue;
-      auto reg = cdyc<ir::LocalReg>(dest);
+      auto reg = dyc<ir::LocalReg>(dest);
       assert(reg);
-      if (defined.find(reg->identifier) != defined.end())
-        assert(false && "regsiter with multiple definitions");
-      defined.emplace(reg->identifier);
+      if (defined.find(reg->getIdentifier()) != defined.end())
+        assert(false && "register with multiple definitions");
+      defined.emplace(reg->getIdentifier());
     }
   }
 
@@ -311,7 +290,7 @@ void verifyFuncModule(const ir::FunctionModule &func) {
 
       std::vector<std::size_t> sources;
       for (auto &option : phi->getOptions())
-        sources.emplace_back(option.second->id);
+        sources.emplace_back(option.second->getID());
       std::sort(sources.begin(), sources.end());
       if (preds != sources)
         assert(false && "mismatched predecessors and phi-function options");

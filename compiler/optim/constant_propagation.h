@@ -45,7 +45,7 @@ private:
 private:
   Value computeValue(const std::string &destName);
 
-  Value getValue(const std::shared_ptr<const ir::Addr> &addr);
+  Value getValue(const std::shared_ptr<ir::Addr> &addr);
 
 private:
   std::unordered_map<std::string, std::shared_ptr<ir::IRInst>> instDefine;

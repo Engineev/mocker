@@ -48,37 +48,28 @@ template <class T, class V> std::shared_ptr<T> dyc(V &&v) {
   return detail::dyc_impl(std::forward<V>(v), (T *)(nullptr));
 }
 
-template <class T, class V> decltype(auto) cdyc(V &&v) {
-  return std::dynamic_pointer_cast<const T>(v);
-}
-
 } // namespace ir
 } // namespace mocker
 
 namespace mocker {
 namespace ir {
 
-std::shared_ptr<const Addr> getDest(const std::shared_ptr<IRInst> &inst);
+std::shared_ptr<Addr> getDest(const std::shared_ptr<IRInst> &inst);
 
 // std::shared_ptr<Addr> &getDestRef(const std::shared_ptr<IRInst> &inst);
 
-const std::string &
-getLocalRegIdentifier(const std::shared_ptr<const Addr> &addr);
+const std::string &getLocalRegIdentifier(const std::shared_ptr<Addr> &addr);
 
-std::vector<std::shared_ptr<const Addr>>
+std::vector<std::shared_ptr<Addr>>
 getOperandsUsed(const std::shared_ptr<IRInst> &inst);
-
-std::shared_ptr<Addr> copy(const std::shared_ptr<const ir::Addr> &addr);
-
-std::shared_ptr<IRInst> copy(const std::shared_ptr<ir::IRInst> &inst);
 
 std::shared_ptr<IRInst> copyWithReplacedOperands(
     const std::shared_ptr<ir::IRInst> &inst,
-    const std::vector<std::shared_ptr<const ir::Addr>> &operands);
+    const std::vector<std::shared_ptr<ir::Addr>> &operands);
 
 std::shared_ptr<IRInst>
 copyWithReplacedDest(const std::shared_ptr<ir::IRInst> &inst,
-                     const std::shared_ptr<const ir::Addr> &newDest);
+                     const std::shared_ptr<ir::Addr> &newDest);
 
 // terminate if an error occurs
 void verifyFuncModule(const ir::FunctionModule &func);

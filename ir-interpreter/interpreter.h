@@ -59,18 +59,17 @@ private:
 
   std::size_t executeInst(std::size_t idx);
 
-  std::int64_t readVal(const std::shared_ptr<const Addr> &reg) const;
+  std::int64_t readVal(const std::shared_ptr<Addr> &reg) const;
 
-  template <class T>
-  void writeReg(const std::shared_ptr<const Addr> &reg, T val_) {
+  template <class T> void writeReg(const std::shared_ptr<Addr> &reg, T val_) {
     auto val = reinterpret_cast<std::int64_t>(val_);
     printLog(reg, val);
-    if (auto p = cdyc<LocalReg>(reg)) {
-      ars.top().localReg[p->identifier] = val;
+    if (auto p = dyc<LocalReg>(reg)) {
+      ars.top().localReg[p->getIdentifier()] = val;
       return;
     }
-    if (auto p = cdyc<GlobalReg>(reg)) {
-      globalReg[p->identifier] = val;
+    if (auto p = dyc<GlobalReg>(reg)) {
+      globalReg[p->getIdentifier()] = val;
       return;
     }
     assert(false);
@@ -79,7 +78,7 @@ private:
   // Just for fun...
   void *fastMalloc(std::size_t sz);
 
-  void printLog(const std::shared_ptr<const Addr> &addr, std::int64_t val);
+  void printLog(const std::shared_ptr<Addr> &addr, std::int64_t val);
 
   void printLog(std::int64_t addr, std::int64_t val);
 

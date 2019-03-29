@@ -35,8 +35,8 @@ void DeadCodeElimination::updateWorkList(
     const std::shared_ptr<ir::IRInst> &inst) {
   auto operands = ir::getOperandsUsed(inst);
   for (auto &operand : operands) {
-    if (auto p = ir::cdyc<ir::LocalReg>(operand))
-      workList.emplace(p->identifier);
+    if (auto p = ir::dyc<ir::LocalReg>(operand))
+      workList.emplace(p->getIdentifier());
   }
 }
 

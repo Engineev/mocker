@@ -40,9 +40,9 @@ std::vector<std::size_t> BasicBlock::getSuccessors() const {
   if (std::dynamic_pointer_cast<Ret>(lastInst))
     return {};
   if (auto p = std::dynamic_pointer_cast<Jump>(lastInst))
-    return {p->getLabel()->id};
+    return {p->getLabel()->getID()};
   if (auto p = std::dynamic_pointer_cast<Branch>(lastInst))
-    return {p->getThen()->id, p->getElse()->id};
+    return {p->getThen()->getID(), p->getElse()->getID()};
   assert(false);
 }
 

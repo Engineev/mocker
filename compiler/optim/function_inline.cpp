@@ -103,7 +103,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
   succBBIter->getMutableInsts().pop_front();
   if (call->getDest())
     succBBIter->getMutableInsts().emplace_front(
-        std::make_shared<ir::Load>(ir::copy(call->getDest()), retVal));
+        std::make_shared<ir::Load>(call->getDest(), retVal));
 
   // insert new BBs
   std::unordered_map<std::size_t, std::size_t> newLabelID;
@@ -125,34 +125,35 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
     auto &bb = *iter;
     for (auto &inst : bb.getMutableInsts()) {
       assert(!ir::dyc<ir::Phi>(inst));
-      if (auto dest = ir::cdyc<ir::LocalReg>(ir::getDest(inst))) {
-        auto newDest = caller.makeTempLocalReg(dest->identifier);
+      if (auto dest = ir::dyc<ir::LocalReg>(ir::getDest(inst))) {
+        auto newDest = caller.makeTempLocalReg(dest->getIdentifier());
         inst = ir::copyWithReplacedDest(inst, newDest);
-        newIdent[dest->identifier] = newDest->identifier;
+        newIdent[dest->getIdentifier()] = newDest->getIdentifier();
       }
 
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = ir::cdyc<ir::LocalReg>(operand);
+        auto reg = ir::dyc<ir::LocalReg>(operand);
         if (!reg)
           continue;
-        if (isParameter(callee, reg->identifier)) {
-          auto n = std::stol(reg->identifier, nullptr);
+        if (isParameter(callee, reg->getIdentifier())) {
+          auto n = std::stol(reg->getIdentifier(), nullptr);
           operand = call->getArgs().at((std::size_t)n);
           continue;
         }
-        operand = std::make_shared<ir::LocalReg>(newIdent.at(reg->identifier));
+        operand =
+            std::make_shared<ir::LocalReg>(newIdent.at(reg->getIdentifier()));
       }
       inst = ir::copyWithReplacedOperands(inst, operands);
 
       if (auto br = ir::dyc<ir::Branch>(inst)) {
         inst = std::make_shared<ir::Branch>(
-            ir::copy(br->getCondition()),
-            std::make_shared<ir::Label>(newLabelID.at(br->getThen()->id)),
-            std::make_shared<ir::Label>(newLabelID.at(br->getElse()->id)));
+            br->getCondition(),
+            std::make_shared<ir::Label>(newLabelID.at(br->getThen()->getID())),
+            std::make_shared<ir::Label>(newLabelID.at(br->getElse()->getID())));
       } else if (auto jump = ir::dyc<ir::Jump>(inst)) {
-        inst = std::make_shared<ir::Jump>(
-            std::make_shared<ir::Label>(newLabelID.at(jump->getLabel()->id)));
+        inst = std::make_shared<ir::Jump>(std::make_shared<ir::Label>(
+            newLabelID.at(jump->getLabel()->getID())));
       }
 
       if (auto alloca = ir::dyc<ir::AllocVar>(inst)) {
@@ -171,8 +172,8 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
     bb.getMutableInsts().pop_back();
     if (call->getDest()) {
       bb.appendInst(std::make_shared<ir::Store>(
-          retVal, ret->getVal() ? ir::copy(ret->getVal())
-                                : std::make_shared<ir::IntLiteral>(0)));
+          retVal,
+          ret->getVal() ? ret->getVal() : std::make_shared<ir::IntLiteral>(0)));
     }
     bb.appendInst(std::make_shared<ir::Jump>(
         std::make_shared<ir::Label>(succBBIter->getLabelID())));

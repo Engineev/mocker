@@ -13,9 +13,9 @@ buildInstDefine(const ir::FunctionModule &func) {
       auto dest = ir::getDest(inst);
       if (!dest)
         continue;
-      auto p = ir::cdyc<ir::LocalReg>(dest);
+      auto p = ir::dyc<ir::LocalReg>(dest);
       assert(p);
-      res[p->identifier] = inst;
+      res[p->getIdentifier()] = inst;
     }
   }
 
@@ -59,13 +59,12 @@ std::shared_ptr<ir::IRInst> deletePhiOption(const std::shared_ptr<ir::Phi> &phi,
   std::vector<ir::Phi::Option> newOptions;
 
   for (auto &option : phi->getOptions())
-    if (option.second->id != bbLabel) {
-      newOptions.emplace_back(std::make_pair(
-          ir::copy(option.first), ir::dyc<ir::Label>(ir::copy(option.second))));
+    if (option.second->getID() != bbLabel) {
+      newOptions.emplace_back(
+          std::make_pair(option.first, ir::dyc<ir::Label>(option.second)));
     }
 
-  return std::make_shared<ir::Phi>(ir::copy(phi->getDest()),
-                                   std::move(newOptions));
+  return std::make_shared<ir::Phi>(phi->getDest(), std::move(newOptions));
 }
 
 std::shared_ptr<ir::IRInst>
@@ -74,30 +73,29 @@ replacePhiOption(const std::shared_ptr<ir::Phi> &phi, std::size_t oldLabel,
   std::vector<ir::Phi::Option> newOptions;
   for (auto &option : phi->getOptions()) {
     newOptions.emplace_back(std::make_pair(
-        ir::copy(option.first),
-        std::make_shared<ir::Label>(
-            option.second->id == oldLabel ? newLabel : option.second->id)));
+        option.first,
+        std::make_shared<ir::Label>(option.second->getID() == oldLabel
+                                        ? newLabel
+                                        : option.second->getID())));
   }
-  return std::make_shared<ir::Phi>(ir::copy(phi->getDest()),
-                                   std::move(newOptions));
+  return std::make_shared<ir::Phi>(phi->getDest(), std::move(newOptions));
 }
 
 std::shared_ptr<ir::IRInst>
 replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
                        std::size_t oldLabel, std::size_t newLabel) {
   if (auto p = ir::dyc<ir::Jump>(inst)) {
-    assert(p->getLabel()->id == oldLabel);
+    assert(p->getLabel()->getID() == oldLabel);
     return std::make_shared<ir::Jump>(std::make_shared<ir::Label>(newLabel));
   }
   if (auto p = ir::dyc<ir::Branch>(inst)) {
-    if (p->getThen()->id == oldLabel)
+    if (p->getThen()->getID() == oldLabel)
+      return std::make_shared<ir::Branch>(p->getCondition(),
+                                          std::make_shared<ir::Label>(newLabel),
+                                          p->getElse());
+    if (p->getElse()->getID() == oldLabel)
       return std::make_shared<ir::Branch>(
-          ir::copy(p->getCondition()), std::make_shared<ir::Label>(newLabel),
-          std::make_shared<ir::Label>(p->getElse()->id));
-    if (p->getElse()->id == oldLabel)
-      return std::make_shared<ir::Branch>(
-          ir::copy(p->getCondition()),
-          std::make_shared<ir::Label>(p->getThen()->id),
+          p->getCondition(), p->getThen(),
           std::make_shared<ir::Label>(newLabel));
     assert(false);
   }
