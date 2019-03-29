@@ -12,7 +12,7 @@ namespace mocker {
 // Addr
 namespace ir {
 
-class Addr : std::enable_shared_from_this<Addr> {
+class Addr {
 public:
   virtual ~Addr() = default;
 };
@@ -66,7 +66,7 @@ namespace ir {
 
 using InstID = std::uintptr_t;
 
-class IRInst : public std::enable_shared_from_this<IRInst> {
+class IRInst {
 public:
   enum InstType {
     Deleted,
