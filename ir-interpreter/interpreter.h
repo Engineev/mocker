@@ -104,7 +104,7 @@ private:
   using ExternalFuncType =
       std::function<std::int64_t(const std::vector<std::int64_t> &)>;
 
-  std::vector<std::shared_ptr<AllocVar>> globalVars;
+  std::vector<GlobalVar> globalVars;
   std::unordered_map<std::string, FuncModule> funcs;
   std::unordered_map<std::string, ExternalFuncType> externalFuncs;
   std::unordered_map<std::string, Integer> globalReg;

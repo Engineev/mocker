@@ -21,6 +21,7 @@ private:
   void buildGlobalVarUsedImpl(const ir::FunctionModule &func);
 
 private:
+  // The global variables used in each function
   std::unordered_map<std::string, std::unordered_set<std::string>>
       globalVarUsed;
 };

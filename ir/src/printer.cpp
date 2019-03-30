@@ -36,8 +36,8 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
     res += " " + fmtAddr(p->getOperand());
     return res;
   }
-  if (auto p = dyc<AllocVar>(inst)) {
-    return fmtAddr(p->getDest()) + " = allocvar";
+  if (auto p = dyc<Alloca>(inst)) {
+    return fmtAddr(p->getDest()) + " = alloca";
   }
   if (auto p = dyc<Malloc>(inst)) {
     return fmtAddr(p->getDest()) + " = malloc " + fmtAddr(p->getSize());
@@ -88,25 +88,6 @@ std::string fmtInst(const std::shared_ptr<IRInst> &inst) {
     for (auto &addr : p->getArgs())
       res += " " + fmtAddr(addr);
     return res;
-  }
-  if (auto p = dyc<StrCpy>(inst)) {
-    std::string fmtStr;
-    for (auto &ch : p->getData()) {
-      if (ch == '\n') {
-        fmtStr += "\\n";
-        continue;
-      }
-      if (ch == '\\') {
-        fmtStr += "\\\\";
-        continue;
-      }
-      if (ch == '\"') {
-        fmtStr += "\\\"";
-        continue;
-      }
-      fmtStr.push_back(ch);
-    }
-    return "strcpy " + fmtAddr(p->getAddr()) + " \"" + fmtStr + "\"";
   }
   if (auto p = dyc<Phi>(inst)) {
     std::string res = fmtAddr(p->getDest()) + " = phi ";
@@ -160,8 +141,14 @@ void printFunc(const FunctionModule &func, std::ostream &out) {
 }
 
 void printModule(const Module &module, std::ostream &out) {
-  for (auto &var : module.getGlobalVars())
-    out << fmtInst(var) << std::endl;
+  for (auto &var : module.getGlobalVars()) {
+    std::string str = var.getLabel() + ":";
+    for (auto &ch : var.getData())
+      str += " " + std::to_string(ch) + ",";
+    if (str.back() == ',')
+      str.pop_back();
+    out << str << '\n';
+  }
   out << std::endl;
 
   for (auto &kv : module.getFuncs()) {

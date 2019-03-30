@@ -206,7 +206,7 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
       return Value(compute(p->getOp(), lhsV.val, rhsV.val));
     return Value(Value::Top);
   }
-  if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::AllocVar>(inst) ||
+  if (ir::dyc<ir::Load>(inst) || ir::dyc<ir::Alloca>(inst) ||
       ir::dyc<ir::Malloc>(inst) || ir::dyc<ir::Call>(inst))
     return Value(Value::Bottom);
   if (auto p = ir::dyc<ir::Phi>(inst)) {
@@ -230,7 +230,7 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
     }
     return Value((bool)lastVal ? lastVal.value() : 0);
   }
-  // Store, StrCpy, Branch, Jump, Ret,
+  // Store, Branch, Jump, Ret,
   assert(false);
 }
 

@@ -90,7 +90,7 @@ public:
 
   std::shared_ptr<Reg> addStringLiteral(const std::string &literal);
 
-  void addGlobalVar(std::string ident);
+  void addGlobalVar(std::string ident, std::string data = "12345678");
 
   template <class Inst, class... Args>
   void emplaceGlobalInitInst(Args &&... args) {

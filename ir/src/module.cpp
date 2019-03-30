@@ -46,6 +46,9 @@ std::vector<std::size_t> BasicBlock::getSuccessors() const {
   assert(false);
 }
 
+GlobalVar::GlobalVar(std::string label, std::string data)
+    : label(std::move(label)), data(std::move(data)) {}
+
 FunctionModule::FunctionModule(std::string identifier,
                                std::vector<std::string> args_, bool isExternal)
     : identifier(std::move(identifier)), args(std::move(args_)),
@@ -99,9 +102,8 @@ FunctionModule &Module::addFunc(std::string ident, FunctionModule func) {
   return p.first->second;
 }
 
-void Module::addGlobalVar(std::string identifier) {
-  globalVars.emplace_back(std::make_shared<ir::AllocVar>(
-      std::make_shared<ir::Reg>(std::move(identifier))));
+void Module::addGlobalVar(std::string identifier, std::string data) {
+  globalVars.emplace_back(std::move(identifier), std::move(data));
 }
 
 } // namespace ir

@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
 
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
-  runOptPasses<PromoteGlobalVariables>(module);
+//  runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);
 
   std::cerr << "\nAfter inline and promotion of global variables:\n";

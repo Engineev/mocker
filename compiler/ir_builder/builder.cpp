@@ -118,7 +118,7 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
 
     auto boolExpAddr = ctx.makeTempLocalReg("boolExpAddr");
     ctx.appendInstFront(func.getFirstBB(),
-                        std::make_shared<AllocVar>(boolExpAddr));
+                        std::make_shared<Alloca>(boolExpAddr));
 
     auto rhsFirstBB = func.insertBBAfter(originBB);
     auto rhsFirstLabel = getBBLabel(rhsFirstBB);
@@ -235,7 +235,7 @@ void Builder::operator()(const ast::VarDeclStmt &node) const {
   auto &func = ctx.getCurFunc();
   auto name = node.identifier->val;
   auto valPtr = makeReg(name);
-  ctx.appendInstFront(func.getFirstBB(), std::make_shared<AllocVar>(valPtr));
+  ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(valPtr));
 
   if (node.initExpr && !isNullTy(ctx.getExprType(node.initExpr->getID()))) {
     visit(*node.initExpr);
@@ -348,13 +348,13 @@ void Builder::operator()(const ast::FuncDecl &node) const {
 
   if (isMember) {
     auto reg = makeReg("this");
-    ctx.appendInstFront(func.getFirstBB(), std::make_shared<AllocVar>(reg));
+    ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(reg));
     ctx.emplaceInst<Store>(reg, makeReg("0"));
   }
   for (std::size_t i = 0; i < node.formalParameters.size(); ++i) {
     auto name = node.formalParameters[i]->identifier->val;
     auto reg = makeReg(name);
-    ctx.appendInstFront(func.getFirstBB(), std::make_shared<AllocVar>(reg));
+    ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(reg));
     ctx.emplaceInst<Store>(reg, makeReg(std::to_string(i + isMember)));
   }
 
@@ -407,7 +407,7 @@ void Builder::addClassLayout(const ast::ClassDecl &node) const {
       std::string varName =
           splitMemberVarIdent(decl->decl->identifier->val).second;
       classLayout.offset[varName] = classLayout.size;
-      classLayout.size += 8; // TODO: alignment
+      classLayout.size += 8;
     }
   }
   ctx.addClassLayout(node.identifier->val, std::move(classLayout));
@@ -628,7 +628,7 @@ std::shared_ptr<Addr> Builder::translateNewArray(
   // 6.
   auto curElementPtrPtr = ctx.makeTempLocalReg("curElementPtrPtr");
   ctx.appendInstFront(func.getFirstBB(),
-                      std::make_shared<AllocVar>(curElementPtrPtr));
+                      std::make_shared<Alloca>(curElementPtrPtr));
   ctx.emplaceInst<Store>(curElementPtrPtr, contentPtr);
   auto contentEndPtr = ctx.makeTempLocalReg("contentEndPtr");
   ctx.emplaceInst<ArithBinaryInst>(contentEndPtr, ArithBinaryInst::Add,

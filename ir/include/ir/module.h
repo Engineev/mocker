@@ -99,9 +99,21 @@ private: // context
   std::unordered_map<std::size_t, std::vector<std::size_t>> predecessors;
 };
 
+class GlobalVar {
+public:
+  GlobalVar(std::string label, std::string data);
+
+  const std::string &getLabel() const { return label; }
+
+  const std::string &getData() const { return data; }
+
+private:
+  std::string label, data;
+};
+
 class Module {
 public:
-  using GlobalVarList = std::list<std::shared_ptr<AllocVar>>;
+  using GlobalVarList = std::list<GlobalVar>;
   using GlobalVarIter = GlobalVarList::iterator;
   using FuncsMap = std::unordered_map<std::string, FunctionModule>;
 
@@ -115,7 +127,7 @@ public:
 
   FunctionModule &addFunc(std::string ident, FunctionModule func);
 
-  void addGlobalVar(std::string identifier);
+  void addGlobalVar(std::string identifier, std::string data);
 
 private:
   GlobalVarList globalVars;

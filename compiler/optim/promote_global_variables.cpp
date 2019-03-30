@@ -9,6 +9,7 @@ namespace mocker {
 
 PromoteGlobalVariables::PromoteGlobalVariables(ir::Module &module)
     : ModulePass(module) {
+  assert(false && "The construction of globalVarUsed is broken");
   for (auto &kv : module.getFuncs()) {
     if (kv.second.isExternalFunc())
       continue;
@@ -71,12 +72,12 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
     }
   }
 
-  // Insert AllocVar's
+  // Insert Alloca's
   auto &firstBB = *func.getFirstBB();
   for (auto &nameReg : aliasReg) {
     std::list<std::shared_ptr<ir::IRInst>> toBeInserted;
     auto gReg = std::make_shared<ir::Reg>(nameReg.first);
-    toBeInserted.emplace_back(std::make_shared<ir::AllocVar>(nameReg.second));
+    toBeInserted.emplace_back(std::make_shared<ir::Alloca>(nameReg.second));
     auto tmp = func.makeTempLocalReg();
     toBeInserted.emplace_back(std::make_shared<ir::Load>(tmp, gReg));
     toBeInserted.emplace_back(std::make_shared<ir::Store>(nameReg.second, tmp));

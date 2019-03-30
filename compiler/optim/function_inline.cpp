@@ -91,8 +91,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
   std::shared_ptr<ir::Reg> retVal = nullptr;
   if (call->getDest()) {
     retVal = caller.makeTempLocalReg("retVal");
-    caller.getFirstBB()->appendInstFront(
-        std::make_shared<ir::AllocVar>(retVal));
+    caller.getFirstBB()->appendInstFront(std::make_shared<ir::Alloca>(retVal));
   }
 
   // move the subsequent instructions to a new BB
@@ -155,7 +154,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
             newLabelID.at(jump->getLabel()->getID())));
       }
 
-      if (auto alloca = ir::dyc<ir::AllocVar>(inst)) {
+      if (auto alloca = ir::dyc<ir::Alloca>(inst)) {
         caller.getFirstBB()->getMutableInsts().push_front(std::move(inst));
         inst = std::make_shared<ir::Deleted>();
       }

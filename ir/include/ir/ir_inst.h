@@ -66,9 +66,8 @@ public:
     RelationInst,
     Store,
     Load,
-    AllocVar,
+    Alloca,
     Malloc,
-    StrCpy,
     Branch,
     Jump,
     Ret,
@@ -240,10 +239,10 @@ private:
   std::shared_ptr<Addr> addr;
 };
 
-class AllocVar : public IRInst, public Definition {
+class Alloca : public IRInst, public Definition {
 public:
-  explicit AllocVar(std::shared_ptr<Reg> dest)
-      : IRInst(InstType::AllocVar), Definition(std::move(dest)) {}
+  explicit Alloca(std::shared_ptr<Reg> dest)
+      : IRInst(InstType::Alloca), Definition(std::move(dest)) {}
 };
 
 class Malloc : public IRInst, public Definition {
@@ -256,21 +255,6 @@ public:
 
 private:
   std::shared_ptr<Addr> size;
-};
-
-class StrCpy : public IRInst {
-public:
-  StrCpy(std::shared_ptr<Addr> addr, std::string data)
-      : IRInst(InstType::StrCpy), addr(std::move(addr)), data(std::move(data)) {
-  }
-
-  const std::shared_ptr<Addr> &getAddr() const { return addr; }
-
-  const std::string &getData() const { return data; }
-
-private:
-  std::shared_ptr<Addr> addr;
-  std::string data;
 };
 
 class Branch : public IRInst, public Terminator {

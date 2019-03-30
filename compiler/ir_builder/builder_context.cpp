@@ -32,7 +32,7 @@ Module &BuilderContext::getResult() {
   // call _init_global_vars
   auto &insts = module.getFuncs().at("main").getFirstBB()->getMutableInsts();
   auto iter = insts.begin();
-  while (ir::dyc<ir::AllocVar>(*iter))
+  while (ir::dyc<ir::Alloca>(*iter))
     ++iter;
   insts.emplace(iter,
                 std::make_shared<ir::Call>(std::string("_init_global_vars")));
@@ -124,7 +124,9 @@ BuilderContext::addStringLiteral(const std::string &literal) {
     return iter->second;
 
   auto ident = "@_strlit_" + std::to_string(strLitCounter++);
+  auto contentIdent = ident + "c";
   addGlobalVar(ident);
+  addGlobalVar(contentIdent, literal);
 
   auto &func = module.getFuncs().at("_init_global_vars");
   auto &bb = func.getMutableBBs().back();
@@ -139,21 +141,24 @@ BuilderContext::addStringLiteral(const std::string &literal) {
 
   auto litLen = std::make_shared<IntLiteral>(literal.length());
   bb.appendInst(std::make_shared<Store>(strInstPtr, litLen));
-  auto contentPtr = func.makeTempLocalReg("contentPtr");
-  bb.appendInst(std::make_shared<Malloc>(contentPtr, litLen));
+  //  auto contentPtr = func.makeTempLocalReg("contentPtr");
+  //  bb.appendInst(std::make_shared<Malloc>(contentPtr, litLen));
   auto contentPtrPtr = func.makeTempLocalReg("contentPtrPtr");
   bb.appendInst(std::make_shared<ArithBinaryInst>(
       contentPtrPtr, ArithBinaryInst::Add, strInstPtr,
       std::make_shared<IntLiteral>(8)));
-  bb.appendInst(std::make_shared<Store>(contentPtrPtr, contentPtr));
-  bb.appendInst(std::make_shared<StrCpy>(contentPtr, literal));
+  bb.appendInst(std::make_shared<Store>(contentPtrPtr,
+                                        std::make_shared<Reg>(contentIdent)));
+  //  bb.appendInst(std::make_shared<Call>("memcpy", contentPtr,
+  //  std::make_shared<Reg>(contentIdent),
+  //      std::make_shared<ir::IntLiteral>(literal.size())));
 
   strLits.emplace(literal, strInstPtrPtr);
   return strInstPtrPtr;
 }
 
-void BuilderContext::addGlobalVar(std::string ident) {
-  module.addGlobalVar(std::move(ident));
+void BuilderContext::addGlobalVar(std::string ident, std::string data) {
+  module.addGlobalVar(std::move(ident), std::move(data));
 }
 
 } // namespace ir

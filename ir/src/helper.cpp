@@ -45,8 +45,6 @@ getOperandsUsed(const std::shared_ptr<IRInst> &inst) {
     return {p->getAddr()};
   if (auto p = std::dynamic_pointer_cast<Malloc>(inst))
     return {p->getSize()};
-  if (auto p = std::dynamic_pointer_cast<StrCpy>(inst))
-    return {p->getAddr()};
   if (auto p = std::dynamic_pointer_cast<Branch>(inst))
     return {p->getCondition()};
   if (auto p = std::dynamic_pointer_cast<Ret>(inst)) {
@@ -87,9 +85,9 @@ std::shared_ptr<IRInst> copyWithReplacedDestAndOperands(
     assert(operands.empty());
     return mkS<AttachedComment>(p->getContent());
   }
-  if (auto p = dyc<AllocVar>(inst)) {
+  if (auto p = dyc<Alloca>(inst)) {
     assert(operands.empty());
-    return mkS<AllocVar>(dest);
+    return mkS<Alloca>(dest);
   }
   if (auto p = dyc<Jump>(inst)) {
     assert(operands.empty());
@@ -123,10 +121,6 @@ std::shared_ptr<IRInst> copyWithReplacedDestAndOperands(
   if (auto p = dyc<Malloc>(inst)) {
     assert(operands.size() == 1);
     return mkS<Malloc>(dest, operands[0]);
-  }
-  if (auto p = dyc<StrCpy>(inst)) {
-    assert(operands.size() == 1);
-    return mkS<StrCpy>(operands[0], p->getData());
   }
   if (auto p = dyc<Branch>(inst)) {
     assert(operands.size() == 1);
@@ -174,9 +168,9 @@ std::shared_ptr<IRInst> copyWithReplacedOperands(
     assert(operands.empty());
     return mkS<AttachedComment>(p->getContent());
   }
-  if (auto p = dyc<AllocVar>(inst)) {
+  if (auto p = dyc<Alloca>(inst)) {
     assert(operands.empty());
-    return mkS<AllocVar>(p->getDest());
+    return mkS<Alloca>(p->getDest());
   }
   if (auto p = dyc<Jump>(inst)) {
     assert(operands.empty());
@@ -212,10 +206,6 @@ std::shared_ptr<IRInst> copyWithReplacedOperands(
   if (auto p = dyc<Malloc>(inst)) {
     assert(operands.size() == 1);
     return mkS<Malloc>(p->getDest(), operands[0]);
-  }
-  if (auto p = dyc<StrCpy>(inst)) {
-    assert(operands.size() == 1);
-    return mkS<StrCpy>(operands[0], p->getData());
   }
   if (auto p = dyc<Branch>(inst)) {
     assert(operands.size() == 1);

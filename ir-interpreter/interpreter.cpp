@@ -30,8 +30,11 @@ Interpreter::~Interpreter() {
 
 std::int64_t Interpreter::run() {
   for (auto &var : globalVars) {
-    auto res = fastMalloc(8);
-    writeReg(var->getDest(), res);
+    auto &ident = var.getLabel();
+    auto &data = var.getData();
+    auto res = fastMalloc(data.size());
+    std::memcpy(res, data.c_str(), data.size());
+    writeReg(std::make_shared<Reg>(ident), res);
   }
 
   return executeFunc("main", {});
@@ -88,8 +91,16 @@ void Interpreter::parse(const std::string &source) {
       std::stringstream lineSS(line);
       std::string ident;
       lineSS >> ident;
-      globalVars.emplace_back(
-          std::make_shared<ir::AllocVar>(std::make_shared<Reg>(ident)));
+      ident.pop_back(); // pop the colon
+      std::string data;
+      char nxt;
+      do {
+        int ascii;
+        lineSS >> ascii;
+        data.push_back(char(ascii));
+        nxt = lineSS.get();
+      } while (nxt == ',');
+      globalVars.emplace_back(std::move(ident), std::move(data));
       continue;
     }
     std::stringstream lineSS(line);
@@ -159,33 +170,6 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
     auto operand = parseAddr(buffer);
     return std::make_shared<Store>(dest, operand);
   }
-  if (buffer == "strcpy") {
-    lineSS >> buffer;
-    auto dest = parseAddr(buffer);
-    while (lineSS.peek() != '\"')
-      lineSS.get();
-    lineSS.get();
-    std::getline(lineSS, buffer);
-    assert(buffer.back() == '\"');
-    buffer.pop_back();
-    std::string data;
-    for (auto iter = buffer.begin(); iter != buffer.end(); ++iter) {
-      if (*iter == '\\') {
-        ++iter;
-        if (*iter == 'n')
-          data.push_back('\n');
-        else if (*iter == '\\')
-          data.push_back('\\');
-        else if (*iter == '\"')
-          data.push_back('\"');
-        else
-          assert(false);
-        continue;
-      }
-      data.push_back(*iter);
-    }
-    return std::make_shared<StrCpy>(dest, std::move(data));
-  }
   if (buffer == "jump") {
     lineSS >> buffer;
     auto label = std::static_pointer_cast<Label>(parseAddr(buffer));
@@ -232,8 +216,8 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
   if (buffer == "call") {
     return parseCallRHS(std::move(dest));
   }
-  if (buffer == "allocvar") {
-    return std::make_shared<AllocVar>(dest);
+  if (buffer == "alloca") {
+    return std::make_shared<Alloca>(dest);
   }
   if (buffer == "malloc") {
     lineSS >> buffer;
@@ -392,8 +376,9 @@ void Interpreter::initExternalFuncs() {
   externalFuncs.emplace("print", [this](Args args) {
     auto len = externalFuncs["#string#length"]({args[0]});
     auto contentPtrPtr = (char **)args[0] + 1;
-    auto contentPtr = *contentPtrPtr;
-    std::cout << std::string{contentPtr, contentPtr + len};
+    char *contentPtr = *contentPtrPtr;
+    auto str = std::string{contentPtr, contentPtr + len};
+    std::cout << str;
     return 0;
   });
   // println ( str )
@@ -596,12 +581,7 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
     printLog((std::int64_t)addr, val);
     return idx + 1;
   }
-  if (auto p = dyc<StrCpy>(inst)) {
-    auto dest = (void *)readVal(p->getAddr());
-    std::memcpy(dest, p->getData().c_str(), p->getData().size());
-    return idx + 1;
-  }
-  if (auto p = dyc<AllocVar>(inst)) {
+  if (auto p = dyc<Alloca>(inst)) {
     auto res = fastMalloc(8);
     writeReg(p->getDest(), res);
     return idx + 1;
@@ -683,12 +663,8 @@ void *Interpreter::fastMalloc(std::size_t sz) {
 void Interpreter::printLog(const std::shared_ptr<Addr> &addr,
                            std::int64_t val) {
 #ifdef PRINT_LOG
-  if (auto p = dyc<LocalReg>(addr)) {
-    std::cerr << p->identifier << " <- " << val << std::endl;
-    return;
-  }
-  if (auto p = dyc<GlobalReg>(addr)) {
-    std::cerr << p->identifier << " <- " << val << std::endl;
+  if (auto p = dyc<Reg>(addr)) {
+    std::cerr << p->getIdentifier() << " <- " << val << std::endl;
     return;
   }
 #endif

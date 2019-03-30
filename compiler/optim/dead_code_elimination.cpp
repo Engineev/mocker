@@ -43,7 +43,7 @@ void DeadCodeElimination::updateWorkList(
 void DeadCodeElimination::init() {
   auto isUseful = [](const std::shared_ptr<ir::IRInst> &inst) -> bool {
     return ir::dyc<ir::Terminator>(inst) || ir::dyc<ir::Store>(inst) ||
-           ir::dyc<ir::StrCpy>(inst) || ir::dyc<ir::Call>(inst);
+           ir::dyc<ir::Call>(inst);
   };
 
   for (auto &bb : func.getBBs()) {
