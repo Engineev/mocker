@@ -28,7 +28,7 @@ void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {
   auto updateInstsUse = [&](const std::shared_ptr<ir::IRInst> &inst) {
     auto operands = ir::getOperandsUsed(inst);
     for (auto &operand : operands) {
-      if (auto p = ir::dyc<ir::LocalReg>(operand))
+      if (auto p = ir::dycLocalReg(operand))
         instsUse[p->getIdentifier()].emplace_back(inst);
     }
   };
@@ -38,9 +38,9 @@ void SparseSimpleConstantPropagation::buildInstDefineAndInstsUse() {
       auto dest = ir::getDest(inst);
       if (!dest)
         continue;
-      if (ir::dyc<ir::GlobalReg>(dest))
+      if (ir::dycGlobalReg(dest))
         continue;
-      auto destName = ir::getLocalRegIdentifier(dest);
+      auto destName = dest->getIdentifier();
       instDefine.emplace(destName, inst);
       updateInstsUse(inst);
     }
@@ -63,7 +63,7 @@ void SparseSimpleConstantPropagation::propagate() {
     for (auto &inst : instsUse[name]) {
       auto dest = ir::getDest(inst);
       assert(dest);
-      const auto &destName = ir::getLocalRegIdentifier(dest);
+      const auto &destName = dest->getIdentifier();
       if (values.at(destName).type == Value::Bottom)
         continue;
       auto newVal = computeValue(destName);
@@ -81,9 +81,9 @@ void SparseSimpleConstantPropagation::propagate() {
 void SparseSimpleConstantPropagation::rewrite() {
   auto rewriteIfPossible = [&](const std::shared_ptr<ir::IRInst> &inst)
       -> std::shared_ptr<ir::IRInst> {
-    auto dest = ir::dyc<ir::LocalReg>(ir::getDest(inst));
+    auto dest = ir::dycLocalReg(ir::getDest(inst));
     if (dest) {
-      auto destName = ir::getLocalRegIdentifier(dest);
+      auto destName = dest->getIdentifier();
       auto val = values[destName];
       if (val.type == Value::Constant) {
         // All the insts that use this value will be rewrite so that they use
@@ -96,10 +96,10 @@ void SparseSimpleConstantPropagation::rewrite() {
     // Rewrite the operands
     auto operands = ir::getOperandsUsed(inst);
     for (auto &operand : operands) {
-      auto reg = ir::dyc<ir::LocalReg>(operand);
+      auto reg = ir::dycLocalReg(operand);
       if (!reg)
         continue;
-      auto name = ir::getLocalRegIdentifier(reg);
+      auto name = reg->getIdentifier();
       auto val = values[name];
       if (val.type == Value::Constant) {
         ++modificationCnt;
@@ -125,9 +125,9 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
     if (auto v = ir::dyc<ir::IntLiteral>(p->getOperand()))
       return Value(p->getOp() == ir::ArithUnaryInst::BitNot ? ~v->getVal()
                                                             : -v->getVal());
-    if (!ir::dyc<ir::LocalReg>(p->getOperand()))
+    if (!ir::dycLocalReg(p->getOperand()))
       return Value(Value::Bottom);
-    auto operandV = values[ir::getLocalRegIdentifier(p->getOperand())];
+    auto operandV = values[ir::dyc<ir::Reg>(p->getOperand())->getIdentifier()];
     if (operandV.type == Value::Constant)
       return Value(p->getOp() == ir::ArithUnaryInst::BitNot ? ~operandV.val
                                                             : -operandV.val);
@@ -212,7 +212,7 @@ SparseSimpleConstantPropagation::computeValue(const std::string &destName) {
   if (auto p = ir::dyc<ir::Phi>(inst)) {
     Optional<std::int64_t> lastVal;
     for (auto &option : p->getOptions()) {
-      if (auto reg = ir::dyc<ir::LocalReg>(option.first)) {
+      if (auto reg = ir::dycLocalReg(option.first)) {
         if (reg->getIdentifier() == ".phi_nan")
           continue;
       }
@@ -238,12 +238,12 @@ SparseSimpleConstantPropagation::Value
 SparseSimpleConstantPropagation::getValue(
     const std::shared_ptr<ir::Addr> &addr) {
   assert(!ir::dyc<ir::Label>(addr));
-  if (ir::dyc<ir::GlobalReg>(addr))
+  if (ir::dycGlobalReg(addr))
     return Value(Value::Bottom);
   if (auto p = ir::dyc<ir::IntLiteral>(addr))
     return Value(p->getVal());
-  assert(ir::dyc<ir::LocalReg>(addr));
-  return values[ir::getLocalRegIdentifier(addr)];
+  assert(ir::dycLocalReg(addr));
+  return values[ir::dyc<ir::Reg>(addr)->getIdentifier()];
 }
 
 } // namespace mocker

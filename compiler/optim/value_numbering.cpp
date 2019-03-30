@@ -37,8 +37,8 @@ bool LocalValueNumbering::operator()() {
     if (iter != key2ValueNumber.end()) {
       key2ValueNumber[lhsKey] = iter->second;
       auto rhsVal = valueNumber2Addr.at(iter->second);
-      if (auto p = ir::dyc<ir::LocalReg>(rhsVal)) {
-        if (p->getIdentifier() == ir::getLocalRegIdentifier(dest))
+      if (auto p = ir::dycLocalReg(rhsVal)) {
+        if (p->getIdentifier() == dest->getIdentifier())
           assert(false);
       }
 
@@ -58,9 +58,9 @@ bool LocalValueNumbering::operator()() {
 std::string LocalValueNumbering::hash(const std::shared_ptr<ir::Addr> &addr) {
   if (auto p = ir::dyc<ir::IntLiteral>(addr))
     return "int:" + std::to_string(p->getVal());
-  if (auto p = ir::dyc<ir::GlobalReg>(addr))
+  if (auto p = ir::dycGlobalReg(addr))
     return "global:" + p->getIdentifier();
-  if (auto p = ir::dyc<ir::LocalReg>(addr))
+  if (auto p = ir::dycLocalReg(addr))
     return "local:" + p->getIdentifier();
   assert(false);
 }

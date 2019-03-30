@@ -13,7 +13,7 @@ buildInstDefine(const ir::FunctionModule &func) {
       auto dest = ir::getDest(inst);
       if (!dest)
         continue;
-      auto p = ir::dyc<ir::LocalReg>(dest);
+      auto p = ir::dycLocalReg(dest);
       assert(p);
       res[p->getIdentifier()] = inst;
     }

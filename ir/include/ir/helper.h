@@ -48,17 +48,17 @@ template <class T, class V> std::shared_ptr<T> dyc(V &&v) {
   return detail::dyc_impl(std::forward<V>(v), (T *)(nullptr));
 }
 
+std::shared_ptr<Reg> dycLocalReg(const std::shared_ptr<Addr> &addr);
+
+std::shared_ptr<Reg> dycGlobalReg(const std::shared_ptr<Addr> &addr);
+
 } // namespace ir
 } // namespace mocker
 
 namespace mocker {
 namespace ir {
 
-std::shared_ptr<Addr> getDest(const std::shared_ptr<IRInst> &inst);
-
-// std::shared_ptr<Addr> &getDestRef(const std::shared_ptr<IRInst> &inst);
-
-const std::string &getLocalRegIdentifier(const std::shared_ptr<Addr> &addr);
+std::shared_ptr<Reg> getDest(const std::shared_ptr<IRInst> &inst);
 
 std::vector<std::shared_ptr<Addr>>
 getOperandsUsed(const std::shared_ptr<IRInst> &inst);
@@ -69,7 +69,7 @@ std::shared_ptr<IRInst> copyWithReplacedOperands(
 
 std::shared_ptr<IRInst>
 copyWithReplacedDest(const std::shared_ptr<ir::IRInst> &inst,
-                     const std::shared_ptr<ir::Addr> &newDest);
+                     const std::shared_ptr<ir::Reg> &newDest);
 
 // terminate if an error occurs
 void verifyFuncModule(const ir::FunctionModule &func);

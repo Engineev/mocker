@@ -122,12 +122,11 @@ private:
   void addGlobalVariable(const std::shared_ptr<ast::VarDecl> &decl) const;
 
 private:
-  std::shared_ptr<LocalReg>
-  getMemberElementPtr(const std::shared_ptr<Addr> &base,
-                      const std::string &className,
-                      const std::string &varName) const;
+  std::shared_ptr<Reg> getMemberElementPtr(const std::shared_ptr<Addr> &base,
+                                           const std::string &className,
+                                           const std::string &varName) const;
 
-  std::shared_ptr<Addr> makeReg(std::string identifier) const;
+  std::shared_ptr<Reg> makeReg(std::string identifier) const;
 
   std::shared_ptr<Addr> /* contains the pointer to the actual instance */
   makeNewNonarray(const std::shared_ptr<ast::Type> &type) const;

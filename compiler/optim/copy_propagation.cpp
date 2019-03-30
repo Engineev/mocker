@@ -30,13 +30,13 @@ void CopyPropagation::buildValue() {
       auto assign = ir::dyc<ir::Assign>(inst);
       if (!assign)
         continue;
-      auto destName = ir::dyc<ir::LocalReg>(assign->getDest())->getIdentifier();
+      auto destName = ir::dycLocalReg(assign->getDest())->getIdentifier();
       auto val = assign->getOperand();
-      if (ir::dyc<ir::IntLiteral>(val) || ir::dyc<ir::GlobalReg>(val)) {
+      if (ir::dyc<ir::IntLiteral>(val) || ir::dycGlobalReg(val)) {
         value[destName] = val;
         continue;
       }
-      if (auto reg = ir::dyc<ir::LocalReg>(val)) {
+      if (auto reg = ir::dycLocalReg(val)) {
         auto iter = value.find(reg->getIdentifier());
         if (iter != value.end()) {
           value[destName] = iter->second;
@@ -61,7 +61,7 @@ void CopyPropagation::rewrite() {
     for (auto &inst : bb.getMutableInsts()) {
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = ir::dyc<ir::LocalReg>(operand);
+        auto reg = ir::dycLocalReg(operand);
         if (!reg)
           continue;
         auto iter = value.find(reg->getIdentifier());

@@ -64,11 +64,11 @@ private:
   template <class T> void writeReg(const std::shared_ptr<Addr> &reg, T val_) {
     auto val = reinterpret_cast<std::int64_t>(val_);
     printLog(reg, val);
-    if (auto p = dyc<LocalReg>(reg)) {
+    if (auto p = dycLocalReg(reg)) {
       ars.top().localReg[p->getIdentifier()] = val;
       return;
     }
-    if (auto p = dyc<GlobalReg>(reg)) {
+    if (auto p = dycGlobalReg(reg)) {
       globalReg[p->getIdentifier()] = val;
       return;
     }

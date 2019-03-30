@@ -89,10 +89,8 @@ std::vector<std::size_t> FunctionModule::getPredcessors(std::size_t bb) const {
   return predecessors.at(bb);
 }
 
-std::shared_ptr<LocalReg>
-FunctionModule::makeTempLocalReg(const std::string &hint) {
-  return std::make_shared<LocalReg>(hint + "_" +
-                                    std::to_string(tempRegCounter++));
+std::shared_ptr<Reg> FunctionModule::makeTempLocalReg(const std::string &hint) {
+  return std::make_shared<Reg>(hint + "_" + std::to_string(tempRegCounter++));
 }
 
 FunctionModule &Module::addFunc(std::string ident, FunctionModule func) {
@@ -103,7 +101,7 @@ FunctionModule &Module::addFunc(std::string ident, FunctionModule func) {
 
 void Module::addGlobalVar(std::string identifier) {
   globalVars.emplace_back(std::make_shared<ir::AllocVar>(
-      std::make_shared<ir::GlobalReg>(std::move(identifier))));
+      std::make_shared<ir::Reg>(std::move(identifier))));
 }
 
 } // namespace ir

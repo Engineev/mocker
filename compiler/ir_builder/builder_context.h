@@ -35,7 +35,7 @@ public:
 
   void setExprAddr(ast::NodeID id, std::shared_ptr<Addr> addr);
 
-  std::shared_ptr<LocalReg> makeTempLocalReg(const std::string &hint = "");
+  std::shared_ptr<Reg> makeTempLocalReg(const std::string &hint = "");
 
   template <class InstType, class... Args> void emplaceInst(Args &&... args) {
     auto inst = std::make_shared<InstType>(std::forward<Args>(args)...);
@@ -88,7 +88,7 @@ public:
 
   void initFuncCtx(std::size_t paramNum);
 
-  std::shared_ptr<GlobalReg> addStringLiteral(const std::string &literal);
+  std::shared_ptr<Reg> addStringLiteral(const std::string &literal);
 
   void addGlobalVar(std::string ident);
 
@@ -106,7 +106,7 @@ private:
   std::stack<std::shared_ptr<Label>> loopEntry, loopSuccessor;
   // The key is <class name> + '_' + <variable name>
   std::unordered_map<std::string, ClassLayout> classLayout;
-  std::unordered_map<std::string, std::shared_ptr<GlobalReg>> strLits;
+  std::unordered_map<std::string, std::shared_ptr<Reg>> strLits;
 
   Module module;
 

@@ -16,8 +16,7 @@ BuilderContext::BuilderContext(
   initGlobalVars.pushBackBB();
 }
 
-std::shared_ptr<LocalReg>
-BuilderContext::makeTempLocalReg(const std::string &hint) {
+std::shared_ptr<Reg> BuilderContext::makeTempLocalReg(const std::string &hint) {
   return curFunc->makeTempLocalReg(hint);
 }
 
@@ -115,7 +114,7 @@ void BuilderContext::initFuncCtx(std::size_t paramNum) {
   bbReside.clear();
 }
 
-std::shared_ptr<GlobalReg>
+std::shared_ptr<Reg>
 BuilderContext::addStringLiteral(const std::string &literal) {
   // Note that what we store is a string object, i.e., length + content, instead
   // of the literal itself.
@@ -132,7 +131,7 @@ BuilderContext::addStringLiteral(const std::string &literal) {
   assert(!bb.isCompleted());
 
   // init
-  auto strInstPtrPtr = std::make_shared<GlobalReg>(ident);
+  auto strInstPtrPtr = std::make_shared<Reg>(ident);
   auto strInstPtr = func.makeTempLocalReg("strInstPtr");
   bb.appendInst(
       std::make_shared<Malloc>(strInstPtr, std::make_shared<IntLiteral>(16)));

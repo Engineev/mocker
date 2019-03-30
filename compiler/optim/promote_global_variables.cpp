@@ -42,7 +42,7 @@ void PromoteGlobalVariables::buildGlobalVarUsedImpl(
 
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = ir::dyc<ir::GlobalReg>(operand);
+        auto reg = ir::dycGlobalReg(operand);
         if (reg && reg->getIdentifier() != "@null")
           used.insert(reg->getIdentifier());
       }
@@ -52,7 +52,7 @@ void PromoteGlobalVariables::buildGlobalVarUsedImpl(
 
 void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
   const auto &globalVars = globalVarUsed[func.getIdentifier()];
-  std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> aliasReg;
+  std::unordered_map<std::string, std::shared_ptr<ir::Reg>> aliasReg;
   for (const auto &name : globalVars) {
     assert(name != "@null");
     aliasReg[name] = func.makeTempLocalReg("alias" + name);
@@ -63,7 +63,7 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
     for (auto &inst : bb.getMutableInsts()) {
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto p = ir::dyc<ir::GlobalReg>(operand);
+        auto p = ir::dycGlobalReg(operand);
         if (p && p->getIdentifier() != "@null")
           operand = aliasReg.at(p->getIdentifier());
       }
@@ -75,7 +75,7 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
   auto &firstBB = *func.getFirstBB();
   for (auto &nameReg : aliasReg) {
     std::list<std::shared_ptr<ir::IRInst>> toBeInserted;
-    auto gReg = std::make_shared<ir::GlobalReg>(nameReg.first);
+    auto gReg = std::make_shared<ir::Reg>(nameReg.first);
     toBeInserted.emplace_back(std::make_shared<ir::AllocVar>(nameReg.second));
     auto tmp = func.makeTempLocalReg();
     toBeInserted.emplace_back(std::make_shared<ir::Load>(tmp, gReg));
@@ -89,7 +89,7 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
     auto &insts = bb.getMutableInsts();
     auto insert = [&insts, &func, &aliasReg](ir::InstListIter iter,
                                              const std::string &name) {
-      auto gReg = std::make_shared<ir::GlobalReg>(name);
+      auto gReg = std::make_shared<ir::Reg>(name);
       auto alias = aliasReg.at(name);
       auto tmp = func.makeTempLocalReg();
       insts.insert(iter, std::make_shared<ir::Load>(tmp, alias));

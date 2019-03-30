@@ -183,7 +183,7 @@ void SSAConstruction::insertPhiFunctions() {
   const auto &firstBB = *func.getFirstBB();
   for (const auto &inst : firstBB.getInsts()) {
     if (auto p = ir::dyc<ir::AllocVar>(inst)) {
-      auto reg = ir::dyc<ir::LocalReg>(p->getDest());
+      auto reg = ir::dycLocalReg(p->getDest());
       assert(reg);
       varNames.emplace(reg->getIdentifier());
     }
@@ -234,7 +234,7 @@ SSAConstruction::collectAndReplaceDefs(const std::string &name) {
         continue;
 
       auto p = std::static_pointer_cast<ir::Store>(inst);
-      auto reg = ir::dyc<ir::LocalReg>(p->getAddr());
+      auto reg = ir::dycLocalReg(p->getAddr());
       if (!reg)
         continue;
       if (reg->getIdentifier() != name)
@@ -270,13 +270,13 @@ void SSAConstruction::renameVariablesImpl(
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
 
-      auto newVarName = ir::dyc<ir::LocalReg>(p->getDest())->getIdentifier();
+      auto newVarName = ir::dycLocalReg(p->getDest())->getIdentifier();
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
       continue;
     }
     if (auto p = ir::dyc<ir::Load>(inst)) {
-      auto var = ir::dyc<ir::LocalReg>(p->getAddr());
+      auto var = ir::dycLocalReg(p->getAddr());
       if (!var) // is a global variable
         continue;
       if (!isIn(var->getIdentifier(), varNames))
@@ -285,7 +285,7 @@ void SSAConstruction::renameVariablesImpl(
       updateReachingDef(var->getIdentifier(), bb.getLabelID());
       inst = std::make_shared<ir::Assign>(
           p->getDest(),
-          std::make_shared<ir::LocalReg>(reachingDef.at(var->getIdentifier())));
+          std::make_shared<ir::Reg>(reachingDef.at(var->getIdentifier())));
       continue;
     }
     if (auto p = ir::dyc<ir::Assign>(inst)) {
@@ -295,7 +295,7 @@ void SSAConstruction::renameVariablesImpl(
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
 
-      auto newVarName = ir::dyc<ir::LocalReg>(p->getDest())->getIdentifier();
+      auto newVarName = ir::dycLocalReg(p->getDest())->getIdentifier();
       reachingDef[newVarName] = reachingDef[varName];
       reachingDef[varName] = newVarName;
     }
@@ -319,7 +319,7 @@ void SSAConstruction::renameVariablesImpl(
       auto varName = iter->second;
       updateReachingDef(varName, bb.getLabelID());
       auto reachingDefOfV = reachingDef.at(varName);
-      options.emplace_back(std::make_shared<ir::LocalReg>(reachingDefOfV),
+      options.emplace_back(std::make_shared<ir::Reg>(reachingDefOfV),
                            std::make_shared<ir::Label>(bb.getLabelID()));
       inst = std::make_shared<ir::Phi>(phi->getDest(), std::move(options));
       varDefined[inst->getID()] = varName;
@@ -396,7 +396,7 @@ void SSADestruction::insertAllocas() {
       auto phi = ir::dyc<ir::Phi>(inst);
       if (!phi)
         break;
-      varNames.emplace_back(ir::getLocalRegIdentifier(phi->getDest()));
+      varNames.emplace_back(phi->getDest()->getIdentifier());
     }
   }
 
@@ -452,10 +452,10 @@ void SSADestruction::replacePhisWithParallelCopies() {
       if (!phi)
         break;
 
-      auto dest = ir::dyc<ir::LocalReg>(phi->getDest());
+      auto dest = ir::dycLocalReg(phi->getDest());
       for (auto &option : phi->getOptions())
         parallelCopies[option.second->getID()].emplace_back(
-            ir::dyc<ir::LocalReg>(dest), option.first);
+            ir::dycLocalReg(dest), option.first);
       inst =
           std::make_shared<ir::Load>(dest, addresses.at(dest->getIdentifier()));
     }
@@ -469,7 +469,7 @@ void SSADestruction::sequentializeParallelCopies() {
   // Redundant Loads can be eliminate in later passes.
 
   for (auto &bb : func.getMutableBBs()) {
-    std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>>
+    std::unordered_map<std::string, std::shared_ptr<ir::Reg>>
         regHoldingOldValue;
     const auto &pcopies = parallelCopies[bb.getLabelID()];
     for (auto &pcopy : pcopies) {
@@ -478,7 +478,7 @@ void SSADestruction::sequentializeParallelCopies() {
       auto addr = addresses.at(pcopy.dest->getIdentifier());
       bb.appendInstBeforeTerminator(std::make_shared<ir::Load>(oldVal, addr));
       std::shared_ptr<ir::Addr> newVal = pcopy.val;
-      if (auto p = ir::dyc<ir::LocalReg>(pcopy.val)) {
+      if (auto p = ir::dycLocalReg(pcopy.val)) {
         auto iter = regHoldingOldValue.find(p->getIdentifier());
         if (iter != regHoldingOldValue.end())
           newVal = iter->second;

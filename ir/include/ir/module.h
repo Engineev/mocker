@@ -73,7 +73,7 @@ public:
 
   const std::string &getIdentifier() const { return identifier; }
 
-  std::shared_ptr<LocalReg> makeTempLocalReg(const std::string &hint = "");
+  std::shared_ptr<Reg> makeTempLocalReg(const std::string &hint = "");
 
 public:
   void buildContext();

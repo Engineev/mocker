@@ -12,9 +12,9 @@ namespace ir {
 std::string fmtAddr(const std::shared_ptr<Addr> &addr) {
   if (auto p = dyc<IntLiteral>(addr))
     return std::to_string(p->getVal());
-  if (auto p = dyc<LocalReg>(addr))
+  if (auto p = dycLocalReg(addr))
     return "%" + p->getIdentifier();
-  if (auto p = dyc<GlobalReg>(addr))
+  if (auto p = dyc<Reg>(addr)) // global reg
     return p->getIdentifier();
   if (auto p = dyc<Label>(addr))
     return "<" + std::to_string(p->getID()) + ">";

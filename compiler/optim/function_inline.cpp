@@ -88,7 +88,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
   //    std::cerr << ir::fmtInst(call) << std::endl;
 
   // create a temporary variable to hold the return value
-  std::shared_ptr<ir::Addr> retVal = nullptr;
+  std::shared_ptr<ir::Reg> retVal = nullptr;
   if (call->getDest()) {
     retVal = caller.makeTempLocalReg("retVal");
     caller.getFirstBB()->appendInstFront(
@@ -125,7 +125,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
     auto &bb = *iter;
     for (auto &inst : bb.getMutableInsts()) {
       assert(!ir::dyc<ir::Phi>(inst));
-      if (auto dest = ir::dyc<ir::LocalReg>(ir::getDest(inst))) {
+      if (auto dest = ir::dycLocalReg(ir::getDest(inst))) {
         auto newDest = caller.makeTempLocalReg(dest->getIdentifier());
         inst = ir::copyWithReplacedDest(inst, newDest);
         newIdent[dest->getIdentifier()] = newDest->getIdentifier();
@@ -133,7 +133,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
 
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
-        auto reg = ir::dyc<ir::LocalReg>(operand);
+        auto reg = ir::dycLocalReg(operand);
         if (!reg)
           continue;
         if (isParameter(callee, reg->getIdentifier())) {
@@ -141,8 +141,7 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
           operand = call->getArgs().at((std::size_t)n);
           continue;
         }
-        operand =
-            std::make_shared<ir::LocalReg>(newIdent.at(reg->getIdentifier()));
+        operand = std::make_shared<ir::Reg>(newIdent.at(reg->getIdentifier()));
       }
       inst = ir::copyWithReplacedOperands(inst, operands);
 

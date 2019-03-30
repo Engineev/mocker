@@ -140,10 +140,10 @@ private:
   void splitCriticalEdges();
 
   struct Copy {
-    Copy(std::shared_ptr<ir::LocalReg> dest, std::shared_ptr<ir::Addr> val)
+    Copy(std::shared_ptr<ir::Reg> dest, std::shared_ptr<ir::Addr> val)
         : dest(std::move(dest)), val(std::move(val)) {}
 
-    std::shared_ptr<ir::LocalReg> dest;
+    std::shared_ptr<ir::Reg> dest;
     std::shared_ptr<ir::Addr> val;
   };
 
@@ -155,7 +155,7 @@ private:
   std::unordered_map<std::size_t, std::list<Copy>> parallelCopies;
   // For each phi-function a=phi(...), we create an AllocVar instruction for a,
   // and [address] is the mapping from the identifiers to the AllocVar's
-  std::unordered_map<std::string, std::shared_ptr<ir::LocalReg>> addresses;
+  std::unordered_map<std::string, std::shared_ptr<ir::Reg>> addresses;
 };
 
 } // namespace mocker

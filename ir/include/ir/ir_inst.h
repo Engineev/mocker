@@ -27,21 +27,9 @@ private:
   std::int64_t val;
 };
 
-class LocalReg : public Addr {
+class Reg : public Addr {
 public:
-  explicit LocalReg(std::string identifier)
-      : identifier(std::move(identifier)) {}
-
-  const std::string &getIdentifier() const { return identifier; }
-
-private:
-  std::string identifier;
-};
-
-class GlobalReg : public Addr {
-public:
-  explicit GlobalReg(std::string identifier)
-      : identifier(std::move(identifier)) {}
+  explicit Reg(std::string identifier) : identifier(std::move(identifier)) {}
 
   const std::string &getIdentifier() const { return identifier; }
 
@@ -107,14 +95,14 @@ public:
 
 class Definition {
 public:
-  explicit Definition(std::shared_ptr<Addr> dest) : dest(std::move(dest)) {}
+  explicit Definition(std::shared_ptr<Reg> dest) : dest(std::move(dest)) {}
 
   virtual ~Definition() = default;
 
-  const std::shared_ptr<Addr> &getDest() const { return dest; }
+  const std::shared_ptr<Reg> &getDest() const { return dest; }
 
 protected:
-  std::shared_ptr<Addr> dest;
+  std::shared_ptr<Reg> dest;
 };
 
 class Deleted : public IRInst {
@@ -151,7 +139,7 @@ private:
 
 class Assign : public IRInst, public Definition {
 public:
-  Assign(std::shared_ptr<Addr> dest, std::shared_ptr<Addr> operand)
+  Assign(std::shared_ptr<Reg> dest, std::shared_ptr<Addr> operand)
       : IRInst(InstType::Assign), Definition(std::move(dest)),
         operand(std::move(operand)) {}
 
@@ -165,7 +153,7 @@ class ArithUnaryInst : public IRInst, public Definition {
 public:
   enum OpType { Neg, BitNot };
 
-  ArithUnaryInst(std::shared_ptr<Addr> dest, OpType op,
+  ArithUnaryInst(std::shared_ptr<Reg> dest, OpType op,
                  std::shared_ptr<Addr> operand)
       : IRInst(InstType::ArithUnaryInst), Definition(std::move(dest)), op(op),
         operand(std::move(operand)) {}
@@ -190,7 +178,7 @@ public:
   };
   // clang-format on
 
-  ArithBinaryInst(std::shared_ptr<Addr> dest, OpType op,
+  ArithBinaryInst(std::shared_ptr<Reg> dest, OpType op,
                   std::shared_ptr<Addr> lhs, std::shared_ptr<Addr> rhs)
       : IRInst(InstType::ArithBinaryInst), Definition(std::move(dest)), op(op),
         lhs(std::move(lhs)), rhs(std::move(rhs)) {}
@@ -210,7 +198,7 @@ class RelationInst : public IRInst, public Definition {
 public:
   enum OpType { Eq, Ne, Lt, Gt, Le, Ge };
 
-  RelationInst(std::shared_ptr<Addr> dest, OpType op, std::shared_ptr<Addr> lhs,
+  RelationInst(std::shared_ptr<Reg> dest, OpType op, std::shared_ptr<Addr> lhs,
                std::shared_ptr<Addr> rhs)
       : IRInst(InstType::RelationInst), Definition(std::move(dest)), op(op),
         lhs(std::move(lhs)), rhs(std::move(rhs)) {}
@@ -242,7 +230,7 @@ private:
 
 class Load : public IRInst, public Definition {
 public:
-  Load(std::shared_ptr<Addr> dest, std::shared_ptr<Addr> addr)
+  Load(std::shared_ptr<Reg> dest, std::shared_ptr<Addr> addr)
       : IRInst(InstType::Load), Definition(std::move(dest)),
         addr(std::move(addr)) {}
 
@@ -254,13 +242,13 @@ private:
 
 class AllocVar : public IRInst, public Definition {
 public:
-  explicit AllocVar(std::shared_ptr<Addr> dest)
+  explicit AllocVar(std::shared_ptr<Reg> dest)
       : IRInst(InstType::AllocVar), Definition(std::move(dest)) {}
 };
 
 class Malloc : public IRInst, public Definition {
 public:
-  Malloc(std::shared_ptr<Addr> dest, std::shared_ptr<Addr> size)
+  Malloc(std::shared_ptr<Reg> dest, std::shared_ptr<Addr> size)
       : IRInst(InstType::Malloc), Definition(std::move(dest)),
         size(std::move(size)) {}
 
@@ -328,7 +316,7 @@ private:
 class Call : public IRInst, public Definition {
 public:
   template <class... Args>
-  Call(std::shared_ptr<Addr> dest, std::string funcName, Args... args)
+  Call(std::shared_ptr<Reg> dest, std::string funcName, Args... args)
       : IRInst(InstType::Call), Definition(std::move(dest)),
         funcName(std::move(funcName)), args({std::move(args)...}) {}
 
@@ -337,7 +325,7 @@ public:
       : IRInst(InstType::Call), Definition(nullptr),
         funcName(std::move(funcName)), args({std::move(args)...}) {}
 
-  Call(std::shared_ptr<Addr> dest, std::string funcName,
+  Call(std::shared_ptr<Reg> dest, std::string funcName,
        std::vector<std::shared_ptr<Addr>> args)
       : IRInst(InstType::Call), Definition(std::move(dest)),
         funcName(std::move(funcName)), args(std::move(args)) {}
@@ -355,7 +343,7 @@ class Phi : public IRInst, public Definition {
 public:
   using Option = std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>;
 
-  Phi(std::shared_ptr<Addr> dest, std::vector<Option> options)
+  Phi(std::shared_ptr<Reg> dest, std::vector<Option> options)
       : IRInst(InstType::Phi), Definition(std::move(dest)),
         options(std::move(options)) {}
 

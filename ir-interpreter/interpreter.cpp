@@ -89,7 +89,7 @@ void Interpreter::parse(const std::string &source) {
       std::string ident;
       lineSS >> ident;
       globalVars.emplace_back(
-          std::make_shared<ir::AllocVar>(std::make_shared<GlobalReg>(ident)));
+          std::make_shared<ir::AllocVar>(std::make_shared<Reg>(ident)));
       continue;
     }
     std::stringstream lineSS(line);
@@ -202,7 +202,7 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
   }
   auto parseCallRHS =
       [&lineSS, &buffer,
-       this](std::shared_ptr<Addr> dest) { // the content after "call"
+       this](std::shared_ptr<Reg> dest) { // the content after "call"
         std::string funcName;
         lineSS >> funcName;
         std::vector<std::shared_ptr<Addr>> args;
@@ -215,7 +215,7 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
     return parseCallRHS(nullptr);
   }
 
-  auto dest = parseAddr(buffer);
+  auto dest = std::static_pointer_cast<Reg>(parseAddr(buffer));
   lineSS >> buffer;
   assert(buffer == "=");
   lineSS >> buffer;
@@ -293,9 +293,9 @@ std::shared_ptr<IRInst> Interpreter::parseInst(const std::string &line) const {
 std::shared_ptr<Addr> Interpreter::parseAddr(const std::string &str) const {
   assert(!str.empty());
   if (str[0] == '@')
-    return std::make_shared<GlobalReg>(str);
+    return std::make_shared<Reg>(str);
   if (str[0] == '%')
-    return std::make_shared<LocalReg>(std::string(str.begin() + 1, str.end()));
+    return std::make_shared<Reg>(std::string(str.begin() + 1, str.end()));
   if (str[0] == '<')
     return std::make_shared<Label>(
         (std::size_t)(std::strtoul(&str[0] + 1, nullptr, 10)));
@@ -654,12 +654,12 @@ std::size_t Interpreter::executeInst(std::size_t idx) {
 }
 
 std::int64_t Interpreter::readVal(const std::shared_ptr<Addr> &reg) const {
-  if (auto p = dyc<LocalReg>(reg)) {
+  if (auto p = dycLocalReg(reg)) {
     if (p->getIdentifier() == ".phi_nan")
       return -123;
     return ars.top().localReg.at(p->getIdentifier());
   }
-  if (auto p = dyc<GlobalReg>(reg)) {
+  if (auto p = dycGlobalReg(reg)) {
     return globalReg.at(p->getIdentifier());
   }
   if (auto p = dyc<IntLiteral>(reg)) {

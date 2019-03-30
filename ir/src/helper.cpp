@@ -8,17 +8,25 @@
 namespace mocker {
 namespace ir {
 
-std::shared_ptr<Addr> getDest(const std::shared_ptr<IRInst> &inst) {
+std::shared_ptr<Reg> dycLocalReg(const std::shared_ptr<Addr> &addr) {
+  auto reg = dyc<Reg>(addr);
+  if (!reg || reg->getIdentifier()[0] == '@')
+    return nullptr;
+  return reg;
+}
+
+std::shared_ptr<Reg> dycGlobalReg(const std::shared_ptr<Addr> &addr) {
+  auto reg = dyc<Reg>(addr);
+  if (!reg || reg->getIdentifier()[0] != '@')
+    return nullptr;
+  return reg;
+}
+
+std::shared_ptr<Reg> getDest(const std::shared_ptr<IRInst> &inst) {
   auto def = dyc<Definition>(inst);
   if (!def)
     return nullptr;
   return def->getDest();
-}
-
-const std::string &getLocalRegIdentifier(const std::shared_ptr<Addr> &addr) {
-  auto p = dyc<LocalReg>(addr);
-  assert(p);
-  return p->getIdentifier();
 }
 
 std::vector<std::shared_ptr<Addr>>
@@ -65,7 +73,7 @@ template <class T, class... Args> std::shared_ptr<T> mkS(Args &&... args) {
 namespace {
 std::shared_ptr<IRInst> copyWithReplacedDestAndOperands(
     const std::shared_ptr<ir::IRInst> &inst,
-    const std::shared_ptr<ir::Addr> &dest,
+    const std::shared_ptr<ir::Reg> &dest,
     const std::vector<std::shared_ptr<ir::Addr>> &operands) {
   if (dyc<Deleted>(inst)) {
     assert(operands.empty());
@@ -241,7 +249,7 @@ std::shared_ptr<IRInst> copyWithReplacedOperands(
 
 std::shared_ptr<IRInst>
 copyWithReplacedDest(const std::shared_ptr<ir::IRInst> &inst,
-                     const std::shared_ptr<ir::Addr> &newDest) {
+                     const std::shared_ptr<ir::Reg> &newDest) {
   return copyWithReplacedDestAndOperands(inst, newDest, getOperandsUsed(inst));
 }
 
@@ -258,7 +266,7 @@ void verifyFuncModule(const ir::FunctionModule &func) {
       auto dest = getDest(inst);
       if (!dest)
         continue;
-      auto reg = dyc<ir::LocalReg>(dest);
+      auto reg = dycLocalReg(dest);
       assert(reg);
       if (defined.find(reg->getIdentifier()) != defined.end())
         assert(false && "register with multiple definitions");

@@ -208,7 +208,8 @@ void Builder::operator()(const ast::FuncCallExpr &node) const {
     args.emplace_back(ctx.getExprAddr(arg->getID()));
   }
 
-  ctx.emplaceInst<Call>(dest, funcName, args);
+  ctx.emplaceInst<Call>(std::static_pointer_cast<ir::Reg>(dest), funcName,
+                        args);
 
   if (dest)
     ctx.setExprAddr(node.getID(), dest);
@@ -733,7 +734,7 @@ void Builder::addGlobalVariable(
   ctx.emplaceGlobalInitInst<Call>(funcName);
 }
 
-std::shared_ptr<LocalReg>
+std::shared_ptr<Reg>
 Builder::getMemberElementPtr(const std::shared_ptr<Addr> &base,
                              const std::string &className,
                              const std::string &varName) const {
@@ -749,18 +750,18 @@ Builder::getMemberElementPtr(const std::shared_ptr<Addr> &base,
   return varPtr;
 }
 
-std::shared_ptr<Addr> Builder::makeReg(std::string identifier) const {
+std::shared_ptr<Reg> Builder::makeReg(std::string identifier) const {
   if (identifier.at(0) == '@') // is global variable
-    return std::make_shared<GlobalReg>(std::move(identifier));
+    return std::make_shared<Reg>(std::move(identifier));
   if (identifier.at(0) == '#') { // is member variable
     std::string className, varName;
     std::tie(className, varName) = splitMemberVarIdent(identifier);
-    auto instancePtrPtr = std::make_shared<LocalReg>("this");
+    auto instancePtrPtr = std::make_shared<Reg>("this");
     auto instancePtr = ctx.makeTempLocalReg("instPtr");
     ctx.emplaceInst<Load>(instancePtr, instancePtrPtr);
     return getMemberElementPtr(instancePtr, className, varName);
   }
-  return std::make_shared<LocalReg>(std::move(identifier));
+  return std::make_shared<Reg>(std::move(identifier));
 }
 
 std::shared_ptr<Addr>
