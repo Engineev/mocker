@@ -9,12 +9,23 @@ class Defer {
 public:
   Defer(std::function<void()> action) : action(std::move(action)) {}
 
-  Defer(const Defer &) = default;
-  Defer(Defer &&) noexcept = default;
-  Defer &operator=(const Defer &) = default;
-  Defer &operator=(Defer &&) noexcept = default;
+  Defer(const Defer &) = delete;
+  Defer(Defer &&o) noexcept {
+    action = o.action;
+    o.action = nullptr;
+  };
+  Defer &operator=(const Defer &) = delete;
+  Defer &operator=(Defer &&o) noexcept = delete;
 
-  ~Defer() { action(); }
+  ~Defer() {
+    if (action != nullptr)
+      action();
+  }
+
+  void execute() {
+    action();
+    action = nullptr;
+  }
 
 private:
   std::function<void()> action;

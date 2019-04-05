@@ -1,9 +1,8 @@
 {
   "testcases_dir": "../compiler-offline-judge/compiler-testcases/TestCases",
-  "bash_dir": "../",
-  "ir_interpreter": "../build/ir-interpreter/ir-interpreter",
+  "bash_dir": "./",
+  "ir_interpreter": "",
   "phases": [
-    "semantic pretest", "semantic extended",
     "codegen pretest", "codegen extended"
   ]
 }

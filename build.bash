@@ -3,14 +3,25 @@
 set -e
 cd "$(dirname "$0")"
 
-if [[ ! -d "./build/" ]]; then
-  mkdir build;
-fi;
-cd build
-cmake ..
-make
+cd builtin
+./c2nasm.bash ./builtin.c
+cd ..
 
-#g++ -O2 -std=c++14 -I./support -I./ir/include -I./ir/include/ir -I./compiler \
-#  ./ir/src/*.cpp ./compiler/ir_builder/*.cpp ./compiler/optim/*.cpp \
-#  ./compiler/parse/*.cpp ./compiler/semantic/*.cpp ./compiler/main.cpp \
-#  -o mocker-c
+# ir
+g++ -c -O2 -std=c++14 -I./support \
+  -I./ir/include/ir ./ir/src/*.cpp
+ar rvs libir.a *.o
+rm *.o
+# nasm
+g++ -c -O2 -std=c++14 -I./support \
+  -I./nasm/include/nasm ./nasm/src/*.cpp
+ar rvs libnasm.a *.o
+rm *.o
+# compiler
+g++ -O2 -std=c++14 -I./support -I./ir/include -I./nasm/include -I./compiler \
+  ./compiler/ir_builder/*.cpp ./compiler/optim/*.cpp ./compiler/codegen/*.cpp \
+  ./compiler/parse/*.cpp ./compiler/semantic/*.cpp ./compiler/main.cpp \
+  -o mocker-c \
+  libir.a libnasm.a
+
+

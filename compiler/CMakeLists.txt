@@ -4,6 +4,10 @@ set(HEADERS
   ast/fwd.h
   ast/helper.h
 
+  codegen/common.h
+  codegen/naive_instruction_selection.h
+  codegen/naive_register_allocation.h
+
   common/defs.h
   common/error.h
   common/position.h
@@ -18,6 +22,7 @@ set(HEADERS
   optim/dead_code_elimination.h
   optim/function_inline.h
   optim/helper.h
+  optim/module_simplification.h
   optim/opt_pass.h
   optim/optimizer.h
   optim/promote_global_variables.h
@@ -35,6 +40,9 @@ set(HEADERS
   semantic/sym_tbl.h
 )
 set(SOURCES
+  codegen/naive_instruction_selection.cpp
+  codegen/naive_register_allocation.cpp
+
   ir_builder/builder.cpp
   ir_builder/builder_context.cpp
   ir_builder/preprocessor.cpp
@@ -44,6 +52,7 @@ set(SOURCES
   optim/dead_code_elimination.cpp
   optim/function_inline.cpp
   optim/helper.cpp
+  optim/module_simplification.cpp
   optim/promote_global_variables.cpp
   optim/simplify_cfg.cpp
   optim/ssa.cpp
@@ -57,14 +66,14 @@ set(SOURCES
   semantic/sym_tbl.cpp
 
   main.cpp
-)
+  codegen/naive_instruction_selection.cpp codegen/naive_register_allocation.h codegen/naive_register_allocation.cpp)
 
 add_executable(${PROJECT_NAME}-c ${HEADERS} ${SOURCES})
 target_include_directories(${PROJECT_NAME}-c
   PRIVATE ${CMAKE_CURRENT_LIST_DIR}
 )
 target_link_libraries(${PROJECT_NAME}-c
-  PRIVATE ${PROJECT_NAME}-ir ${PROJECT_NAME}-support
+  PRIVATE ${PROJECT_NAME}-ir ${PROJECT_NAME}-support ${PROJECT_NAME}-nasm
 )
 target_compile_features(${PROJECT_NAME}-c
   PRIVATE cxx_std_14

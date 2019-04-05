@@ -6,3 +6,6 @@ build*/
 .vs/
 program.in
 mocker-c
+a.asm
+builtin.asm
+*.a
