@@ -7,5 +7,4 @@ build*/
 program.in
 mocker-c
 a.asm
-builtin.asm
 *.a

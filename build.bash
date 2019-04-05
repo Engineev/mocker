@@ -3,9 +3,9 @@
 set -e
 cd "$(dirname "$0")"
 
-cd builtin
-./c2nasm.bash ./builtin.c
-cd ..
+#cd builtin
+#./c2nasm.bash ./builtin.c
+#cd ..
 
 # ir
 g++ -c -O2 -std=c++14 -I./support \
