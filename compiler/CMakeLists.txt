@@ -66,7 +66,7 @@ set(SOURCES
   semantic/sym_tbl.cpp
 
   main.cpp
-  codegen/naive_instruction_selection.cpp codegen/naive_register_allocation.h codegen/naive_register_allocation.cpp)
+)
 
 add_executable(${PROJECT_NAME}-c ${HEADERS} ${SOURCES})
 target_include_directories(${PROJECT_NAME}-c
