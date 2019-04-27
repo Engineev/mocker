@@ -61,6 +61,7 @@ int main(int argc, char **argv) {
   //  std::ofstream fout("");
   //  mocker::nasm::printModule(nasmModule, fout);
   //  fout.close();
+  mocker::nasm::printModule(nasmModule, std::cerr);
   mocker::nasm::printModule(nasmModule, std::cout);
 
   return 0;
