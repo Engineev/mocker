@@ -595,11 +595,12 @@ void RegisterAllocator::rewriteProgram(const std::vector<Node> &toBeSpilled) {
     baseOffset = nasm::dyc<nasm::NumericConstant>(inst->getRhs())->getVal();
     int64_t alignSz = baseOffset + 8 * toBeSpilled.size() +
                       (16 - (8 * toBeSpilled.size()) % 16);
+    auto label = iter->label;
     auto pos = section.erase(iter);
     auto newSubRsp = std::make_shared<nasm::BinaryInst>(
         nasm::BinaryInst::Sub, nasm::rsp(),
         std::make_shared<nasm::NumericConstant>(alignSz));
-    section.appendLine(pos, nasm::Line(iter->label, newSubRsp));
+    section.appendLine(pos, nasm::Line(label, newSubRsp));
 
   } else {
     for (iter = funcBeg; iter != funcEnd; ++iter) {
@@ -660,11 +661,14 @@ void RegisterAllocator::rewriteProgram(const std::vector<Node> &toBeSpilled) {
   }
 
   funcBeg = funcEnd = section.erase(funcBeg, funcEnd);
-  --funcBeg;
+  bool flag = false;
   for (auto &line : lines) {
     section.appendLine(funcEnd, std::move(line));
+    if (!flag) {
+      flag = true;
+      --funcBeg;
+    }
   }
-  ++funcBeg;
 }
 
 } // namespace detail

@@ -57,9 +57,7 @@ int main(int argc, char **argv) {
     //    mocker::ir::printModule(irModule);
   }
 
-  std::cerr << "codegen... ";
   auto nasmModule = codegen(irModule);
-  std::cerr << "done\n";
   //  std::ofstream fout("");
   //  mocker::nasm::printModule(nasmModule, fout);
   //  fout.close();
