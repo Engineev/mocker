@@ -21,9 +21,26 @@ template <class T, class V> std::shared_ptr<T> dyc(V &&v) {
 // inst
 namespace nasm {
 
+using InstID = std::uintptr_t;
+
 class Inst {
 public:
   virtual ~Inst() = default;
+
+  InstID getID() const { return (InstID)this; }
+};
+
+struct InstPtrHash {
+  std::size_t operator()(const std::shared_ptr<Inst> &inst) const {
+    return (std::size_t)inst->getID();
+  }
+};
+
+struct InstPtrEqual {
+  bool operator()(const std::shared_ptr<Inst> &lhs,
+                  const std::shared_ptr<Inst> &rhs) const {
+    return lhs->getID() == rhs->getID();
+  }
 };
 
 class Empty : public Inst {};
@@ -99,26 +116,6 @@ public:
 
 private:
   std::string funcName;
-};
-
-class Db : public Inst {
-public:
-  explicit Db(std::string data) : data(std::move(data)) {}
-
-  const std::string &getData() const { return data; }
-
-private:
-  std::string data;
-};
-
-class Resb : public Inst {
-public:
-  explicit Resb(size_t sz) : sz(sz) {}
-
-  const std::size_t getSize() const { return sz; }
-
-private:
-  std::size_t sz;
 };
 
 class Push : public Inst {
@@ -199,9 +196,9 @@ private:
   std::shared_ptr<Label> label;
 };
 
-class IDivq : public Inst {
+class IDiv : public Inst {
 public:
-  explicit IDivq(std::shared_ptr<Addr> rhs) : rhs(std::move(rhs)) {}
+  explicit IDiv(std::shared_ptr<Addr> rhs) : rhs(std::move(rhs)) {}
 
   const std::shared_ptr<Addr> &getRhs() const { return rhs; }
 
@@ -209,7 +206,7 @@ private:
   std::shared_ptr<Addr> rhs;
 };
 
-class Cqto : public Inst {};
+class Cqo : public Inst {};
 
 } // namespace nasm
 
@@ -256,7 +253,25 @@ private:
 // pseudo inst
 namespace nasm {
 
-class AlignStack : public Inst {};
+class Db : public Inst {
+public:
+  explicit Db(std::string data) : data(std::move(data)) {}
+
+  const std::string &getData() const { return data; }
+
+private:
+  std::string data;
+};
+
+class Resb : public Inst {
+public:
+  explicit Resb(size_t sz) : sz(sz) {}
+
+  const std::size_t getSize() const { return sz; }
+
+private:
+  std::size_t sz;
+};
 
 } // namespace nasm
 

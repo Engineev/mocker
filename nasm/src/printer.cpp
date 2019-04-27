@@ -15,7 +15,9 @@ std::string fmtDirective(const std::shared_ptr<Directive> &directive) {
   if (auto p = dyc<Global>(directive))
     return "global " + p->getIdentifier();
   if (auto p = dyc<Extern>(directive)) {
+#ifdef ONLINE_JUDGE_SUPPORT
     return "";
+#endif
     return "extern " + p->getIdentifier();
   }
   assert(false);
@@ -56,7 +58,6 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
 
   if (auto p = dyc<Db>(inst)) {
     const auto &bytes = p->getData();
-    //    assert(!bytes.empty());
     std::string res = "db " + std::to_string(bytes[0]);
     for (std::size_t i = 1; i < bytes.size(); ++i) {
       res += ", " + std::to_string(bytes[i]);
@@ -76,11 +77,16 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
     return "ret";
   }
   if (auto p = dyc<BinaryInst>(inst)) {
+    if (p->getType() == BinaryInst::Sal || p->getType() == BinaryInst::Sar) {
+      return (p->getType() == BinaryInst::Sal ? "sal " : "sar ") +
+             fmtAddr(p->getLhs()) + ", cl";
+    }
+
     static SmallMap<BinaryInst::OpType, std::string> opName{
         {BinaryInst::BitOr, "or"s}, {BinaryInst::BitAnd, "and"s},
         {BinaryInst::Xor, "xor"s},  {BinaryInst::Add, "add"s},
         {BinaryInst::Sub, "sub"s},  {BinaryInst::Mul, "imul"s},
-        {BinaryInst::Sal, "sal"s},  {BinaryInst::Sar, "sar"s},
+        //        {BinaryInst::Sal, "sal"s},  {BinaryInst::Sar, "sar"s},
     };
     return opName.at(p->getType()) + " " + fmtAddr(p->getLhs()) + ", " +
            fmtAddr(p->getRhs());
@@ -103,9 +109,6 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
   if (auto p = dyc<Jmp>(inst)) {
     return "jmp " + fmtAddr(p->getLabel());
   }
-  if (auto p = dyc<AlignStack>(inst)) {
-    return "alignstack";
-  }
   if (auto p = dyc<Cmp>(inst)) {
     return "cmp " + fmtAddr(p->getLhs()) + ", " + fmtAddr(p->getRhs());
   }
@@ -115,7 +118,8 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
         {Set::OpType::Lt, "setl"}, {Set::OpType::Le, "setle"},
         {Set::OpType::Gt, "setg"}, {Set::OpType::Ge, "setge"},
     };
-    return opName.at(p->getOp()) + " " + fmtAddr(p->getReg());
+    assert(p->getReg()->getIdentifier() == nasm::rax()->getIdentifier());
+    return opName.at(p->getOp()) + " al";
   }
   if (auto p = dyc<CJump>(inst)) {
     assert(p->getOp() == CJump::Nz);
@@ -128,10 +132,10 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
       return "not " + fmtAddr(p->getReg());
     assert(false);
   }
-  if (auto p = dyc<Cqto>(inst)) {
+  if (auto p = dyc<Cqo>(inst)) {
     return "cqto";
   }
-  if (auto p = dyc<IDivq>(inst)) {
+  if (auto p = dyc<IDiv>(inst)) {
     return "idiv " + fmtAddr(p->getRhs());
   }
   std::cerr << typeid(*inst).name() << std::endl;

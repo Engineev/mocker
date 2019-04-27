@@ -14,6 +14,10 @@
 namespace mocker {
 namespace {
 
+const std::vector<std::shared_ptr<nasm::Register>> CalleeSave = {
+    nasm::rbp(), nasm::rbx(), nasm::r12(),
+    nasm::r13(), nasm::r14(), nasm::r15()};
+
 // replace "#" with "__"
 std::string renameIdentifier(const std::string &ident) {
   std::string res;
@@ -64,6 +68,16 @@ public:
     assert(false);
   }
 
+  void setPRegBak(const std::shared_ptr<nasm::Register> &pReg,
+                  const std::shared_ptr<nasm::Register> &vReg) {
+    pRegBak[pReg] = vReg;
+  }
+
+  const std::shared_ptr<nasm::Register>
+  getPRegBak(const std::shared_ptr<nasm::Register> &reg) const {
+    return pRegBak.at(reg);
+  }
+
 private:
   std::shared_ptr<nasm::Register> newVirtualRegFor(const std::string &ident) {
     auto res = newVirtualReg();
@@ -75,6 +89,7 @@ private:
   std::size_t vRegCnt = 0;
   std::unordered_map<std::string, std::shared_ptr<nasm::Register>> stackVar2Reg;
   std::unordered_map<std::string, std::shared_ptr<nasm::Register>> irReg2VReg;
+  nasm::RegMap<std::shared_ptr<nasm::Register>> pRegBak;
 
   //  nasm::Section & text;
 };
@@ -123,8 +138,6 @@ void genLoad(nasm::Section &text, Context &ctx,
 
 void genCall(nasm::Section &text, Context &ctx,
              const std::shared_ptr<ir::Call> &p) {
-  text.emplaceInst<nasm::AlignStack>();
-
   static const std::vector<std::shared_ptr<nasm::Register>> ParamRegs = {
       nasm::rdi(), nasm::rsi(), nasm::rdx(),
       nasm::rcx(), nasm::r8(),  nasm::r9()};
@@ -183,13 +196,13 @@ void genInstruction(nasm::Section &text, Context &ctx,
 
       auto lhs = ctx.getAddr(p->getLhs());
       text.emplaceInst<nasm::Mov>(nasm::rax(), lhs);
-      // text.emplaceInst<nasm::Cqto>();
+      // text.emplaceInst<nasm::Cqo>();
       text.emplaceInst<nasm::Mov>(nasm::rdx(),
                                   std::make_shared<nasm::NumericConstant>(0));
 
       auto divisor = ctx.newVirtualReg();
       text.emplaceInst<nasm::Mov>(divisor, ctx.getAddr(p->getRhs()));
-      text.emplaceInst<nasm::IDivq>(divisor);
+      text.emplaceInst<nasm::IDiv>(divisor);
 
       auto dest = ctx.getAddr(p->getDest());
       if (p->getOp() == ir::ArithBinaryInst::Mod)
@@ -207,10 +220,10 @@ void genInstruction(nasm::Section &text, Context &ctx,
       text.emplaceInst<nasm::Mov>(nasm::rcx(), ctx.getAddr(p->getRhs()));
       auto dest = ctx.getAddr(p->getDest());
       text.emplaceInst<nasm::Mov>(dest, ctx.getAddr(p->getLhs()));
-      text.emplaceInst<nasm::BinaryInst>(
-          p->getOp() == ir::ArithBinaryInst::Shr ? nasm::BinaryInst::Sar
-                                                 : nasm::BinaryInst::Sal,
-          dest, std::make_shared<nasm::Register>("cl"));
+      text.emplaceInst<nasm::BinaryInst>(p->getOp() == ir::ArithBinaryInst::Shr
+                                             ? nasm::BinaryInst::Sar
+                                             : nasm::BinaryInst::Sal,
+                                         dest, nasm::rcx());
       text.emplaceInst<nasm::Mov>(nasm::rcx(), rcxCopy);
       return;
     }
@@ -223,8 +236,6 @@ void genInstruction(nasm::Section &text, Context &ctx,
             {ir::ArithBinaryInst::BitAnd, nasm::BinaryInst::BitAnd},
             {ir::ArithBinaryInst::BitOr, nasm::BinaryInst::BitOr},
             {ir::ArithBinaryInst::Xor, nasm::BinaryInst::Xor},
-            //        {ir::ArithBinaryInst::Shl, nasm::BinaryInst::Sal},
-            //        {ir::ArithBinaryInst::Shr, nasm::BinaryInst::Sar},
         };
     auto dest = ctx.getAddr(p->getDest());
     text.emplaceInst<nasm::Mov>(dest, ctx.getAddr(p->getLhs()));
@@ -254,7 +265,10 @@ void genInstruction(nasm::Section &text, Context &ctx,
         {ir::RelationInst::Gt, nasm::Set::Gt},
         {ir::RelationInst::Ge, nasm::Set::Ge},
     };
-    text.emplaceInst<nasm::Set>(mp.at(p->getOp()), dest);
+    text.emplaceInst<nasm::Mov>(nasm::rax(),
+                                std::make_shared<nasm::NumericConstant>(0));
+    text.emplaceInst<nasm::Set>(mp.at(p->getOp()), nasm::rax());
+    text.emplaceInst<nasm::Mov>(dest, nasm::rax());
     return;
   }
   if (auto p = ir::dyc<ir::Branch>(inst)) {
@@ -273,6 +287,9 @@ void genInstruction(nasm::Section &text, Context &ctx,
     if (p->getVal()) {
       auto val = ctx.getAddr(p->getVal());
       text.emplaceInst<nasm::Mov>(nasm::rax(), val);
+    }
+    for (auto &reg : CalleeSave) {
+      text.emplaceInst<nasm::Mov>(reg, ctx.getPRegBak(reg));
     }
     text.emplaceInst<nasm::Leave>();
     text.emplaceInst<nasm::Ret>();
@@ -313,6 +330,12 @@ void genFunction(nasm::Section &text, Context &ctx,
   text.labelThisLine(renameIdentifier(func.getIdentifier()));
   text.emplaceInst<nasm::Push>(nasm::rbp());
   text.emplaceInst<nasm::Mov>(nasm::rbp(), nasm::rsp());
+
+  for (auto &reg : CalleeSave) {
+    auto bak = ctx.newVirtualReg();
+    text.emplaceInst<nasm::Mov>(bak, reg);
+    ctx.setPRegBak(reg, bak);
+  }
 
   static const std::vector<std::shared_ptr<nasm::Register>> ParamRegs = {
       nasm::rdi(), nasm::rsi(), nasm::rdx(),

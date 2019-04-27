@@ -6,6 +6,7 @@
 #include "ast/ast_node.h"
 #include "codegen/naive_instruction_selection.h"
 #include "codegen/naive_register_allocation.h"
+#include "codegen/register_allocation.h"
 #include "ir/helper.h"
 #include "ir/printer.h"
 #include "ir/stats.h"
@@ -57,6 +58,9 @@ int main(int argc, char **argv) {
   }
 
   auto nasmModule = codegen(irModule);
+  //  std::ofstream fout("");
+  //  mocker::nasm::printModule(nasmModule, fout);
+  //  fout.close();
   mocker::nasm::printModule(nasmModule, std::cout);
 
   return 0;
@@ -97,7 +101,7 @@ void optimize(mocker::ir::Module &module) {
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
-  //  runOptPasses<PromoteGlobalVariables>(module);
+  // runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);
 
   //  std::cerr << "\nAfter inline and promotion of global variables:\n";
@@ -128,7 +132,8 @@ mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
   using namespace mocker;
   auto res = runNaiveInstructionSelection(irModule);
   //  nasm::printModule(res);
-  res = allocateRegistersNaively(res);
+  res = allocateRegisters(res);
+  //  res = allocateRegistersNaively(res);
   return res;
 }
 

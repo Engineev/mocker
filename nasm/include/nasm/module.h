@@ -29,9 +29,11 @@ struct Line {
 
 class Section {
 public:
+  using LineIter = std::list<Line>::const_iterator;
+
   explicit Section(std::string name) : name(std::move(name)) {}
 
-  void labelThisLine(const std::string &name) { lines.emplace_back(name); }
+  void labelThisLine(const std::string &label) { lines.emplace_back(label); }
 
   template <class Type, class... Args>
   void emplaceLine(std::string label, Args &&... args) {
@@ -49,14 +51,22 @@ public:
 
   void appendLine(Line line) { lines.emplace_back(std::move(line)); }
 
+  void appendLine(LineIter pos, Line line) {
+    lines.emplace(pos, std::move(line));
+  }
+
+  LineIter erase(LineIter beg, LineIter end) { return lines.erase(beg, end); }
+
+  LineIter erase(LineIter pos) { return lines.erase(pos); }
+
 public:
   const std::string &getName() const { return name; }
 
-  const std::vector<Line> &getLines() const { return lines; }
+  const std::list<Line> &getLines() const { return lines; }
 
 private:
   std::string name;
-  std::vector<Line> lines;
+  std::list<Line> lines;
 };
 
 class Module {

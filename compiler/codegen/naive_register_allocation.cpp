@@ -4,18 +4,15 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "helper.h"
+#include "nasm/addr.h"
 #include "nasm/helper.h"
 
 namespace mocker {
 namespace {
 
-using LineIter = std::vector<nasm::Line>::const_iterator;
-
-using RegSet = std::unordered_map<std::shared_ptr<nasm::Register>,
-                                  nasm::RegPtrHash, nasm::RegPtrEqual>;
-template <class T>
-using RegMap = std::unordered_map<std::shared_ptr<nasm::Register>, T,
-                                  nasm::RegPtrHash, nasm::RegPtrEqual>;
+using nasm::RegMap;
+using nasm::RegSet;
 
 std::shared_ptr<nasm::Register>
 dycVReg(const std::shared_ptr<nasm::Addr> &addr) {
@@ -134,10 +131,8 @@ void allocateMov(const std::shared_ptr<nasm::Mov> &p,
 
 void allocate(const std::shared_ptr<nasm::Inst> &inst,
               const RegMap<std::size_t> &offsets, nasm::Section &text) {
-  if (nasm::dyc<nasm::AlignStack>(inst))
-    return;
-
-  if (nasm::getInvolvedRegs(inst).empty()) {
+  if (nasm::getInvolvedRegs(inst).empty() || nasm::dyc<nasm::Call>(inst) ||
+      nasm::dyc<nasm::Leave>(inst)) {
     text.appendInst(inst);
     return;
   }
@@ -228,14 +223,14 @@ void allocate(const std::shared_ptr<nasm::Inst> &inst,
     store(reg, nasm::r10());
     return;
   }
-  if (auto p = nasm::dyc<nasm::IDivq>(inst)) {
+  if (auto p = nasm::dyc<nasm::IDiv>(inst)) {
     auto reg = dycVReg(p->getRhs());
     if (!reg) {
       text.appendInst(p);
       return;
     }
     load(nasm::r10(), reg);
-    text.emplaceInst<nasm::IDivq>(nasm::r10());
+    text.emplaceInst<nasm::IDiv>(nasm::r10());
     return;
   }
 

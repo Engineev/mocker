@@ -15,5 +15,11 @@ target_include_directories(${PROJECT_NAME}-nasm
   PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include/nasm
 )
+if (ONLINE_JUDGE_SUPPORT)
+  target_compile_definitions(${PROJECT_NAME}-nasm
+    PRIVATE
+      ONLINE_JUDGE_SUPPORT
+  )
+endif()
 target_link_libraries(${PROJECT_NAME}-nasm PRIVATE ${PROJECT_NAME}-support)
 target_compile_features(${PROJECT_NAME}-nasm PUBLIC cxx_std_14)

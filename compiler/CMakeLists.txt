@@ -4,9 +4,12 @@ set(HEADERS
   ast/fwd.h
   ast/helper.h
 
-  codegen/common.h
+  codegen/helper.h
+  codegen/liveness.h
   codegen/naive_instruction_selection.h
   codegen/naive_register_allocation.h
+  codegen/nasm_cfg.h
+  codegen/register_allocation.h
 
   common/defs.h
   common/error.h
@@ -40,8 +43,11 @@ set(HEADERS
   semantic/sym_tbl.h
 )
 set(SOURCES
+  codegen/liveness.cpp
   codegen/naive_instruction_selection.cpp
   codegen/naive_register_allocation.cpp
+  codegen/nasm_cfg.cpp
+  codegen/register_allocation.cpp
 
   ir_builder/builder.cpp
   ir_builder/builder_context.cpp

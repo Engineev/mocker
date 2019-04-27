@@ -12,11 +12,13 @@ g++ -c -O2 -std=c++14 -I./support \
   -I./ir/include/ir ./ir/src/*.cpp
 ar rvs libir.a *.o
 rm *.o
+
 # nasm
-g++ -c -O2 -std=c++14 -I./support \
+g++ -c -O2 -std=c++14 -I./support -DONLINE_JUDGE_SUPPORT \
   -I./nasm/include/nasm ./nasm/src/*.cpp
 ar rvs libnasm.a *.o
 rm *.o
+
 # compiler
 g++ -DDISABLE_FORWARD_REFERENCE_FOR_GLOBAL_VAR \
   -O2 -std=c++14 -I./support -I./ir/include -I./nasm/include -I./compiler \

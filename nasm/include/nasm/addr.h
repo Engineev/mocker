@@ -5,6 +5,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #define MOCKER_NASM_GET_REG(NAME)                                              \
   inline const std::shared_ptr<Register> &NAME() {                             \
@@ -54,6 +56,12 @@ struct RegPtrEqual {
   }
 };
 
+using RegSet = std::unordered_set<std::shared_ptr<nasm::Register>,
+                                  nasm::RegPtrHash, nasm::RegPtrEqual>;
+template <class T>
+using RegMap = std::unordered_map<std::shared_ptr<nasm::Register>, T,
+                                  nasm::RegPtrHash, nasm::RegPtrEqual>;
+
 class Label : public Addr {
 public:
   explicit Label(std::string name) : name(std::move(name)) {}
@@ -73,6 +81,10 @@ public:
       : reg1(std::static_pointer_cast<Register>(reg1)) {}
   MemoryAddr(const std::shared_ptr<Addr> &reg1, std::int64_t number)
       : reg1(std::static_pointer_cast<Register>(reg1)), number(number) {}
+  MemoryAddr(std::shared_ptr<Register> reg1, std::shared_ptr<Register> reg2,
+             int scale, std::int64_t number)
+      : reg1(std::move(reg1)), reg2(std::move(reg2)), scale(scale),
+        number(number) {}
 
   const std::shared_ptr<Register> &getReg1() const { return reg1; }
 

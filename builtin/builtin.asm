@@ -21,11 +21,11 @@ global toString
 global println
 
 extern putchar
-extern strcpy
 extern sprintf
 extern strlen
-extern printf
 extern __isoc99_scanf
+extern printf
+extern getchar
 extern __stack_chk_fail
 extern strtol
 extern memcpy
@@ -289,24 +289,51 @@ getInt:
         push    rbp
         mov     rbp, rsp
         sub     rsp, 16
+        call    getchar
+        mov     byte [rbp-9H], al
+        mov     dword [rbp-8H], 0
+        jmp     L_004
 
+L_002:  cmp     byte [rbp-9H], 45
+        jnz     L_003
+        mov     dword [rbp-8H], 1
+L_003:  call    getchar
+        mov     byte [rbp-9H], al
+L_004:  cmp     byte [rbp-9H], 47
+        jle     L_002
+        cmp     byte [rbp-9H], 57
+        jg      L_002
+        movsx   eax, byte [rbp-9H]
+        sub     eax, 48
+        mov     dword [rbp-4H], eax
+        call    getchar
+        mov     byte [rbp-9H], al
+        jmp     L_006
 
-        mov     rax, qword [fs:abs 28H]
-        mov     qword [rbp-8H], rax
-        xor     eax, eax
-        lea     rax, [rbp-10H]
-        mov     rsi, rax
-        lea     rdi, [rel L_005]
-        mov     eax, 0
-        call    __isoc99_scanf
-        mov     rax, qword [rbp-10H]
-        mov     rdx, qword [rbp-8H]
+L_005:  mov     edx, dword [rbp-4H]
+        mov     eax, edx
+        shl     eax, 2
+        add     eax, edx
+        add     eax, eax
+        mov     edx, eax
+        movsx   eax, byte [rbp-9H]
+        add     eax, edx
+        sub     eax, 48
+        mov     dword [rbp-4H], eax
+        call    getchar
+        mov     byte [rbp-9H], al
+L_006:  cmp     byte [rbp-9H], 47
+        jle     L_007
+        cmp     byte [rbp-9H], 57
+        jle     L_005
+L_007:  cmp     dword [rbp-8H], 0
+        jz      L_008
+        mov     eax, dword [rbp-4H]
+        neg     eax
+        jmp     L_009
 
-
-        xor     rdx, qword [fs:abs 28H]
-        jz      L_002
-        call    __stack_chk_fail
-L_002:  leave
+L_008:  mov     eax, dword [rbp-4H]
+L_009:  leave
         ret
 
 
@@ -329,7 +356,7 @@ print:
         mov     rax, qword [rbp-8H]
         mov     rdx, rax
         mov     esi, ecx
-        lea     rdi, [rel L_006]
+        lea     rdi, [rel L_012]
         mov     eax, 0
         call    printf
         nop
@@ -351,7 +378,7 @@ getString:
         mov     qword [rbp-128H], rax
         lea     rax, [rbp-110H]
         mov     rsi, rax
-        lea     rdi, [rel L_007]
+        lea     rdi, [rel L_013]
         mov     eax, 0
         call    __isoc99_scanf
         lea     rax, [rbp-110H]
@@ -380,59 +407,60 @@ getString:
 
 
         xor     rcx, qword [fs:abs 28H]
-        jz      L_003
+        jz      L_010
         call    __stack_chk_fail
-L_003:  leave
+L_010:  leave
         ret
 
 
 toString:
         push    rbp
         mov     rbp, rsp
-        sub     rsp, 80
-        mov     qword [rbp-48H], rdi
+        add     rsp, -128
+        mov     qword [rbp-78H], rdi
 
 
         mov     rax, qword [fs:abs 28H]
         mov     qword [rbp-8H], rax
         xor     eax, eax
-        mov     rdx, qword [rbp-48H]
-        lea     rax, [rbp-20H]
-        lea     rsi, [rel L_005]
+        mov     rdx, qword [rbp-78H]
+        lea     rax, [rbp-50H]
+        lea     rsi, [rel L_014]
         mov     rdi, rax
         mov     eax, 0
         call    sprintf
         mov     edi, 16
         call    malloc
-        mov     qword [rbp-38H], rax
-        lea     rax, [rbp-20H]
+        mov     qword [rbp-68H], rax
+        lea     rax, [rbp-50H]
         mov     rdi, rax
         call    strlen
-        mov     qword [rbp-30H], rax
-        mov     rax, qword [rbp-38H]
-        mov     rdx, qword [rbp-30H]
+        mov     qword [rbp-60H], rax
+        mov     rax, qword [rbp-68H]
+        mov     rdx, qword [rbp-60H]
         mov     qword [rax], rdx
-        mov     rax, qword [rbp-30H]
+        mov     rax, qword [rbp-60H]
         mov     rdi, rax
         call    malloc
-        mov     qword [rbp-28H], rax
-        mov     rax, qword [rbp-38H]
+        mov     qword [rbp-58H], rax
+        mov     rax, qword [rbp-68H]
         lea     rdx, [rax+8H]
-        mov     rax, qword [rbp-28H]
+        mov     rax, qword [rbp-58H]
         mov     qword [rdx], rax
-        lea     rdx, [rbp-20H]
-        mov     rax, qword [rbp-28H]
-        mov     rsi, rdx
+        mov     rdx, qword [rbp-60H]
+        lea     rcx, [rbp-50H]
+        mov     rax, qword [rbp-58H]
+        mov     rsi, rcx
         mov     rdi, rax
-        call    strcpy
-        mov     rax, qword [rbp-38H]
+        call    memcpy
+        mov     rax, qword [rbp-68H]
         mov     rcx, qword [rbp-8H]
 
 
         xor     rcx, qword [fs:abs 28H]
-        jz      L_004
+        jz      L_011
         call    __stack_chk_fail
-L_004:  leave
+L_011:  leave
         ret
 
 
@@ -460,13 +488,13 @@ SECTION .bss
 
 SECTION .rodata 
 
-L_005:
-        db 25H, 6CH, 64H, 00H
-
-L_006:
+L_012:
         db 25H, 2EH, 2AH, 73H, 00H
 
-L_007:
+L_013:
         db 25H, 73H, 00H
+
+L_014:
+        db 25H, 6CH, 64H, 00H
 
 

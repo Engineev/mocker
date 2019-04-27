@@ -12,5 +12,5 @@ if [[ ! -d "./build/" ]]; then
   mkdir build;
 fi;
 cd build
-cmake ..
+cmake -DONLINE_JUDGE_SUPPORT=ON ..
 make
