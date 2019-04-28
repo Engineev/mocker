@@ -3,6 +3,7 @@
   "bash_dir": "./",
   "ir_interpreter": "",
   "phases": [
-    "codegen pretest", "codegen extended"
+    "codegen pretest", "codegen extended",
+    "optim pretest", "optim extended"
   ]
 }

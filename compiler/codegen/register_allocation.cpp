@@ -219,9 +219,9 @@ void InterferenceGraph::addEdge(Node u, Node v) {
   if (u->getIdentifier() < v->getIdentifier())
     std::swap(u, v);
 
-  if (edges.find(std::make_pair(u, v)) != edges.end())
+  auto found = !edges.emplace(std::make_pair(u, v)).second;
+  if (found)
     return;
-  edges.emplace(std::make_pair(u, v));
   if (!isPrecolored(u)) {
     originalAdjList.at(u).emplace(v);
     curDegree.at(u)++;
