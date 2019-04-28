@@ -66,7 +66,7 @@ ___array___size:
         mov     rbp, rsp
         mov     qword [rbp-8H], rdi
         mov     rax, qword [rbp-8H]
-        mov     rax, qword [rax]
+        mov     rax, qword [rax-8H]
         pop     rbp
         ret
 
@@ -492,7 +492,7 @@ L_012:
         db 25H, 2EH, 2AH, 73H, 00H
 
 L_013:
-        db 25H, 73H, 00H
+        db 25H, 32H, 35H, 36H, 73H, 00H
 
 L_014:
         db 25H, 6CH, 64H, 00H

@@ -129,7 +129,6 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
     auto lhsVal = ctx.getExprAddr(node.lhs->getID());
     ctx.emplaceInst<Store>(boolExpAddr, lhsVal);
 
-    //    auto lhsLastBB = ctx.getCurBasicBlock();
     if (node.op == ast::BinaryExpr::LogicalAnd) {
       ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()), rhsFirstLabel,
                               successorLabel);
@@ -150,13 +149,6 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
     auto val = ctx.makeTempLocalReg("v");
     ctx.setExprAddr(node.getID(), val);
 
-    //    auto boolLit = std::make_shared<IntLiteral>(
-    //        (Integer)(node.op == ast::BinaryExpr::LogicalOr));
-    //    std::vector<std::pair<std::shared_ptr<Addr>, std::shared_ptr<Label>>>
-    //        phiOptions = {std::make_pair(boolLit, getBBLabel(lhsLastBB)),
-    //                      std::make_pair(ctx.getExprAddr(node.rhs->getID()),
-    //                                     getBBLabel(rhsLastBB))};
-    //    ctx.emplaceInst<Phi>(val, std::move(phiOptions));
     ctx.emplaceInst<Load>(val, boolExpAddr);
     return;
   }
@@ -453,12 +445,7 @@ Builder::getElementPtr(const std::shared_ptr<ast::ASTNode> &exp) const {
     visit(*p->rhs);
 
     auto arrayInstPtr = ctx.getExprAddr(p->lhs->getID());
-    auto contentPtrPtr = ctx.makeTempLocalReg("contentPtrPtr");
-    ctx.emplaceInst<ArithBinaryInst>(contentPtrPtr, ArithBinaryInst::Add,
-                                     arrayInstPtr, makeILit(8));
-    auto contentPtr = ctx.makeTempLocalReg("contentPtr");
-    ctx.emplaceInst<Load>(contentPtr, contentPtrPtr);
-
+    auto contentPtr = arrayInstPtr;
     auto idx = ctx.getExprAddr(p->rhs->getID());
     auto offset = ctx.makeTempLocalReg("offset");
     ctx.emplaceInst<ArithBinaryInst>(offset, ArithBinaryInst::Mul, idx,
@@ -542,48 +529,40 @@ std::shared_ptr<Addr> Builder::translateNewArray(
     std::queue<std::shared_ptr<Addr>> &sizeProvided) const {
   // We describe the translation of statements "new T[N]" here. First, note that
   // the result is a pointer arrayInstPtr, which points to the address of the
-  // array instance. It is stored in a temporary register, which is the return
-  // value of this function. Hence, the first step is
-  //   1. to malloc a piece of memory of length 16 and store the address into
-  //      arrayInstPtr.
-  // Then, we shall construct the array instance. The first thing to do is
-  //   2. to store the length into the first 8 bytes of the instance.
-  // After that, we shall deal with the last 8 bytes, which will store the
-  // address of the head of the content. We shall process as follow.
-  //   3. Calculate the bytes required. Note that this is a java-like language
-  //      instead of a C-like one, so the bytes required are expected to be
-  //      8 * arraySize if we do not treat bool in a different way.
-  //   4. Malloc the memory. The head address will be store in a temporary
-  //      register named contentPtr
-  //   5. Store the contentPtr into the last 8 bytes of the instance
-  // Finally, we initialize each element with a loop. If T is int or bool, then
-  // there is nothing to do. If T is a class (or string), then we shall malloc
-  // each instance and store its address into the corresponding position. To
-  // implement the loop, we first need a temporary variable to store the address
-  // of the current element since our registers are of SSA form, that is, they
-  // can not be assigned more than once. Namely, we shall
-  //  6. alloca a piece of memory for the temporary variable and store the
-  //     address into the register curElementPtrPtr. And store contentPtr into
-  //     the address stored in curElementPtrPtr. (Meanwhile, we shall compute
-  //     the address of the end of the content for later use.)
-  // Then, after finishing the routine of creating basic blocks and labels, we
+  // first element of the array. (The length of the array is store in front of
+  // the array elements.) It is the return value of this function. Hence, the
+  // first step is
+  //   1. to malloc a piece of memory of length 8 + 8 * N and store the address
+  //      + 8 into arrayInstPtr;
+  //   2. and store N into the first 8 bytes.
+  // Then, we shall construct the array. If T is int or bool, then there is
+  // nothing to do. Otherwise, we shall construct each element via a loop. To
+  // implement the loop, we first need aa temporary variable to store the
+  // address of the current element since our registers are of SSA form, that
+  // is, they can not be assigned more than once. Namely, we shall
+  //   3. alloca a piece of memory for the temporary varaible and store the
+  //      address into the register curElementPtrPtr. And store the address of
+  //      the head, namely, the contentPtr, into the address stored in
+  //      curElementPtrPtr. (Meanwhile, we shall compute the address of the
+  //      end of the array for later use.)
+  // After finishing the routine of creating basic blocks and labels, we
   // construct the condition for the loop to end.
-  //   7. Load curElementPtr from the address stored in curElementPtrPtr.
-  //   8. Compare it with contentEndPtr and jump based on the result.
-  // Now, we implement the body of the loop. In fact, what we need to do is just
-  // initialize the current element.
-  //   9. New a element. (See next section for details.)
-  //   10. Store the address into the current element.
-  //   11. Update the loop variable and jump back to the condition basic block.
+  //   4. Load curElementPtr from the address stored in curElementPtrPtr.
+  //   5. Compare it with the end pointer and jump according to the result.
+  // Now we implement the body of the loop. In fact, what we need to do is just
+  // initializing the current element.
+  //   6. New an element. (See next section for details.)
+  //   7. Store the address into the current element.
+  //   8. Update the loop variable and jump back to the condition basic block.
   //
   // In this passage, we handle some details. First, we need to support newing
   // a jagged array. To achieve this, we let this function to be recursive, that
-  // is, in step 9., if the type of the element is still array, then, instead of
-  // newing a element, we call this function recursively and pass down the
+  // is, in step 6., if the type of the element is still array, then, instead of
+  // newing an element, we call this function recursively and pass down the
   // remaining provided sizes.
   // Note that the number of sizes provided may be less than the dimension of
   // the array. This case is similar to the int/bool case. We just return after
-  // step 5., leaving the elements uninitialized.
+  // step 2., leaving the elements uninitialized.
 
   auto &func = ctx.getCurFunc();
   auto curType = std::dynamic_pointer_cast<ast::ArrayType>(rawCurType);
@@ -591,30 +570,27 @@ std::shared_ptr<Addr> Builder::translateNewArray(
   auto elementType = curType->baseType;
 
   // 1.
-  auto arrayInstPtr = ctx.makeTempLocalReg("arrayInstPtr");
-  ctx.emplaceInst<Malloc>(arrayInstPtr, makeILit(16));
-
-  // 2.
   auto size = sizeProvided.front();
   sizeProvided.pop();
-  ctx.emplaceInst<Store>(arrayInstPtr, size);
-
-  // 3. ~ 5.
-  //  auto elementSize =
-  //      std::make_shared<IntLiteral>((Integer)getTypeSize(elementType));
   auto memLen = ctx.makeTempLocalReg("memLen");
   ctx.emplaceInst<AttachedComment>("Calculate the memory needed");
-  ctx.emplaceInst<ArithBinaryInst>(memLen, ArithBinaryInst::Mul, makeILit(8),
+  auto contentLen = ctx.makeTempLocalReg("contentLen");
+  ctx.emplaceInst<ArithBinaryInst>(contentLen, ArithBinaryInst::Mul,
+                                   makeILit(8),
                                    size); // calcMemLen
-  auto contentPtr = ctx.makeTempLocalReg("contentPtr");
-  ctx.emplaceInst<Malloc>(contentPtr, memLen); // mallocContent
+  ctx.emplaceInst<ArithBinaryInst>(memLen, ArithBinaryInst::Add, contentLen,
+                                   makeILit(8));
+  auto memPtr = ctx.makeTempLocalReg("memPtr");
+  ctx.emplaceInst<Malloc>(memPtr, memLen);
 
-  auto contentPtrPtr = ctx.makeTempLocalReg("contentPtrPtr");
-  ctx.emplaceInst<ArithBinaryInst>(
-      contentPtrPtr, ArithBinaryInst::Add, arrayInstPtr,
-      std::make_shared<IntLiteral>((Integer)8)); // calcContentPtrPtr
-  ctx.emplaceInst<Store>(contentPtrPtr, contentPtr);
+  auto arrayInstPtr = ctx.makeTempLocalReg("arrayInstPtr");
+  ctx.emplaceInst<ArithBinaryInst>(arrayInstPtr, ArithBinaryInst::Add, memPtr,
+                                   makeILit(8));
 
+  // 2.
+  ctx.emplaceInst<Store>(memPtr, size);
+
+  // 3.
   if (isIntTy(elementType) || isBoolTy(elementType))
     return arrayInstPtr;
   if ((bool)std::dynamic_pointer_cast<ast::ArrayType>(elementType) &&
@@ -625,14 +601,14 @@ std::shared_ptr<Addr> Builder::translateNewArray(
   auto defer = std::shared_ptr<void *>(
       nullptr, [this](void *) { ctx.emplaceInst<Comment>(""); });
 
-  // 6.
   auto curElementPtrPtr = ctx.makeTempLocalReg("curElementPtrPtr");
   ctx.appendInstFront(func.getFirstBB(),
                       std::make_shared<Alloca>(curElementPtrPtr));
-  ctx.emplaceInst<Store>(curElementPtrPtr, contentPtr);
+  ctx.emplaceInst<Store>(curElementPtrPtr, arrayInstPtr);
   auto contentEndPtr = ctx.makeTempLocalReg("contentEndPtr");
+  // calcContentEndPtr
   ctx.emplaceInst<ArithBinaryInst>(contentEndPtr, ArithBinaryInst::Add,
-                                   contentPtr, memLen); // calcContentEndPtr
+                                   arrayInstPtr, contentLen);
 
   auto originBB = ctx.getCurBasicBlock();
   auto conditionFirstBB = func.insertBBAfter(originBB);
@@ -645,25 +621,25 @@ std::shared_ptr<Addr> Builder::translateNewArray(
   auto jump2condition = std::make_shared<Jump>(conditionLabel);
   ctx.appendInst(jump2condition);
 
-  // 7.
+  // 4.
   ctx.setCurBasicBlock(conditionFirstBB);
   auto curElementPtr = ctx.makeTempLocalReg("curElementPtr");
   ctx.emplaceInst<Load>(curElementPtr, curElementPtrPtr);
-  // 8.
+  // 5.
   auto cmpRes = ctx.makeTempLocalReg("cmpRes");
   ctx.emplaceInst<RelationInst>(cmpRes, RelationInst::Ne, curElementPtr,
                                 contentEndPtr);
   ctx.emplaceInst<Branch>(cmpRes, bodyLabel, successorLabel);
 
-  // 9.
+  // 6.
   ctx.setCurBasicBlock(bodyFirstBB);
   auto elementInstPtr =
       (bool)std::dynamic_pointer_cast<ast::ArrayType>(elementType)
           ? translateNewArray(elementType, sizeProvided)
           : makeNewNonarray(elementType);
-  // 10.
+  // 7.
   ctx.emplaceInst<Store>(curElementPtr, elementInstPtr);
-  // 11.
+  // 8.
   auto nextElementPtr = ctx.makeTempLocalReg("nextElementPtr");
   ctx.emplaceInst<ArithBinaryInst>(nextElementPtr, ArithBinaryInst::Add,
                                    curElementPtr,

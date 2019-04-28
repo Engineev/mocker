@@ -291,18 +291,12 @@ void Interpreter::initExternalFuncs() {
   using Args = const std::vector<std::int64_t> &;
 
   // #_array_#_ctor_ ( this arraySize elementSize )
-  externalFuncs.emplace("#_array_#_ctor_", [this](Args args) {
-    //    assert(false);
-    auto instPtr = reinterpret_cast<char *>(args[0]);
-    *(std::int64_t *)(instPtr) = args[1];
-    auto addr = fastMalloc((std::size_t)(args[1] * args[2]));
-    *(void **)(instPtr + 8) = addr;
-    return 0;
-  });
+  externalFuncs.emplace("#_array_#_ctor_",
+                        [this](Args args) -> std::int64_t { assert(false); });
   // #_array_#size ( this )
   externalFuncs.emplace("#_array_#size", [](Args args) {
-    auto res = *(std::int64_t *)args[0];
-    return *(std::int64_t *)args[0];
+    auto res = *((std::int64_t *)(args[0]) - 1);
+    return res;
   });
 
   // #string#length ( this )

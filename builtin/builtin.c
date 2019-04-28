@@ -10,7 +10,7 @@ void ___array____ctor_(void *ptr, int64_t sz, int64_t element_sz) {
   *(void **)(inst_ptr + 8) = addr;
 }
 
-uint64_t ___array___size(void *ptr) { return *(uint64_t *)ptr; }
+uint64_t ___array___size(void *ptr) { return *((uint64_t *)ptr - 1); }
 
 uint64_t __string__length(void *ptr) { return *(uint64_t *)ptr; }
 
@@ -87,16 +87,13 @@ void print(void *ptr) {
   uint64_t length = *(uint64_t *)ptr;
   char **content_ptr_ptr = (char **)ptr + 1;
   char *content_ptr = *content_ptr_ptr;
-  // for (int i = 0; i < length; ++i)
-  //   printf("%u,", *(content_ptr + i));
   printf("%.*s", (int)length, content_ptr);
 }
 
 void *getString() {
   void *res_inst_ptr = malloc(16);
-
   char buffer[256];
-  scanf("%s", buffer);
+  scanf("%256s", buffer);
 
   uint64_t len = strlen(buffer);
   *(int64_t *)res_inst_ptr = len;

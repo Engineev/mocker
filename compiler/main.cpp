@@ -105,6 +105,8 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
+  // mocker::ir::printModule(module, std::cerr);
+
   runOptsUntilFixedPoint(module);
 
   std::cerr << "\nAfter pre-SSA optimization:\n";
@@ -131,7 +133,7 @@ mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
   auto res = runNaiveInstructionSelection(irModule);
   //  nasm::printModule(res);
   res = allocateRegisters(res);
-//  res = allocateRegistersNaively(res);
+  //  res = allocateRegistersNaively(res);
   return res;
 }
 
