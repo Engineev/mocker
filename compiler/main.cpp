@@ -46,8 +46,6 @@ int main(int argc, char **argv) {
   assert(stats.countInsts<mocker::ir::Phi>() == 0);
 
   optimize(irModule);
-  //  mocker::runOptPasses<mocker::FunctionInline>(irModule);
-  //  mocker::runOptPasses<mocker::UnusedFunctionRemoval>(irModule);
 
   if (argc == 3) {
     std::string irPath = argv[2];
@@ -58,10 +56,9 @@ int main(int argc, char **argv) {
   }
 
   auto nasmModule = codegen(irModule);
-  //  std::ofstream fout("");
-  //  mocker::nasm::printModule(nasmModule, fout);
-  //  fout.close();
-//  mocker::nasm::printModule(nasmModule, std::cerr);
+  std::ofstream fout("/Users/aaronren/Desktop/llvm-ir/my.asm");
+  mocker::nasm::printModule(nasmModule, fout);
+  fout.close();
   mocker::nasm::printModule(nasmModule, std::cout);
 
   return 0;
@@ -96,37 +93,37 @@ void optimize(mocker::ir::Module &module) {
   using namespace mocker;
 
   mocker::ir::Stats stats(module);
-  //  std::cerr << "Original:\n";
-  //  printIRStats(stats);
+  std::cerr << "Original:\n";
+  printIRStats(stats);
 
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
-  // runOptPasses<PromoteGlobalVariables>(module);
+  runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);
 
-  //  std::cerr << "\nAfter inline and promotion of global variables:\n";
-  //  printIRStats(stats);
+  std::cerr << "\nAfter inline and promotion of global variables:\n";
+  printIRStats(stats);
 
   runOptsUntilFixedPoint(module);
 
-  //  std::cerr << "\nAfter pre-SSA optimization:\n";
-  //  printIRStats(stats);
+  std::cerr << "\nAfter pre-SSA optimization:\n";
+  printIRStats(stats);
 
   runOptPasses<SSAConstruction>(module);
 
   runOptsUntilFixedPoint(module);
 
-  //  std::cerr << "\nBefore SSA destruction:\n";
-  //  printIRStats(stats);
+  std::cerr << "\nBefore SSA destruction:\n";
+  printIRStats(stats);
 
   runOptPasses<SSADestruction>(module);
   assert(stats.countInsts<ir::Phi>() == 0);
 
   runOptsUntilFixedPoint(module);
 
-  //  std::cerr << "\nAfter optimization:\n";
-  //  printIRStats(stats);
+  std::cerr << "\nAfter optimization:\n";
+  printIRStats(stats);
 }
 
 mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
@@ -134,7 +131,7 @@ mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
   auto res = runNaiveInstructionSelection(irModule);
   //  nasm::printModule(res);
   res = allocateRegisters(res);
-  //  res = allocateRegistersNaively(res);
+//  res = allocateRegistersNaively(res);
   return res;
 }
 

@@ -8,7 +8,8 @@
 
 namespace mocker {
 
-// Promote global variables to stack so that the SSA pass can consider them.
+// Promote global variables to stack so that the SSA pass can take them into
+// consideration.
 class PromoteGlobalVariables : public ModulePass {
 public:
   explicit PromoteGlobalVariables(ir::Module &module);
@@ -16,14 +17,10 @@ public:
   bool operator()() override;
 
 private:
-  void promoteGlobalVariables(ir::FunctionModule &func);
-
-  void buildGlobalVarUsedImpl(const ir::FunctionModule &func);
-
-private:
-  // The global variables used in each function
-  std::unordered_map<std::string, std::unordered_set<std::string>>
-      globalVarUsed;
+  void promoteGlobalVariables(
+      ir::FunctionModule &func,
+      const std::unordered_map<std::string, std::unordered_set<std::string>>
+          &GlobalVarUsed);
 };
 
 } // namespace mocker

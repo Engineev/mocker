@@ -1,74 +1,149 @@
 #include "promote_global_variables.h"
 
 #include <cassert>
+#include <queue>
+#include <vector>
 
 #include "helper.h"
 #include "ir/helper.h"
+#include "ir/ir_inst.h"
+
+#include <iostream>
+
+namespace mocker {
+namespace {
+
+// Return the functions called by [func].
+std::vector<std::string> collectCallees(const ir::FunctionModule &func) {
+  std::vector<std::string> res;
+
+  for (auto &bb : func.getBBs()) {
+    for (auto &inst : bb.getInsts()) {
+      auto call = ir::dyc<ir::Call>(inst);
+      if (!call)
+        continue;
+      res.emplace_back(call->getFuncName());
+    }
+  }
+
+  return res;
+}
+
+// Return the map that maps each function to the functions that calls it.
+std::unordered_map<std::string, std::vector<std::string>>
+buildCallGraph(const ir::Module &module) {
+  std::unordered_map<std::string, std::vector<std::string>> res;
+  for (auto &kv : module.getFuncs())
+    res[kv.first] = {};
+
+  for (auto &kv : module.getFuncs()) {
+    auto &func = kv.second;
+    auto callees = collectCallees(func);
+    for (auto &callee : callees) {
+      res[callee].emplace_back(kv.first);
+    }
+  }
+
+  return res;
+}
+
+template <class Set, class T> void unionSet(Set &s, const T &xs) {
+  for (auto &x : xs) {
+    s.emplace(x);
+  }
+}
+
+// Return the map that maps each function to the global variables it used
+std::unordered_map<std::string, std::unordered_set<std::string>>
+buildGlobalVarUsed(
+    const ir::Module &module,
+    const std::unordered_map<std::string, std::vector<std::string>>
+        &CallGraph) {
+  std::unordered_map<std::string, std::unordered_set<std::string>> res;
+  // Initialize res
+  for (auto &kv : module.getFuncs()) {
+    auto &func = kv.second;
+    auto &used = res[kv.first];
+    for (auto &bb : func.getBBs()) {
+      for (auto &inst : bb.getInsts()) {
+        auto operands = ir::getOperandsUsed(inst);
+        for (auto &operand : operands) {
+          auto reg = ir::dycGlobalReg(operand);
+          if (reg && reg->getIdentifier() != "@null")
+            used.insert(reg->getIdentifier());
+        }
+      }
+    }
+  }
+
+  // update the result iteratively
+  std::queue<std::string> worklist;
+  for (auto &kv : module.getFuncs())
+    worklist.emplace(kv.first);
+
+  while (!worklist.empty()) {
+    auto funcName = worklist.front();
+    worklist.pop();
+    const auto &Callers = CallGraph.at(funcName);
+    const auto &usedByCallee = res[funcName];
+    for (auto &caller : Callers) {
+      auto &usedByCaller = res[caller];
+      std::size_t originalSize = usedByCaller.size();
+      unionSet(usedByCaller, usedByCallee);
+      std::size_t newSize = usedByCaller.size();
+      if (originalSize != newSize)
+        worklist.emplace(caller);
+    }
+  }
+
+  return res;
+}
+
+} // namespace
+} // namespace mocker
 
 namespace mocker {
 
 PromoteGlobalVariables::PromoteGlobalVariables(ir::Module &module)
-    : ModulePass(module) {
-//  assert(false && "The construction of globalVarUsed is broken");
-  for (auto &kv : module.getFuncs()) {
-    if (kv.second.isExternalFunc())
-      continue;
-    buildGlobalVarUsedImpl(kv.second);
-  }
-}
+    : ModulePass(module) {}
 
 bool PromoteGlobalVariables::operator()() {
+  const auto CallGraph = buildCallGraph(module);
+  auto GlobalVarUsed = buildGlobalVarUsed(module, CallGraph);
+
   for (auto &kv : module.getFuncs())
     if (!kv.second.isExternalFunc())
-      promoteGlobalVariables(kv.second);
+      promoteGlobalVariables(kv.second, GlobalVarUsed);
   return false;
 }
 
-void PromoteGlobalVariables::buildGlobalVarUsedImpl(
-    const ir::FunctionModule &func) {
-  if (globalVarUsed.find(func.getIdentifier()) != globalVarUsed.end())
-    return;
-
-  auto &used = globalVarUsed[func.getIdentifier()];
-  for (auto &bb : func.getBBs()) {
-    for (auto &inst : bb.getInsts()) {
-      if (auto call = ir::dyc<ir::Call>(inst)) {
-        auto &callee = module.getFuncs().at(call->getFuncName());
-        if (!callee.isExternalFunc()) {
-          buildGlobalVarUsedImpl(callee);
-          for (auto &ident : globalVarUsed.at(callee.getIdentifier()))
-            used.emplace(ident);
-        }
-      }
-
-      auto operands = ir::getOperandsUsed(inst);
-      for (auto &operand : operands) {
-        auto reg = ir::dycGlobalReg(operand);
-        if (reg && reg->getIdentifier() != "@null")
-          used.insert(reg->getIdentifier());
-      }
-    }
-  }
-}
-
-void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
-  const auto &globalVars = globalVarUsed[func.getIdentifier()];
+void PromoteGlobalVariables::promoteGlobalVariables(
+    ir::FunctionModule &func,
+    const std::unordered_map<std::string, std::unordered_set<std::string>>
+        &GlobalVarUsed) {
+  auto GlobalVars = GlobalVarUsed.at(func.getIdentifier());
   std::unordered_map<std::string, std::shared_ptr<ir::Reg>> aliasReg;
-  for (const auto &name : globalVars) {
+  for (const auto &name : GlobalVars) {
     assert(name != "@null");
     aliasReg[name] = func.makeTempLocalReg("alias" + name);
   }
 
   // Rename the use
+  // * In some cases, the use can not be renamed. I am not sure whether I have
+  //   taken all such cases into consideration here.
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
-      auto operands = ir::getOperandsUsed(inst);
-      for (auto &operand : operands) {
+      const auto Operands = ir::getOperandsUsed(inst);
+      auto newOperands = Operands;
+      for (auto &operand : newOperands) {
         auto p = ir::dycGlobalReg(operand);
         if (p && p->getIdentifier() != "@null")
           operand = aliasReg.at(p->getIdentifier());
       }
-      inst = ir::copyWithReplacedOperands(inst, operands);
+      if (ir::dyc<ir::Store>(inst)) {
+        newOperands.at(1) = Operands.at(1);
+      }
+      inst = ir::copyWithReplacedOperands(inst, newOperands);
     }
   }
 
@@ -105,15 +180,15 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
 
     for (auto iter = insts.begin(); iter != insts.end(); ++iter) {
       if (ir::dyc<ir::Ret>(*iter)) {
-        for (auto &toBeStored : globalVars)
+        for (auto &toBeStored : GlobalVars)
           insert(iter, toBeStored);
         continue;
       }
 
       if (auto call = ir::dyc<ir::Call>(*iter)) {
-        auto &usedByCallee = globalVarUsed[call->getFuncName()];
+        auto &usedByCallee = GlobalVarUsed.at(call->getFuncName());
         for (auto &toBeStored : usedByCallee) {
-          if (globalVars.find(toBeStored) == globalVars.end())
+          if (GlobalVars.find(toBeStored) == GlobalVars.end())
             continue;
           insert(iter, toBeStored);
         }
