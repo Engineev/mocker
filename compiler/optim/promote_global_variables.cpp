@@ -1,106 +1,12 @@
 #include "promote_global_variables.h"
 
 #include <cassert>
-#include <queue>
 #include <vector>
 
 #include "helper.h"
 #include "ir/helper.h"
 #include "ir/ir_inst.h"
-
-#include <iostream>
-
-namespace mocker {
-namespace {
-
-// Return the functions called by [func].
-std::vector<std::string> collectCallees(const ir::FunctionModule &func) {
-  std::vector<std::string> res;
-
-  for (auto &bb : func.getBBs()) {
-    for (auto &inst : bb.getInsts()) {
-      auto call = ir::dyc<ir::Call>(inst);
-      if (!call)
-        continue;
-      res.emplace_back(call->getFuncName());
-    }
-  }
-
-  return res;
-}
-
-// Return the map that maps each function to the functions that calls it.
-std::unordered_map<std::string, std::vector<std::string>>
-buildCallGraph(const ir::Module &module) {
-  std::unordered_map<std::string, std::vector<std::string>> res;
-  for (auto &kv : module.getFuncs())
-    res[kv.first] = {};
-
-  for (auto &kv : module.getFuncs()) {
-    auto &func = kv.second;
-    auto callees = collectCallees(func);
-    for (auto &callee : callees) {
-      res[callee].emplace_back(kv.first);
-    }
-  }
-
-  return res;
-}
-
-template <class Set, class T> void unionSet(Set &s, const T &xs) {
-  for (auto &x : xs) {
-    s.emplace(x);
-  }
-}
-
-// Return the map that maps each function to the global variables it used
-std::unordered_map<std::string, std::unordered_set<std::string>>
-buildGlobalVarUsed(
-    const ir::Module &module,
-    const std::unordered_map<std::string, std::vector<std::string>>
-        &CallGraph) {
-  std::unordered_map<std::string, std::unordered_set<std::string>> res;
-  // Initialize res
-  for (auto &kv : module.getFuncs()) {
-    auto &func = kv.second;
-    auto &used = res[kv.first];
-    for (auto &bb : func.getBBs()) {
-      for (auto &inst : bb.getInsts()) {
-        auto operands = ir::getOperandsUsed(inst);
-        for (auto &operand : operands) {
-          auto reg = ir::dycGlobalReg(operand);
-          if (reg && reg->getIdentifier() != "@null")
-            used.insert(reg->getIdentifier());
-        }
-      }
-    }
-  }
-
-  // update the result iteratively
-  std::queue<std::string> worklist;
-  for (auto &kv : module.getFuncs())
-    worklist.emplace(kv.first);
-
-  while (!worklist.empty()) {
-    auto funcName = worklist.front();
-    worklist.pop();
-    const auto &Callers = CallGraph.at(funcName);
-    const auto &usedByCallee = res[funcName];
-    for (auto &caller : Callers) {
-      auto &usedByCaller = res[caller];
-      std::size_t originalSize = usedByCaller.size();
-      unionSet(usedByCaller, usedByCallee);
-      std::size_t newSize = usedByCaller.size();
-      if (originalSize != newSize)
-        worklist.emplace(caller);
-    }
-  }
-
-  return res;
-}
-
-} // namespace
-} // namespace mocker
+#include "set_operation.h"
 
 namespace mocker {
 
@@ -108,23 +14,22 @@ PromoteGlobalVariables::PromoteGlobalVariables(ir::Module &module)
     : ModulePass(module) {}
 
 bool PromoteGlobalVariables::operator()() {
-  const auto CallGraph = buildCallGraph(module);
-  auto GlobalVarUsed = buildGlobalVarUsed(module, CallGraph);
+  funcGlobalVar.init(module);
 
   for (auto &kv : module.getFuncs())
     if (!kv.second.isExternalFunc())
-      promoteGlobalVariables(kv.second, GlobalVarUsed);
+      promoteGlobalVariables(kv.second);
   return false;
 }
 
-void PromoteGlobalVariables::promoteGlobalVariables(
-    ir::FunctionModule &func,
-    const std::unordered_map<std::string, std::unordered_set<std::string>>
-        &GlobalVarUsed) {
-  auto GlobalVars = GlobalVarUsed.at(func.getIdentifier());
+void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
+  const auto &Use = funcGlobalVar.getUse(func.getIdentifier());
+  const auto &Def = funcGlobalVar.getDef(func.getIdentifier());
+
   std::unordered_map<std::string, std::shared_ptr<ir::Reg>> aliasReg;
-  for (const auto &name : GlobalVars) {
-    assert(name != "@null");
+  for (const auto &name : funcGlobalVar.getInvolved(func.getIdentifier())) {
+    if (name == "@null")
+      continue;
     aliasReg[name] = func.makeTempLocalReg("alias" + name);
   }
 
@@ -163,35 +68,48 @@ void PromoteGlobalVariables::promoteGlobalVariables(
   // Insert Loads & Stores before Calls and Rets
   for (auto &bb : func.getMutableBBs()) {
     auto &insts = bb.getMutableInsts();
-    auto insert = [&insts, &func, &aliasReg](ir::InstListIter iter,
-                                             const std::string &name) {
+
+    auto reStore = [&insts, &func, &aliasReg](ir::InstListIter iter,
+                                              const std::string &name) {
+      if (name == "@null")
+        return;
       auto gReg = std::make_shared<ir::Reg>(name);
       auto alias = aliasReg.at(name);
       auto tmp = func.makeTempLocalReg();
       insts.insert(iter, std::make_shared<ir::Load>(tmp, alias));
       insts.insert(iter, std::make_shared<ir::Store>(gReg, tmp));
-      if (ir::dyc<ir::Ret>(*iter))
+    };
+
+    auto reLoad = [&insts, &func, &aliasReg](ir::InstListIter iter,
+                                             const std::string &name) {
+      if (name == "@null")
         return;
+      auto gReg = std::make_shared<ir::Reg>(name);
+      auto alias = aliasReg.at(name);
       ++iter;
-      auto tmp2 = func.makeTempLocalReg();
-      insts.insert(iter, std::make_shared<ir::Load>(tmp2, gReg));
-      insts.insert(iter, std::make_shared<ir::Store>(alias, tmp2));
+      auto tmp = func.makeTempLocalReg();
+      insts.insert(iter, std::make_shared<ir::Load>(tmp, gReg));
+      insts.insert(iter, std::make_shared<ir::Store>(alias, tmp));
     };
 
     for (auto iter = insts.begin(); iter != insts.end(); ++iter) {
       if (ir::dyc<ir::Ret>(*iter)) {
-        for (auto &toBeStored : GlobalVars)
-          insert(iter, toBeStored);
+        for (auto &toBeStored : Def)
+          reStore(iter, toBeStored);
         continue;
       }
 
       if (auto call = ir::dyc<ir::Call>(*iter)) {
-        auto &usedByCallee = GlobalVarUsed.at(call->getFuncName());
-        for (auto &toBeStored : usedByCallee) {
-          if (GlobalVars.find(toBeStored) == GlobalVars.end())
-            continue;
-          insert(iter, toBeStored);
+        const auto &usedByCallee = funcGlobalVar.getUse(call->getFuncName());
+        for (auto &toBeStored : intersectSets(Def, usedByCallee)) {
+          reStore(iter, toBeStored);
         }
+
+        const auto &defedByCallee = funcGlobalVar.getDef(call->getFuncName());
+        for (auto &reg : intersectSets(Use, defedByCallee)) {
+          reLoad(iter, reg);
+        }
+
         continue;
       }
     }

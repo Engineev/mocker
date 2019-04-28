@@ -7,5 +7,6 @@ target_sources(${PROJECT_NAME}-support
   INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/defer.h
     ${CMAKE_CURRENT_LIST_DIR}/optional.h
+    ${CMAKE_CURRENT_LIST_DIR}/set_operation.h
     ${CMAKE_CURRENT_LIST_DIR}/small_map.h
 )

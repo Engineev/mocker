@@ -3,8 +3,7 @@
 
 #include "opt_pass.h"
 
-#include <unordered_map>
-#include <unordered_set>
+#include "analysis/func_global_var.h"
 
 namespace mocker {
 
@@ -17,10 +16,9 @@ public:
   bool operator()() override;
 
 private:
-  void promoteGlobalVariables(
-      ir::FunctionModule &func,
-      const std::unordered_map<std::string, std::unordered_set<std::string>>
-          &GlobalVarUsed);
+  void promoteGlobalVariables(ir::FunctionModule &func);
+
+  FuncGlobalVar funcGlobalVar;
 };
 
 } // namespace mocker

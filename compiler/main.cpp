@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 
   optimize(irModule);
 
-  if (argc == 3) {
+  if (argc >= 3) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath);
     mocker::ir::printModule(irModule, dumpIR);
@@ -56,9 +56,11 @@ int main(int argc, char **argv) {
   }
 
   auto nasmModule = codegen(irModule);
-  std::ofstream fout("/Users/aaronren/Desktop/llvm-ir/my.asm");
-  mocker::nasm::printModule(nasmModule, fout);
-  fout.close();
+  if (argc >= 4) {
+    std::ofstream fout(argv[3]);
+    mocker::nasm::printModule(nasmModule, fout);
+    fout.close();
+  }
   mocker::nasm::printModule(nasmModule, std::cout);
 
   return 0;
@@ -98,6 +100,7 @@ void optimize(mocker::ir::Module &module) {
 
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
+  runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
   runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);
@@ -121,6 +124,9 @@ void optimize(mocker::ir::Module &module) {
 
   runOptPasses<SSADestruction>(module);
   assert(stats.countInsts<ir::Phi>() == 0);
+
+  std::cerr << "\nAfter SSA destruction:\n";
+  printIRStats(stats);
 
   runOptsUntilFixedPoint(module);
 
