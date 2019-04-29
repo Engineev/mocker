@@ -187,9 +187,11 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
 
 void Builder::operator()(const ast::FuncCallExpr &node) const {
   std::shared_ptr<Addr> dest =
-      (bool)ctx.getExprType(node.getID()) ? ctx.makeTempLocalReg() : nullptr;
+      node.identifier->val != "print" && (bool)ctx.getExprType(node.getID())
+          ? ctx.makeTempLocalReg()
+          : nullptr;
   std::string funcName = node.identifier->val;
-  if (funcName == "println" || funcName == "print") {
+  if (funcName == "print" || funcName == "println") {
     if (translatePrint(node))
       return;
   }
@@ -716,7 +718,40 @@ void Builder::addGlobalVariable(
 }
 
 bool Builder::translatePrint(const ast::FuncCallExpr &print) const {
-  // TODO
+  if (print.identifier->val == "println") {
+    auto printContent = std::make_shared<ast::FuncCallExpr>(
+        nullptr, std::make_shared<ast::Identifier>("print"), print.args);
+    visit(*printContent);
+    auto printNewline = std::make_shared<ast::FuncCallExpr>(
+        nullptr, std::make_shared<ast::Identifier>("print"),
+        std::vector<std::shared_ptr<ast::Expression>>{
+            std::make_shared<ast::StringLitExpr>("\n")});
+    visit(*printNewline);
+    return true;
+  }
+
+  auto val = print.args.at(0);
+  if (auto p = std::dynamic_pointer_cast<ast::FuncCallExpr>(val)) {
+    if (p->identifier->val != "toString")
+      return false;
+    visit(*p->args.at(0));
+    auto arg = ctx.getExprAddr(p->args.at(0)->getID());
+    ctx.emplaceInst<Call>("_printInt", arg);
+    return true;
+  }
+  if (auto p = std::dynamic_pointer_cast<ast::BinaryExpr>(val)) {
+    if (p->op != ast::BinaryExpr::Add)
+      return false;
+    auto printLhs = std::make_shared<ast::FuncCallExpr>(
+        nullptr, std::make_shared<ast::Identifier>("print"),
+        std::vector<std::shared_ptr<ast::Expression>>{p->lhs});
+    visit(*printLhs);
+    auto printRhs = std::make_shared<ast::FuncCallExpr>(
+        nullptr, std::make_shared<ast::Identifier>("print"),
+        std::vector<std::shared_ptr<ast::Expression>>{p->rhs});
+    visit(*printRhs);
+    return true;
+  }
   return false;
 }
 
