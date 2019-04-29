@@ -58,15 +58,12 @@ void FuncGlobalVar::init(const ir::Module &module) {
       if (auto p = ir::dyc<ir::Store>(inst)) {
         if (auto reg = ir::dycGlobalReg(p->getAddr()))
           fDef.emplace(reg->getIdentifier());
-        if (auto reg = ir::dycGlobalReg(p->getVal()))
-          fUse.emplace(reg->getIdentifier());
         return;
       }
-
-      auto operands = ir::getOperandsUsed(inst);
-      for (auto &operand : operands) {
-        if (auto reg = ir::dycGlobalReg(operand))
+      if (auto p = ir::dyc<ir::Load>(inst)) {
+        if (auto reg = ir::dycGlobalReg(p->getAddr()))
           fUse.emplace(reg->getIdentifier());
+        return;
       }
     };
 

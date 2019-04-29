@@ -28,27 +28,30 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
 
   std::unordered_map<std::string, std::shared_ptr<ir::Reg>> aliasReg;
   for (const auto &name : funcGlobalVar.getInvolved(func.getIdentifier())) {
-    if (name == "@null")
-      continue;
+    assert(name != "@null");
     aliasReg[name] = func.makeTempLocalReg("alias" + name);
   }
 
-  // Rename the use
-  // * In some cases, the use can not be renamed. I am not sure whether I have
-  //   taken all such cases into consideration here.
+  // Rename the load & store
   for (auto &bb : func.getMutableBBs()) {
     for (auto &inst : bb.getMutableInsts()) {
-      const auto Operands = ir::getOperandsUsed(inst);
-      auto newOperands = Operands;
-      for (auto &operand : newOperands) {
-        auto p = ir::dycGlobalReg(operand);
-        if (p && p->getIdentifier() != "@null")
-          operand = aliasReg.at(p->getIdentifier());
+
+      if (auto p = ir::dyc<ir::Store>(inst)) {
+        auto reg = ir::dycGlobalReg(p->getAddr());
+        if (!reg)
+          continue;
+        reg = aliasReg.at(reg->getIdentifier());
+        inst = std::make_shared<ir::Store>(reg, p->getVal());
+        continue;
       }
-      if (ir::dyc<ir::Store>(inst)) {
-        newOperands.at(1) = Operands.at(1);
+      if (auto p = ir::dyc<ir::Load>(inst)) {
+        auto reg = ir::dycGlobalReg(p->getAddr());
+        if (!reg)
+          continue;
+        reg = aliasReg.at(reg->getIdentifier());
+        inst = std::make_shared<ir::Load>(p->getDest(), reg);
+        continue;
       }
-      inst = ir::copyWithReplacedOperands(inst, newOperands);
     }
   }
 
