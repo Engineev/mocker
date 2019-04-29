@@ -65,7 +65,7 @@ void DeadCodeElimination::mark() {
   while (!worklist.empty()) {
     auto inst = worklist.front();
     worklist.pop();
-    markUsefulBB(residingBB.at(inst->getID()));
+    usefulBB.emplace(residingBB.at(inst->getID()));
     for (auto &operand : ir::getOperandsUsed(inst)) {
       auto reg = ir::dycLocalReg(operand);
       if (!reg || reg->getIdentifier() == ".phi_nan" ||
@@ -103,8 +103,7 @@ void DeadCodeElimination::sweep() {
       if (!br)
         continue;
       auto target = rdt.getImmediateDominator(bb.getLabelID());
-      while (
-          !isIn(useful, func.getBasicBlock(target).getInsts().back()->getID()))
+      while (!isIn(usefulBB, target))
         target = rdt.getImmediateDominator(target);
       newInsts.emplace_back(
           std::make_shared<ir::Jump>(std::make_shared<ir::Label>(target)));

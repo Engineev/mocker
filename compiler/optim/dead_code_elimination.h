@@ -31,6 +31,7 @@ private:
   std::queue<std::shared_ptr<ir::IRInst>> worklist;
   std::unordered_map<ir::InstID, std::size_t> residingBB;
   std::unordered_set<ir::InstID> useful;
+  std::unordered_set<std::size_t> usefulBB;  // contains a useful instruction
   std::size_t cnt = 0;
 };
 
