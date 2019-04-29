@@ -11,7 +11,9 @@ namespace mocker {
 
 class DominatorTree {
 public:
-  void init(const ir::FunctionModule &func);
+  void init(const ir::FunctionModule &func, bool reverse = false);
+
+  bool isReversed() const { return reverse; }
 
   // whether [u] dominates [v] ?
   bool isDominating(std::size_t u, std::size_t v) const;
@@ -25,6 +27,10 @@ public:
 
   const ir::LabelSet &getChildren(std::size_t n) const {
     return dominatorTree.at(n);
+  }
+
+  const std::size_t getImmediateDominator(std::size_t n) const {
+    return immediateDominator.at(n);
   }
 
 private:
@@ -42,6 +48,7 @@ private:
   void buildDominanceFrontier(const ir::FunctionModule &func);
 
 private:
+  bool reverse = false;
   ir::LabelMap<ir::LabelSet> dominating;
   ir::LabelMap<ir::LabelSet> dominators;
   ir::LabelMap<std::size_t> immediateDominator;

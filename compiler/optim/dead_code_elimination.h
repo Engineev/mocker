@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "analysis/dominance.h"
+#include "ir/ir_inst.h"
 #include "opt_pass.h"
 
 namespace mocker {
@@ -18,8 +20,6 @@ public:
 private:
   bool isParameter(const std::string &identifier);
 
-  void updateWorkList(const std::shared_ptr<ir::IRInst> &inst);
-
   void init();
 
   void mark();
@@ -27,9 +27,10 @@ private:
   void sweep();
 
 private:
-  std::queue<std::string> workList;
+  DominatorTree rdt;
+  std::queue<std::shared_ptr<ir::IRInst>> worklist;
+  std::unordered_map<ir::InstID, std::size_t> residingBB;
   std::unordered_set<ir::InstID> useful;
-  std::unordered_map<std::string, std::shared_ptr<ir::IRInst>> instDefine;
   std::size_t cnt = 0;
 };
 

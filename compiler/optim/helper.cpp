@@ -25,6 +25,8 @@ buildInstDefine(const ir::FunctionModule &func) {
 std::unordered_map<std::size_t, std::vector<std::size_t>>
 buildBlockPredecessors(const ir::FunctionModule &func) {
   std::unordered_map<std::size_t, std::vector<std::size_t>> res;
+  for (auto &bb : func.getBBs())
+    res[bb.getLabelID()] = {};
 
   for (auto &bb : func.getBBs()) {
     auto succ = bb.getSuccessors();

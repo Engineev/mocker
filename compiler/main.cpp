@@ -178,7 +178,11 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     // std::cerr << optimizable;
     optimizable |= runOptPasses<RemoveTrivialBlocks>(module);
     // std::cerr << optimizable;
+    // ir::printModule(module, std::cerr);
     optimizable |= runOptPasses<DeadCodeElimination>(module);
+    optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
+    // ir::printModule(module, std::cerr);
     // std::cerr << optimizable;
+    ir::verifyModule(module);
   }
 }

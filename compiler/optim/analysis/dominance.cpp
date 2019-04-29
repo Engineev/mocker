@@ -3,6 +3,7 @@
 #include <cassert>
 #include <functional>
 
+#include "optim/helper.h"
 #include "set_operation.h"
 
 namespace mocker {
@@ -10,21 +11,34 @@ namespace {
 template <class T> using LabelMap = std::unordered_map<std::size_t, T>;
 using LabelSet = std::unordered_set<std::size_t>;
 
-std::unordered_set<std::size_t>
-buildDominatingImpl(const ir::FunctionModule &func, std::size_t node) {
+std::unordered_set<std::size_t> buildDominatingImpl(
+    const ir::FunctionModule &func, std::size_t node,
+    const std::unordered_map<std::size_t, std::vector<std::size_t>> &preds) {
   // Construct the set [avoidable] of nodes which are reachable from the entry
   // without passing [node]. The nodes dominated by [node] are just the nodes
   // which are not in [avoidable].
+  bool reverse = !preds.empty();
   std::unordered_set<std::size_t> avoidable;
-  std::function<void(std::size_t cur)> visit = [&visit, &avoidable, node,
-                                                &func](std::size_t cur) {
-    if (cur == node || avoidable.find(cur) != avoidable.end())
-      return;
-    avoidable.emplace(cur);
-    for (auto suc : func.getBasicBlock(cur).getSuccessors())
-      visit(suc);
-  };
-  visit(func.getFirstBBLabel());
+  std::function<void(std::size_t cur)> visit =
+      [&visit, &avoidable, node, &preds, &func, reverse](std::size_t cur) {
+        if (cur == node || avoidable.find(cur) != avoidable.end())
+          return;
+        avoidable.emplace(cur);
+        if (!reverse) {
+          for (auto suc : func.getBasicBlock(cur).getSuccessors())
+            visit(suc);
+        } else {
+          for (auto pred : preds.at(cur))
+            visit(pred);
+        }
+      };
+  if (!reverse)
+    visit(func.getFirstBBLabel());
+  else {
+    for (auto &bb : func.getBBs())
+      if (ir::dyc<ir::Ret>(bb.getInsts().back()))
+        visit(bb.getLabelID());
+  }
 
   std::unordered_set<std::size_t> res;
   for (const auto &bb : func.getBBs()) {
@@ -36,9 +50,29 @@ buildDominatingImpl(const ir::FunctionModule &func, std::size_t node) {
 
 } // namespace
 
+void DominatorTree::init(const ir::FunctionModule &func, bool reverse_) {
+  reverse = reverse_;
+  for (auto &bb : func.getBBs()) {
+    auto label = bb.getLabelID();
+    dominating[label] = dominators[label] = {};
+    immediateDominator[label] = (std::size_t)-1;
+    dominatorTree[label] = dominanceFrontier[label] = {};
+  }
+  buildDominating(func);
+  buildDominators();
+  buildImmediateDominator(func);
+  buildDominatorTree();
+  buildDominanceFrontier(func);
+}
+
 void DominatorTree::buildDominating(const ir::FunctionModule &func) {
-  for (const auto &bb : func.getBBs())
-    dominating[bb.getLabelID()] = buildDominatingImpl(func, bb.getLabelID());
+  for (const auto &bb : func.getBBs()) {
+    auto preds =
+        reverse ? buildBlockPredecessors(func)
+                : std::unordered_map<std::size_t, std::vector<std::size_t>>();
+    dominating[bb.getLabelID()] =
+        buildDominatingImpl(func, bb.getLabelID(), preds);
+  }
 }
 
 bool DominatorTree::isDominating(std::size_t u, std::size_t v) const {
@@ -62,7 +96,11 @@ void DominatorTree::buildImmediateDominator(const ir::FunctionModule &func) {
 
   for (const auto &bb : func.getBBs()) {
     auto node = bb.getLabelID();
-    if (node == func.getFirstBBLabel()) {
+    if (!reverse && node == func.getFirstBBLabel()) {
+      immediateDominator[node] = std::size_t(-1);
+      continue;
+    }
+    if (reverse && bb.getSuccessors().empty()) {
       immediateDominator[node] = std::size_t(-1);
       continue;
     }
@@ -97,12 +135,16 @@ void DominatorTree::buildDominatorTree() {
 }
 
 void DominatorTree::buildDominanceFrontier(const ir::FunctionModule &func) {
-  auto collectCFGEdge = [&func] {
+  auto collectCFGEdge = [&func, this] {
     std::vector<std::pair<std::size_t, std::size_t>> res;
     for (const auto &bb : func.getBBs()) {
       auto succ = bb.getSuccessors();
-      for (auto to : succ)
-        res.emplace_back(bb.getLabelID(), to);
+      for (auto to : succ) {
+        if (reverse)
+          res.emplace_back(to, bb.getLabelID());
+        else
+          res.emplace_back(bb.getLabelID(), to);
+      }
     }
     return res;
   };
@@ -111,25 +153,11 @@ void DominatorTree::buildDominanceFrontier(const ir::FunctionModule &func) {
   for (const auto &edge : edges) {
     auto a = edge.first, b = edge.second;
     auto x = a;
-    while (!isStrictlyDominating(x, b)) {
+    while (x != std::size_t(-1) && !isStrictlyDominating(x, b)) {
       dominanceFrontier[x].emplace(b);
       x = immediateDominator[x];
     }
   }
-}
-
-void DominatorTree::init(const ir::FunctionModule &func) {
-  for (auto &bb : func.getBBs()) {
-    auto label = bb.getLabelID();
-    dominating[label] = dominators[label] = {};
-    immediateDominator[label] = (std::size_t)-1;
-    dominatorTree[label] = dominanceFrontier[label] = {};
-  }
-  buildDominating(func);
-  buildDominators();
-  buildImmediateDominator(func);
-  buildDominatorTree();
-  buildDominanceFrontier(func);
 }
 
 } // namespace mocker
