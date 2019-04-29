@@ -50,6 +50,7 @@ set(SOURCES
   codegen/nasm_cfg.cpp
   codegen/register_allocation.cpp
 
+  ir_builder/build.cpp
   ir_builder/builder.cpp
   ir_builder/builder_context.cpp
   ir_builder/preprocessor.cpp

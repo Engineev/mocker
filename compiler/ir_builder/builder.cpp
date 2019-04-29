@@ -189,6 +189,10 @@ void Builder::operator()(const ast::FuncCallExpr &node) const {
   std::shared_ptr<Addr> dest =
       (bool)ctx.getExprType(node.getID()) ? ctx.makeTempLocalReg() : nullptr;
   std::string funcName = node.identifier->val;
+  if (funcName == "println" || funcName == "print") {
+    if (translatePrint(node))
+      return;
+  }
 
   std::vector<std::shared_ptr<Addr>> args;
   if (funcName.at(0) == '#') {
@@ -677,6 +681,7 @@ void Builder::addBuiltinAndExternal() const {
   add("getString", {});
   add("getInt", {});
   add("toString", {"i"});
+  add("_printInt", {"x"});
 
   // builtin functions of string
   add("#string#_ctor_", {"this"});
@@ -708,6 +713,11 @@ void Builder::addGlobalVariable(
   ctx.emplaceInst<Store>(reg, ctx.getExprAddr(decl->decl->initExpr->getID()));
   ctx.emplaceInst<Ret>();
   ctx.emplaceGlobalInitInst<Call>(funcName);
+}
+
+bool Builder::translatePrint(const ast::FuncCallExpr &print) const {
+  // TODO
+  return false;
 }
 
 std::shared_ptr<Reg>

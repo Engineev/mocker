@@ -3,62 +3,40 @@
 #include <stdlib.h>
 #include <string.h>
 
-void ___array____ctor_(void *ptr, int64_t sz, int64_t element_sz) {
-  char *inst_ptr = (char *)(ptr);
-  *(int64_t *)(inst_ptr) = sz;
-  void *addr = malloc((size_t)(sz * element_sz));
-  *(void **)(inst_ptr + 8) = addr;
-}
-
-uint64_t ___array___size(void *ptr) { return *((uint64_t *)ptr - 1); }
-
-uint64_t __string__length(void *ptr) { return *(uint64_t *)ptr; }
-
 void *__string__add(void *lhs, void *rhs) {
-  void *res_inst_ptr = malloc(16);
-
-  uint64_t lhs_len = __string__length(lhs);
-  uint64_t rhs_len = __string__length(rhs);
+  uint64_t lhs_len = *((int64_t *)lhs - 1);
+  uint64_t rhs_len = *((int64_t *)rhs - 1);
   uint64_t length = lhs_len + rhs_len;
-  *(uint64_t *)res_inst_ptr = length;
 
-  void *res_content_ptr = malloc((size_t)length);
-  *((void **)(res_inst_ptr) + 1) = (void *)res_content_ptr;
+  char *res_inst_ptr = (char *)malloc(length + 8);
+  *(int64_t *)res_inst_ptr = length;
+  res_inst_ptr += 8;
 
-  void *lhs_content_ptr = *(void **)((char *)lhs + 8);
-  void *rhs_content_ptr = *(void **)((char *)rhs + 8);
-  memcpy(res_content_ptr, lhs_content_ptr, (size_t)lhs_len);
-  memcpy((char *)res_content_ptr + lhs_len, rhs_content_ptr, (size_t)rhs_len);
+  memcpy(res_inst_ptr, lhs, (size_t)lhs_len);
+  memcpy((char *)res_inst_ptr + lhs_len, rhs, (size_t)rhs_len);
   return res_inst_ptr;
 }
 
 void *__string__substring(void *ptr, int64_t left, int64_t right) {
-  void *res_inst_ptr = malloc(16);
-
   int len = right - left;
+  char *res_inst_ptr = (char *)malloc(len + 8);
   *(int64_t *)(res_inst_ptr) = len;
+  res_inst_ptr += 8;
 
-  void *res_content_ptr = malloc((size_t)len);
-  char *res_content_ptr_ptr = (char *)res_inst_ptr + 8;
-  *(char **)res_content_ptr_ptr = (char *)res_content_ptr;
-
-  void *src_content_ptr_ptr = (char *)ptr + 8;
-  char *src_content_ptr = *(char **)(src_content_ptr_ptr) + left;
-  memcpy(res_content_ptr, src_content_ptr, (size_t)len);
+  char *src_content_ptr = (char *)ptr + left;
+  memcpy(res_inst_ptr, src_content_ptr, (size_t)len);
   return res_inst_ptr;
 }
 
 int64_t __string__ord(void *ptr, int64_t pos) {
-  return (int64_t) * (*(char **)((char *)ptr + 8) + pos);
+  return (int64_t) * ((char *)ptr + pos);
 }
 
 int64_t __string__parseInt(void *ptr) {
-  uint64_t len = *(int64_t *)(ptr);
-  char buffer[len + 1];
+  uint64_t len = *((int64_t *)ptr - 1);
+  char buffer[256];
   buffer[len] = 0;
-  void *content_ptr_ptr = (char *)ptr + 8;
-  char *content_ptr = *(char **)content_ptr_ptr;
-  memcpy(buffer, content_ptr, len);
+  memcpy(buffer, ptr, len);
   return strtol(buffer, NULL, 10);
 }
 
@@ -84,38 +62,33 @@ int getInt() {
 }
 
 void print(void *ptr) {
-  uint64_t length = *(uint64_t *)ptr;
-  char **content_ptr_ptr = (char **)ptr + 1;
-  char *content_ptr = *content_ptr_ptr;
-  printf("%.*s", (int)length, content_ptr);
+  uint64_t len = *((int64_t *)ptr - 1);
+  printf("%.*s", (int)len, (char *)ptr);
 }
 
+void _printInt(int x) { printf("%d", x); }
+
 void *getString() {
-  void *res_inst_ptr = malloc(16);
   char buffer[256];
   scanf("%256s", buffer);
 
   uint64_t len = strlen(buffer);
+  char *res_inst_ptr = (char *)malloc(8 + len);
   *(int64_t *)res_inst_ptr = len;
-
-  void *res_content_ptr = malloc(len);
-  *((char **)(res_inst_ptr) + 1) = (char *)res_content_ptr;
-  memcpy(res_content_ptr, buffer, len);
-
+  res_inst_ptr += 8;
+  memcpy(res_inst_ptr, buffer, len);
   return res_inst_ptr;
 }
 
 void *toString(int64_t val) {
   char buffer[64];
   sprintf(buffer, "%ld", val);
-
-  void *res_inst_ptr = malloc(16);
   int64_t len = strlen(buffer);
-  *(int64_t *)(res_inst_ptr) = len;
-  void *content_ptr = malloc(len);
-  *((char **)(res_inst_ptr) + 1) = (char *)content_ptr;
-  memcpy(content_ptr, buffer, len);
 
+  char *res_inst_ptr = (char *)malloc(8 + len);
+  *(int64_t *)(res_inst_ptr) = len;
+  res_inst_ptr += 8;
+  memcpy(res_inst_ptr, buffer, len);
   return res_inst_ptr;
 }
 

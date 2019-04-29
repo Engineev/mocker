@@ -1,6 +1,7 @@
 #include "builder_context.h"
 
 #include <cassert>
+#include <cstring>
 
 #include "ir/helper.h"
 
@@ -124,37 +125,27 @@ BuilderContext::addStringLiteral(const std::string &literal) {
     return iter->second;
 
   auto ident = "@_strlit_" + std::to_string(strLitCounter++);
-  auto contentIdent = ident + "c";
   addGlobalVar(ident);
-  addGlobalVar(contentIdent, literal);
+  auto instPtr = std::make_shared<Reg>(ident);
+
+  auto strInstIdent = ident + "c";
+  char buffer[8 + literal.size() + 1];
+  *(std::int64_t *)buffer = literal.size();
+  std::strcpy(buffer + 8, literal.c_str());
+  std::string data(buffer, buffer + 8 + literal.size());
+  addGlobalVar(strInstIdent, data);
 
   auto &func = module.getFuncs().at("_init_global_vars");
   auto &bb = func.getMutableBBs().back();
   assert(!bb.isCompleted());
-
-  // init
-  auto strInstPtrPtr = std::make_shared<Reg>(ident);
-  auto strInstPtr = func.makeTempLocalReg("strInstPtr");
-  bb.appendInst(
-      std::make_shared<Malloc>(strInstPtr, std::make_shared<IntLiteral>(16)));
-  bb.appendInst(std::make_shared<Store>(strInstPtrPtr, strInstPtr));
-
-  auto litLen = std::make_shared<IntLiteral>(literal.length());
-  bb.appendInst(std::make_shared<Store>(strInstPtr, litLen));
-  //  auto contentPtr = func.makeTempLocalReg("contentPtr");
-  //  bb.appendInst(std::make_shared<Malloc>(contentPtr, litLen));
-  auto contentPtrPtr = func.makeTempLocalReg("contentPtrPtr");
+  auto contentPtr = func.makeTempLocalReg();
   bb.appendInst(std::make_shared<ArithBinaryInst>(
-      contentPtrPtr, ArithBinaryInst::Add, strInstPtr,
+      contentPtr, ArithBinaryInst::Add, std::make_shared<Reg>(strInstIdent),
       std::make_shared<IntLiteral>(8)));
-  bb.appendInst(std::make_shared<Store>(contentPtrPtr,
-                                        std::make_shared<Reg>(contentIdent)));
-  //  bb.appendInst(std::make_shared<Call>("memcpy", contentPtr,
-  //  std::make_shared<Reg>(contentIdent),
-  //      std::make_shared<ir::IntLiteral>(literal.size())));
+  bb.appendInst(std::make_shared<Store>(instPtr, contentPtr));
 
-  strLits.emplace(literal, strInstPtrPtr);
-  return strInstPtrPtr;
+  strLits.emplace(literal, instPtr);
+  return instPtr;
 }
 
 void BuilderContext::addGlobalVar(std::string ident, std::string data) {

@@ -106,5 +106,13 @@ void Module::addGlobalVar(std::string identifier, std::string data) {
   globalVars.emplace_back(std::move(identifier), std::move(data));
 }
 
+FunctionModule &Module::overwriteFunc(const std::string ident,
+                                      const FunctionModule &func) {
+  auto p = funcs.emplace(std::move(ident), std::move(func));
+  if (!p.second)
+    p.first->second = func;
+  return p.first->second;
+}
+
 } // namespace ir
 } // namespace mocker

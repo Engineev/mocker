@@ -300,65 +300,49 @@ void Interpreter::initExternalFuncs() {
   });
 
   // #string#length ( this )
-  externalFuncs.emplace("#string#length",
-                        [](Args args) { return *(std::int64_t *)(args[0]); });
+  externalFuncs.emplace("#string#length", [](Args args) {
+    auto res = *((std::int64_t *)(args[0]) - 1);
+    return res;
+  });
   // #string#add ( lhs rhs )
   externalFuncs.emplace("#string#add", [this](Args args) {
-    auto resInstPtr = fastMalloc(16);
-
     auto lhsLen = externalFuncs["#string#length"]({args[0]});
     auto rhsLen = externalFuncs["#string#length"]({args[1]});
     std::int64_t length = lhsLen + rhsLen;
+
+    char *resInstPtr = (char *)fastMalloc(length + 8);
     *(std::int64_t *)resInstPtr = length;
+    resInstPtr += 8;
 
-    auto resContentPtr = fastMalloc((std::size_t)length);
-    *((void **)(resInstPtr) + 1) = (void *)resContentPtr;
-
-    auto lhsContentPtr = *(void **)((char *)args[0] + 8);
-    auto rhsContentPtr = *(void **)((char *)args[1] + 8);
-    std::memcpy(resContentPtr, lhsContentPtr, (std::size_t)lhsLen);
-    std::memcpy((char *)resContentPtr + lhsLen, rhsContentPtr,
+    std::memcpy(resInstPtr, (void *)args[0], (std::size_t)lhsLen);
+    std::memcpy((char *)resInstPtr + lhsLen, (void *)args[1],
                 (std::size_t)rhsLen);
     return (std::int64_t)resInstPtr;
   });
   // #string#substring ( this left right )
   externalFuncs.emplace("#string#substring", [this](Args args) {
-    //    assert(false);
-    //    return 0;
-    auto resInstPtr = fastMalloc(16);
-
     auto len = args[2] - args[1];
+    char *resInstPtr = (char *)fastMalloc(len + 8);
     *(std::int64_t *)(resInstPtr) = len;
+    resInstPtr += 8;
 
-    auto resContentPtr = fastMalloc((std::size_t)len);
-    auto resContentPtrPtr = (char *)resInstPtr + 8;
-    *(char **)resContentPtrPtr = (char *)resContentPtr;
-
-    auto srcContentPtrPtr = (char *)args[0] + 8;
-    auto srcContentPtr = *(char **)(srcContentPtrPtr) + args[1];
-    std::memcpy(resContentPtr, srcContentPtr, (std::size_t)len);
+    auto srcContentPtr = (char *)args[0] + args[1];
+    std::memcpy(resInstPtr, srcContentPtr, (std::size_t)len);
     return (std::int64_t)resInstPtr;
   });
   // #string#ord ( this pos )
   externalFuncs.emplace("#string#ord", [](Args args) {
-    return (std::int64_t) * (*(char **)((char *)args[0] + 8) + args[1]);
-    //    auto contentPtrPtr = (char *)args[0] + 8;
-    //    auto contentPtr = *(char**)(contentPtrPtr);
-    //    return (std::int64_t)*(contentPtr + args[1]);
+    return (std::int64_t) * ((char *)args[0] + args[1]);
   });
   // #string#parseInt ( this )
   externalFuncs.emplace("#string#parseInt", [](Args args) {
-    auto len = *(std::int64_t *)(args[0]);
-    auto contentPtrPtr = (char *)args[0] + 8;
-    auto contentPtr = *(char **)contentPtrPtr;
-    std::string str{contentPtr, contentPtr + len};
+    auto len = *((std::int64_t *)args[0] - 1);
+    std::string str{(char *)args[0], (char *)args[0] + len};
     return std::stoll(str);
   });
   // #string#_ctor_ ( this )
-  externalFuncs.emplace("#string#_ctor_", [](Args args) {
-    *(std::int64_t *)args[0] = 0;
-    return 0;
-  });
+  externalFuncs.emplace("#string#_ctor_",
+                        [](Args args) -> std::int64_t { assert(false); });
 
   // getInt (  )
   externalFuncs.emplace("getInt", [](Args args) {
@@ -369,9 +353,7 @@ void Interpreter::initExternalFuncs() {
   // print ( str )
   externalFuncs.emplace("print", [this](Args args) {
     auto len = externalFuncs["#string#length"]({args[0]});
-    auto contentPtrPtr = (char **)args[0] + 1;
-    char *contentPtr = *contentPtrPtr;
-    auto str = std::string{contentPtr, contentPtr + len};
+    auto str = std::string{(char *)args[0], (char *)args[0] + len};
     std::cout << str;
     return 0;
   });
@@ -381,37 +363,30 @@ void Interpreter::initExternalFuncs() {
     std::cout << std::endl;
     return 0;
   });
+  // _printInt ( x )
+  externalFuncs.emplace("_printInt", [this](Args args) {
+    std::cout << args[0];
+    return 0;
+  });
   // getString (  )
   externalFuncs.emplace("getString", [this](Args args) {
-    //    assert(false);
-    //    return 0;
-    auto resInstPtr = fastMalloc(16);
-
     std::string str;
     std::cin >> str;
 
+    auto resInstPtr = (char *)fastMalloc(8 + str.length());
     *(std::int64_t *)resInstPtr = (std::int64_t)str.length();
-
-    auto resContentPtr = fastMalloc(str.length());
-    *((char **)(resInstPtr) + 1) = (char *)resContentPtr;
-    std::memcpy(resContentPtr, str.c_str(), str.length());
-
+    resInstPtr += 8;
+    std::memcpy(resInstPtr, str.c_str(), str.length());
     return (std::int64_t)resInstPtr;
   });
   // toString ( i )
   externalFuncs.emplace("toString", [this](Args args) {
-    //    assert(false);
-    //    return 0;
     auto str = std::to_string(args[0]);
 
-    auto resInstPtr = fastMalloc(16);
-
+    auto resInstPtr = (char *)fastMalloc(8 + str.length());
     *(std::int64_t *)resInstPtr = (std::int64_t)str.length();
-
-    auto resContentPtr = fastMalloc(str.length());
-    *((char **)(resInstPtr) + 1) = (char *)resContentPtr;
-    std::memcpy(resContentPtr, str.c_str(), str.length());
-
+    resInstPtr += 8;
+    std::memcpy(resInstPtr, str.c_str(), str.length());
     return (std::int64_t)resInstPtr;
   });
 

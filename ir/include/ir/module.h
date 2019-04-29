@@ -127,6 +127,9 @@ public:
 
   FunctionModule &addFunc(std::string ident, FunctionModule func);
 
+  FunctionModule &overwriteFunc(const std::string ident,
+                                const FunctionModule &func);
+
   void addGlobalVar(std::string identifier, std::string data);
 
 private:
