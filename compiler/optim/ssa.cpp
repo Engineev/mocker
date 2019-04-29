@@ -7,179 +7,22 @@
 
 #include "helper.h"
 #include "ir/helper.h"
-
 #include "ir/printer.h"
+#include "set_operation.h"
 
 namespace mocker {
 
 SSAConstruction::SSAConstruction(ir::FunctionModule &func) : FuncPass(func) {}
 
 bool SSAConstruction::operator()() {
-  computeAuxiliaryInfo();
+  dominatorTree.init(func);
   insertPhiFunctions();
   renameVariables();
   return false;
 }
 
-void SSAConstruction::computeAuxiliaryInfo() {
-  buildDominating();
-  buildDominators();
-  buildImmediateDominator();
-  buildDominatorTree();
-  buildDominatingFrontier();
-
-  //  printAuxiliaryInfo();
-}
-
-void SSAConstruction::printAuxiliaryInfo() {
-  std::cerr << "ImmediateDominator:\n";
-  for (auto &kv : bbInfo) {
-    if (kv.first == func.getFirstBB()->getLabelID())
-      continue;
-    std::cerr << "idom(" << kv.first << ") = " << kv.second.immediateDominator
-              << std::endl;
-  }
-
-  std::cerr << "children in the dominator tree:\n";
-  std::function<void(const std::shared_ptr<DTNode> &)> printDTChildren =
-      [&](const std::shared_ptr<DTNode> &cur) {
-        std::cerr << cur->content.get().getLabelID() << ": ";
-        for (auto &child : cur->children)
-          std::cerr << child->content.get().getLabelID() << ", ";
-        std::cerr << std::endl;
-        for (auto &child : cur->children)
-          printDTChildren(child);
-      };
-  printDTChildren(root);
-}
-
-void SSAConstruction::buildDominating() {
-  for (const auto &bb : func.getBBs())
-    buildDominatingImpl(bb.getLabelID());
-}
-
-void SSAConstruction::buildDominatingImpl(std::size_t node) {
-  // Construct the set [avoidable] of nodes which are reachable from the entry
-  // without passing [node]. The nodes dominated by [node] are just the nodes
-  // which are not in [avoidable].
-  LabelSet avoidable;
-  std::function<void(std::size_t cur)> visit = [&visit, &avoidable, node,
-                                                this](std::size_t cur) {
-    if (cur == node || avoidable.find(cur) != avoidable.end())
-      return;
-    avoidable.emplace(cur);
-    for (auto suc : func.getBasicBlock(cur).getSuccessors())
-      visit(suc);
-  };
-  visit(func.getFirstBB()->getLabelID());
-
-  auto &dominating = bbInfo[node].dominating;
-  for (const auto &bb : func.getBBs()) {
-    if (!isIn(bb.getLabelID(), avoidable))
-      dominating.emplace(bb.getLabelID());
-  }
-}
-
-bool SSAConstruction::isDominating(std::size_t u, std::size_t v) const {
-  const auto &d = bbInfo.at(u).dominating;
-  return d.find(v) != d.end();
-}
-
-bool SSAConstruction::isStrictlyDominating(std::size_t u, std::size_t v) const {
-  return u != v && isDominating(u, v);
-}
-
-void SSAConstruction::buildDominators() {
-  for (const auto &infoPair : bbInfo) {
-    auto u = infoPair.first;
-    const auto &info = infoPair.second;
-    for (auto dominatedByU : info.dominating)
-      bbInfo[dominatedByU].dominators.emplace(u);
-  }
-}
-
-void SSAConstruction::buildImmediateDominator() {
-  // For a faster algorithm, see [Lengauer, Tarjan, 1979]
-
-  for (const auto &bb : func.getBBs())
-    if (bb.getLabelID() != func.getFirstBB()->getLabelID())
-      buildImmediateDominatorImpl(bb.getLabelID());
-}
-
-void SSAConstruction::buildImmediateDominatorImpl(std::size_t node) {
-  auto &info = bbInfo.at(node);
-
-  for (auto dominator : info.dominators) {
-    if (dominator == node) // is not strict
-      continue;
-    bool flag = true;
-    for (auto otherDominator : info.dominators) {
-      if (otherDominator == node)
-        continue;
-      if (isStrictlyDominating(dominator, otherDominator)) {
-        flag = false;
-        break;
-      }
-    }
-    if (flag) {
-      info.immediateDominator = dominator;
-      return;
-    }
-  }
-  assert(false); // The immediate dominator of a node must exist.
-}
-
-void SSAConstruction::buildDominatorTree() {
-  LabelMap<std::shared_ptr<DTNode>> nodePool;
-  for (auto &bb : func.getMutableBBs())
-    nodePool.emplace(bb.getLabelID(), std::make_shared<DTNode>(bb));
-  root = nodePool.at(func.getFirstBB()->getLabelID());
-  for (auto &infoPair : bbInfo) {
-    auto child = infoPair.first;
-    if (child == func.getFirstBB()->getLabelID())
-      continue;
-    auto pnt = infoPair.second.immediateDominator;
-    nodePool.at(pnt)->children.emplace_back(nodePool.at(child));
-  }
-
-  // check
-  //    LabelSet visited;
-  //    std::function<void(const std::shared_ptr<DTNode> &)> visit =
-  //        [&visit, &visited](const std::shared_ptr<DTNode> & cur) {
-  //      auto label = cur->content.get().getLabelID();
-  //      if (visited.find(label) != visited.end())
-  //        std::terminate();
-  //      visited.emplace(label);
-  //      for (const auto & child : cur->children)
-  //        visit(child);
-  //    };
-  //    visit(root);
-}
-
-void SSAConstruction::buildDominatingFrontier() {
-  auto collectCFGEdge = [this] {
-    std::vector<std::pair<std::size_t, std::size_t>> res;
-    for (const auto &bb : func.getBBs()) {
-      auto succ = bb.getSuccessors();
-      for (auto to : succ)
-        res.emplace_back(bb.getLabelID(), to);
-    }
-    return res;
-  };
-
-  auto edges = collectCFGEdge();
-  for (const auto &edge : edges) {
-    auto a = edge.first, b = edge.second;
-    auto x = a;
-    while (!isStrictlyDominating(x, b)) {
-      auto &info = bbInfo.at(x);
-      info.dominanceFrontier.emplace_back(b);
-      x = info.immediateDominator;
-    }
-  }
-}
-
 void SSAConstruction::insertPhiFunctions() {
+  // collect varNames
   const auto &firstBB = *func.getFirstBB();
   for (const auto &inst : firstBB.getInsts()) {
     if (auto p = ir::dyc<ir::Alloca>(inst)) {
@@ -205,9 +48,9 @@ void SSAConstruction::insertPhiFunctions(const std::string &varName) {
   while (!remaining.empty()) {
     auto def = remaining.front();
     remaining.pop();
-    const auto &frontier = bbInfo.at(def.blockLabel).dominanceFrontier;
+    const auto &frontier = dominatorTree.getDominanceFrontier(def.blockLabel);
     for (const auto &frontierBB : frontier) {
-      if (isIn(frontierBB, added))
+      if (isIn(added, frontierBB))
         continue;
 
       auto dest = func.makeTempLocalReg(varName);
@@ -219,7 +62,7 @@ void SSAConstruction::insertPhiFunctions(const std::string &varName) {
       bbInst.appendInstFront(phi);
 
       added.emplace(frontierBB);
-      if (!isIn(frontierBB, originalDefs))
+      if (!isIn(originalDefs, frontierBB))
         remaining.emplace(frontierBB, dest);
     }
   }
@@ -255,12 +98,11 @@ void SSAConstruction::renameVariables() {
     reachingDef[name] = ".phi_nan";
   bbDefined[".phi_nan"] = func.getFirstBB()->getLabelID();
 
-  renameVariablesImpl(root);
+  renameVariablesImpl(func.getFirstBBLabel());
 }
 
-void SSAConstruction::renameVariablesImpl(
-    const std::shared_ptr<SSAConstruction::DTNode> &curNode) {
-  auto &bb = curNode->content.get();
+void SSAConstruction::renameVariablesImpl(std::size_t curNode) {
+  auto &bb = func.getMutableBasicBlock(curNode);
 
   for (auto &inst : bb.getMutableInsts()) {
     if (auto p = ir::dyc<ir::Phi>(inst)) {
@@ -279,7 +121,7 @@ void SSAConstruction::renameVariablesImpl(
       auto var = ir::dycLocalReg(p->getAddr());
       if (!var) // is a global variable
         continue;
-      if (!isIn(var->getIdentifier(), varNames))
+      if (!isIn(varNames, var->getIdentifier()))
         continue;
       // I think that the corresponding line in the SSA book is wrong.
       updateReachingDef(var->getIdentifier(), bb.getLabelID());
@@ -326,7 +168,7 @@ void SSAConstruction::renameVariablesImpl(
     }
   }
 
-  for (const auto &child : curNode->children)
+  for (const auto &child : dominatorTree.getChildren(curNode))
     renameVariablesImpl(child);
 }
 
@@ -336,7 +178,7 @@ void SSAConstruction::updateReachingDef(const std::string &varName,
     return;
 
   auto r = reachingDef.at(varName);
-  while (!isDominating(bbDefined.at(r), label))
+  while (!dominatorTree.isDominating(bbDefined.at(r), label))
     r = reachingDef.at(r);
   reachingDef.at(varName) = r;
 }

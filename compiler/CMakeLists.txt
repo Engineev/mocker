@@ -20,6 +20,7 @@ set(HEADERS
   ir_builder/builder_context.h
   ir_builder/preprocessor.h
 
+  optim/analysis/dominance.h
   optim/analysis/func_global_var.h
   optim/constant_propagation.h
   optim/copy_propagation.h
@@ -55,6 +56,7 @@ set(SOURCES
   ir_builder/builder_context.cpp
   ir_builder/preprocessor.cpp
 
+  optim/analysis/dominance.cpp
   optim/analysis/func_global_var.cpp
   optim/constant_propagation.cpp
   optim/copy_propagation.cpp

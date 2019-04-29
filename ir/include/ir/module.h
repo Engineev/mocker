@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "ir_inst.h"
@@ -14,6 +15,8 @@ namespace ir {
 
 using InstList = std::list<std::shared_ptr<IRInst>>;
 using InstListIter = typename InstList::const_iterator;
+template <class T> using LabelMap = std::unordered_map<std::size_t, T>;
+using LabelSet = std::unordered_set<std::size_t>;
 
 class FunctionModule;
 
@@ -83,6 +86,8 @@ public:
   BasicBlock &getMutableBasicBlock(std::size_t labelID);
 
   BBLIter getFirstBB() { return bbs.begin(); }
+
+  std::size_t getFirstBBLabel() const { return bbs.front().getLabelID(); }
 
   std::vector<std::size_t> getPredcessors(std::size_t bb) const;
 

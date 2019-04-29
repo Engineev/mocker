@@ -22,6 +22,10 @@ template <class Set, class T> void intersectSet(Set &s, const T &xs) {
   s = intersectSets(s, xs);
 }
 
+template <class Set, class T> bool isIn(const Set &s, const T &x) {
+  return s.find(x) != s.end();
+}
+
 } // namespace mocker
 
 #endif // MOCKER_SET_OPERATION_H
