@@ -57,61 +57,61 @@ public:
       return std::make_shared<nasm::NumericConstant>(p->getVal());
     }
     if (auto p = ir::dycLocalReg(addr)) {
-      auto iter = irReg2VReg.find(p->getIdentifier());
-      if (iter != irReg2VReg.end())
+      auto iter = irRegAddr.find(p->getIdentifier());
+      if (iter != irRegAddr.end())
         return iter->second;
-      return newVirtualRegFor(p->getIdentifier());
+      return newVirtualRegFor(p);
     }
     if (auto p = ir::dycGlobalReg(addr)) {
-      return std::make_shared<nasm::LabelAddr>("L" + p->getIdentifier());
+      return irRegAddr.at(p->getIdentifier());
     }
     assert(false);
   }
 
-  void setPRegBak(const std::shared_ptr<nasm::Register> &pReg,
-                  const std::shared_ptr<nasm::Register> &vReg) {
-    pRegBak[pReg] = vReg;
+  void setIrRegAddr(const std::shared_ptr<ir::Reg> &irReg,
+                    const std::shared_ptr<nasm::Register> &vReg) {
+    irRegAddr[irReg->getIdentifier()] = vReg;
   }
 
-  const std::shared_ptr<nasm::Register>
-  getPRegBak(const std::shared_ptr<nasm::Register> &reg) const {
-    return pRegBak.at(reg);
+  const std::shared_ptr<nasm::Register> &
+  getIrRegAddr(const std::shared_ptr<ir::Reg> &irReg) const {
+    return irRegAddr.at(irReg->getIdentifier());
+  }
+
+  void setPRegAddr(const std::shared_ptr<nasm::Register> &pReg,
+                   const std::shared_ptr<nasm::Register> &vReg) {
+    pRegAddr[pReg] = vReg;
+  }
+
+  const std::shared_ptr<nasm::Register> &
+  getPRegAddr(const std::shared_ptr<nasm::Register> &reg) const {
+    return pRegAddr.at(reg);
   }
 
 private:
-  std::shared_ptr<nasm::Register> newVirtualRegFor(const std::string &ident) {
+  std::shared_ptr<nasm::Register>
+  newVirtualRegFor(const std::shared_ptr<ir::Reg> &reg) {
     auto res = newVirtualReg();
-    irReg2VReg[ident] = res;
+    irRegAddr[reg->getIdentifier()] = res;
     return res;
   }
 
 private:
   std::size_t vRegCnt = 0;
   std::unordered_map<std::string, std::shared_ptr<nasm::Register>> stackVar2Reg;
-  std::unordered_map<std::string, std::shared_ptr<nasm::Register>> irReg2VReg;
-  nasm::RegMap<std::shared_ptr<nasm::Register>> pRegBak;
 
-  //  nasm::Section & text;
+  nasm::RegMap<std::shared_ptr<nasm::Register>> pRegAddr;
+  std::unordered_map<std::string, std::shared_ptr<nasm::Register>> irRegAddr;
 };
 
 void genStore(nasm::Section &text, Context &ctx,
               const std::shared_ptr<ir::Store> &p) {
   auto val = ctx.getAddr(p->getVal());
-  if (auto gReg = ir::dycGlobalReg(p->getVal())) {
-    val = ctx.newVirtualReg();
-    text.emplaceInst<nasm::Lea>(nasm::dyc<nasm::Register>(val),
-                                ctx.getAddr(p->getVal()));
-  }
-
   auto irAddr = ir::dyc<ir::Reg>(p->getAddr());
   assert(irAddr);
   if (ctx.isStackVar(irAddr->getIdentifier())) {
     auto addr = ctx.getStackVarReg(irAddr->getIdentifier());
     text.emplaceInst<nasm::Mov>(addr, val);
-    return;
-  }
-  if (ir::dycGlobalReg(irAddr)) {
-    text.emplaceInst<nasm::Mov>(ctx.getAddr(irAddr), val);
     return;
   }
   text.emplaceInst<nasm::Mov>(
@@ -126,10 +126,6 @@ void genLoad(nasm::Section &text, Context &ctx,
   if (ctx.isStackVar(irAddr->getIdentifier())) {
     auto val = ctx.getStackVarReg(irAddr->getIdentifier());
     text.emplaceInst<nasm::Mov>(dest, val);
-    return;
-  }
-  if (ir::dycGlobalReg(irAddr)) {
-    text.emplaceInst<nasm::Mov>(dest, ctx.getAddr(irAddr));
     return;
   }
   text.emplaceInst<nasm::Mov>(
@@ -289,7 +285,7 @@ void genInstruction(nasm::Section &text, Context &ctx,
       text.emplaceInst<nasm::Mov>(nasm::rax(), val);
     }
     for (auto &reg : CalleeSave) {
-      text.emplaceInst<nasm::Mov>(reg, ctx.getPRegBak(reg));
+      text.emplaceInst<nasm::Mov>(reg, ctx.getPRegAddr(reg));
     }
     text.emplaceInst<nasm::Leave>();
     text.emplaceInst<nasm::Ret>();
@@ -334,7 +330,7 @@ void genFunction(nasm::Section &text, Context &ctx,
   for (auto &reg : CalleeSave) {
     auto bak = ctx.newVirtualReg();
     text.emplaceInst<nasm::Mov>(bak, reg);
-    ctx.setPRegBak(reg, bak);
+    ctx.setPRegAddr(reg, bak);
   }
 
   static const std::vector<std::shared_ptr<nasm::Register>> ParamRegs = {
@@ -348,6 +344,25 @@ void genFunction(nasm::Section &text, Context &ctx,
     auto dest = ctx.getAddr(std::make_shared<ir::Reg>(std::to_string(i)));
     text.emplaceInst<nasm::Mov>(
         dest, std::make_shared<nasm::MemoryAddr>(nasm::rbp(), (i - 4) * 8));
+  }
+
+  std::vector<std::shared_ptr<ir::Reg>> globalVars;
+  for (auto &bb : func.getBBs()) {
+    for (auto &inst : bb.getInsts()) {
+      auto operands = ir::getOperandsUsed(inst);
+      for (auto &operand : operands) {
+        auto reg = ir::dycGlobalReg(operand);
+        if (reg)
+          globalVars.emplace_back(reg);
+      }
+    }
+  }
+  for (auto &reg : globalVars) {
+    auto labelAddr =
+        std::make_shared<nasm::LabelAddr>("L" + reg->getIdentifier());
+    auto addrReg = ctx.newVirtualReg();
+    text.emplaceInst<nasm::Lea>(addrReg, labelAddr);
+    ctx.setIrRegAddr(reg, addrReg);
   }
 
   for (auto &bb : func.getBBs())
