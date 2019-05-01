@@ -18,6 +18,11 @@ const std::vector<std::shared_ptr<nasm::Register>> CalleeSave = {
     nasm::rbp(), nasm::rbx(), nasm::r12(),
     nasm::r13(), nasm::r14(), nasm::r15()};
 
+std::shared_ptr<nasm::LabelAddr>
+makeLabelAddr(const std::shared_ptr<ir::Reg> &reg) {
+  return std::make_shared<nasm::LabelAddr>("L" + reg->getIdentifier());
+}
+
 // replace "#" with "__"
 std::string renameIdentifier(const std::string &ident) {
   std::string res;
@@ -114,6 +119,11 @@ void genStore(nasm::Section &text, Context &ctx,
     text.emplaceInst<nasm::Mov>(addr, val);
     return;
   }
+  if (auto global = ir::dycGlobalReg(irAddr)) {
+    text.emplaceInst<nasm::Mov>(makeLabelAddr(global), val);
+    return;
+  }
+
   text.emplaceInst<nasm::Mov>(
       std::make_shared<nasm::MemoryAddr>(ctx.getAddr(irAddr)), val);
 }
@@ -128,6 +138,11 @@ void genLoad(nasm::Section &text, Context &ctx,
     text.emplaceInst<nasm::Mov>(dest, val);
     return;
   }
+  if (auto global = ir::dycGlobalReg(p->getAddr())) {
+    text.emplaceInst<nasm::Mov>(dest, makeLabelAddr(global));
+    return;
+  }
+
   text.emplaceInst<nasm::Mov>(
       dest, std::make_shared<nasm::MemoryAddr>(ctx.getAddr(irAddr)));
 }
@@ -312,7 +327,6 @@ void genInstruction(nasm::Section &text, Context &ctx,
       text.emplaceInst<nasm::UnaryInst>(nasm::UnaryInst::Not, dest);
     return;
   }
-  std::cerr << typeid(*inst).name() << std::endl;
   assert(false);
 }
 

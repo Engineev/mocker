@@ -20,6 +20,7 @@
 #include "optim/copy_propagation.h"
 #include "optim/dead_code_elimination.h"
 #include "optim/function_inline.h"
+#include "optim/global_const_inline.h"
 #include "optim/global_value_numbering.h"
 #include "optim/local_value_numbering.h"
 #include "optim/module_simplification.h"
@@ -31,7 +32,6 @@
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
 #include "semantic/sym_tbl.h"
-#include "optim/global_const_inline.h"
 
 mocker::ir::Module runFrontend(const std::string &srcPath);
 
@@ -132,7 +132,6 @@ void optimize(mocker::ir::Module &module) {
 
   std::cerr << "\nBefore SSA destruction:\n";
   printIRStats(stats);
-
   runOptPasses<SSADestruction>(module);
   assert(stats.countInsts<ir::Phi>() == 0);
 

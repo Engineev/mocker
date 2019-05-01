@@ -130,6 +130,10 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
       return "neg " + fmtAddr(p->getReg());
     if (p->getOp() == UnaryInst::Not)
       return "not " + fmtAddr(p->getReg());
+    if (p->getOp() == UnaryInst::Inc)
+      return "inc " + fmtAddr(p->getReg());
+    if (p->getOp() == UnaryInst::Dec)
+      return "dec " + fmtAddr(p->getReg());
     assert(false);
   }
   if (auto p = dyc<Cqo>(inst)) {

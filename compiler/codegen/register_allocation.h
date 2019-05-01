@@ -221,6 +221,8 @@ private:
 
   InterferenceGraph interG;
   MoveInfo moveInfo;
+
+  RegSet spilledLastTime;
 };
 
 } // namespace detail

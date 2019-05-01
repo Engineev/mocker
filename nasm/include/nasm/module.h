@@ -64,6 +64,8 @@ public:
 
   const std::list<Line> &getLines() const { return lines; }
 
+  std::list<Line> &getLines() { return lines; }
+
 private:
   std::string name;
   std::list<Line> lines;

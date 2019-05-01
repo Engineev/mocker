@@ -347,9 +347,21 @@ bool InterferenceGraph::freezeNode() {
 bool InterferenceGraph::spill() {
   if (highDegree.empty())
     return false;
-  auto m = *highDegree.begin();
-  //  std::cerr << "spill: " << m->getIdentifier() << std::endl;
-  highDegree.erase(highDegree.begin());
+
+  auto resIter = highDegree.begin();
+  std::size_t maxDeg = 0;
+  for (auto iter = highDegree.begin(), end = highDegree.end(); iter != end;
+       ++iter) {
+    auto n = *iter;
+    if (curDegree.at(n) > maxDeg) {
+      resIter = iter;
+      maxDeg = curDegree.at(n);
+    }
+  }
+
+  // resIter = highDegree.begin();
+  auto m = *resIter;
+  highDegree.erase(resIter);
   simplifiable.emplace(m);
   freezeMoves(m);
   return true;
@@ -493,6 +505,11 @@ void RegisterAllocator::allocate() {
       color(coloring);
       break;
     }
+    spilledLastTime = RegSet(toBeSpilled.begin(), toBeSpilled.end());
+    std::cerr << "\nto be spilled: ";
+    for (auto &reg : toBeSpilled)
+      std::cerr << reg->getIdentifier() << ", ";
+    std::cerr << std::endl;
     rewriteProgram(toBeSpilled);
   }
 }
