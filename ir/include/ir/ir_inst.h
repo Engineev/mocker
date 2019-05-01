@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -54,6 +55,8 @@ struct RegPtrEqual {
 template <class T>
 using RegMap =
     std::unordered_map<std::shared_ptr<ir::Reg>, T, RegPtrHash, RegPtrEqual>;
+using RegSet =
+    std::unordered_set<std::shared_ptr<ir::Reg>, RegPtrHash, RegPtrEqual>;
 
 class Label : public Addr {
 public:

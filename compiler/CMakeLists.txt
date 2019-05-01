@@ -27,6 +27,7 @@ set(HEADERS
   optim/copy_propagation.h
   optim/dead_code_elimination.h
   optim/function_inline.h
+  optim/global_const_inline.h
   optim/global_value_numbering.h
   optim/helper.h
   optim/local_value_numbering.h
@@ -65,6 +66,7 @@ set(SOURCES
   optim/copy_propagation.cpp
   optim/dead_code_elimination.cpp
   optim/function_inline.cpp
+  optim/global_constant_inline.cpp
   optim/global_value_numbering.cpp
   optim/helper.cpp
   optim/local_value_numbering.cpp

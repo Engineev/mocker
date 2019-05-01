@@ -31,6 +31,7 @@
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
 #include "semantic/sym_tbl.h"
+#include "optim/global_const_inline.h"
 
 mocker::ir::Module runFrontend(const std::string &srcPath);
 
@@ -56,8 +57,6 @@ int main(int argc, char **argv) {
     std::string irPath = argv[2];
     std::ofstream dumpIR(irPath);
     mocker::ir::printModule(irModule, dumpIR);
-  } else {
-    //    mocker::ir::printModule(irModule);
   }
 
   auto nasmModule = codegen(irModule);
@@ -107,6 +106,7 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
+  runOptPasses<GlobalConstantInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
