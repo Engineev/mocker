@@ -1,5 +1,5 @@
-#ifndef MOCKER_VALUE_NUMBERING_H
-#define MOCKER_VALUE_NUMBERING_H
+#ifndef MOCKER_LOCAL_VALUE_NUMBERING_H
+#define MOCKER_LOCAL_VALUE_NUMBERING_H
 
 #include "opt_pass.h"
 
@@ -30,4 +30,4 @@ private:
 
 } // namespace mocker
 
-#endif // MOCKER_VALUE_NUMBERING_H
+#endif //MOCKER_LOCAL_VALUE_NUMBERING_H

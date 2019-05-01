@@ -284,7 +284,7 @@ bool InterferenceGraph::isCoalesceAbleToAMachineReg(const Node &v,
   for (auto &t : originalAdjList.at(v)) {
     // Note that since most nodes removed are of degree < K, we may omit the
     // isIn(removed, t) here to speed up the process.
-    if (isIn(coalesced, t))
+    if (isIn(coalesced, t) || isIn(removed, t))
       continue;
     if (curDegree.at(t) < K)
       continue;

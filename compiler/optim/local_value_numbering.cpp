@@ -1,4 +1,4 @@
-#include "value_numbering.h"
+#include "local_value_numbering.h"
 
 #include <algorithm>
 #include <cassert>

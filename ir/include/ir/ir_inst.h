@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -36,6 +37,23 @@ public:
 private:
   std::string identifier;
 };
+
+struct RegPtrHash {
+  std::size_t operator()(const std::shared_ptr<ir::Reg> &reg) const {
+    return std::hash<std::string>{}(reg->getIdentifier());
+  }
+};
+
+struct RegPtrEqual {
+  bool operator()(const std::shared_ptr<ir::Reg> &lhs,
+                  const std::shared_ptr<ir::Reg> &rhs) const {
+    return lhs->getIdentifier() == rhs->getIdentifier();
+  }
+};
+
+template <class T>
+using RegMap =
+    std::unordered_map<std::shared_ptr<ir::Reg>, T, RegPtrHash, RegPtrEqual>;
 
 class Label : public Addr {
 public:

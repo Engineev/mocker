@@ -26,14 +26,15 @@ set(HEADERS
   optim/copy_propagation.h
   optim/dead_code_elimination.h
   optim/function_inline.h
+  optim/global_value_numbering.h
   optim/helper.h
+  optim/local_value_numbering.h
   optim/module_simplification.h
   optim/opt_pass.h
   optim/optimizer.h
   optim/promote_global_variables.h
   optim/simplify_cfg.h
   optim/ssa.h
-  optim/value_numbering.h
 
   parse/lexer.h
   parse/parser.h
@@ -62,12 +63,13 @@ set(SOURCES
   optim/copy_propagation.cpp
   optim/dead_code_elimination.cpp
   optim/function_inline.cpp
+  optim/global_value_numbering.cpp
   optim/helper.cpp
+  optim/local_value_numbering.cpp
   optim/module_simplification.cpp
   optim/promote_global_variables.cpp
   optim/simplify_cfg.cpp
   optim/ssa.cpp
-  optim/value_numbering.cpp
 
   parse/lexer.cpp
   parse/parser.cpp

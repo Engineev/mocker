@@ -20,10 +20,11 @@
 #include "optim/function_inline.h"
 #include "optim/module_simplification.h"
 #include "optim/optimizer.h"
+#include "optim/global_value_numbering.h"
 #include "optim/promote_global_variables.h"
 #include "optim/simplify_cfg.h"
 #include "optim/ssa.h"
-#include "optim/value_numbering.h"
+#include "optim/local_value_numbering.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
@@ -92,6 +93,9 @@ mocker::ir::Module runFrontend(const std::string &srcPath) {
 }
 
 void optimize(mocker::ir::Module &module) {
+  // ATTENTION!
+  // *
+
   using namespace mocker;
 
   mocker::ir::Stats stats(module);
@@ -108,7 +112,11 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
-  runOptsUntilFixedPoint(module);
+//  runOptsUntilFixedPoint(module);
+  runOptPasses<RewriteBranches>(module);
+  runOptPasses<SimplifyPhiFunctions>(module);
+  runOptPasses<MergeBlocks>(module);
+  runOptPasses<RemoveUnreachableBlocks>(module);
 
   std::cerr << "\nAfter pre-SSA optimization:\n";
   printIRStats(stats);
@@ -159,7 +167,14 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable = false;
     // std::cerr << "\n=======\n";
     // std::cerr << optimizable;
-    optimizable |= runOptPasses<LocalValueNumbering>(module);
+
+    optimizable |= runOptPasses<RewriteBranches>(module);
+    optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
+    optimizable |= runOptPasses<MergeBlocks>(module);
+    optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
+    optimizable |= runOptPasses<GlobalValueNumbering>(module);
+//    optimizable |= runOptPasses<LocalValueNumbering>(module);
+
     // std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
     // std::cerr << optimizable;
@@ -178,10 +193,8 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     // std::cerr << optimizable;
     optimizable |= runOptPasses<RemoveTrivialBlocks>(module);
     // std::cerr << optimizable;
-    // ir::printModule(module, std::cerr);
     optimizable |= runOptPasses<DeadCodeElimination>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-    // ir::printModule(module, std::cerr);
     // std::cerr << optimizable;
     ir::verifyModule(module);
   }
