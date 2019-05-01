@@ -109,7 +109,7 @@ void optimize(mocker::ir::Module &module) {
   runOptPasses<GlobalConstantInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
-  runOptPasses<FunctionInline>(module);
+  // runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
   runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);

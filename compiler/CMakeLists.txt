@@ -21,6 +21,7 @@ set(HEADERS
   ir_builder/builder_context.h
   ir_builder/preprocessor.h
 
+  optim/analysis/defuse.h
   optim/analysis/dominance.h
   optim/analysis/func_global_var.h
   optim/constant_propagation.h

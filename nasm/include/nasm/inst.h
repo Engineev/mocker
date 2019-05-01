@@ -181,7 +181,7 @@ private:
 class CJump : public Inst {
 public:
   enum OpType {
-    Ez,
+    Ez, Ne, Lt, Le, Gt, Ge
   };
 
   CJump(OpType op, std::shared_ptr<Label> label)

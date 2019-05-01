@@ -9,6 +9,7 @@
 #include "ir/helper.h"
 #include "nasm/addr.h"
 #include "nasm/inst.h"
+#include "optim/analysis/defuse.h"
 #include "small_map.h"
 
 namespace mocker {
@@ -39,6 +40,8 @@ std::string renameIdentifier(const std::string &ident) {
 class Context {
 public:
   explicit Context(nasm::Section &text) {}
+
+  void init(const ir::FunctionModule &func) { defUse.init(func); }
 
   std::shared_ptr<nasm::Register> newVirtualReg() {
     return std::make_shared<nasm::Register>("v" + std::to_string(vRegCnt++));
@@ -93,6 +96,11 @@ public:
     return pRegAddr.at(reg);
   }
 
+  const std::vector<typename DefUseChain::Use>
+  getUses(const std::shared_ptr<ir::Reg> &reg) const {
+    return defUse.getUses(reg);
+  }
+
 private:
   std::shared_ptr<nasm::Register>
   newVirtualRegFor(const std::shared_ptr<ir::Reg> &reg) {
@@ -107,6 +115,8 @@ private:
 
   nasm::RegMap<std::shared_ptr<nasm::Register>> pRegAddr;
   std::unordered_map<std::string, std::shared_ptr<nasm::Register>> irRegAddr;
+
+  DefUseChain defUse;
 };
 
 void genStore(nasm::Section &text, Context &ctx,
@@ -175,29 +185,94 @@ void genCall(nasm::Section &text, Context &ctx,
   }
 }
 
-void genInstruction(nasm::Section &text, Context &ctx,
+bool genRelation(nasm::Section &text, Context &ctx,
+                 const std::shared_ptr<ir::RelationInst> &p,
+                 const std::shared_ptr<ir::IRInst> &nextInst,
+                 std::size_t nextBB) {
+  bool skipNext = true;
+  auto br = ir::dyc<ir::Branch>(nextInst);
+  if (!br)
+    skipNext = false;
+  auto irDest = p->getDest();
+  auto condition = ir::dycLocalReg(br->getCondition());
+  if (!condition || condition->getIdentifier() != irDest->getIdentifier())
+    skipNext = false;
+  if (ctx.getUses(irDest).size() > 1)
+    skipNext = false;
+
+  auto lhs = ctx.getAddr(p->getLhs());
+  if (!nasm::dyc<nasm::Register>(lhs)) {
+    lhs = ctx.newVirtualReg();
+    text.emplaceInst<nasm::Mov>(lhs, ctx.getAddr(p->getLhs()));
+  }
+  auto rhs = ctx.getAddr(p->getRhs());
+  assert(!nasm::dyc<nasm::LabelAddr>(rhs));
+  text.emplaceInst<nasm::Cmp>(lhs, rhs);
+
+  if (skipNext) {
+    // Note that the values of this map is the counterpart of the key since it
+    // is used to jump to the else-branch
+    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType> opMap{
+        {ir::RelationInst::Eq, nasm::CJump::Ne},
+        {ir::RelationInst::Ne, nasm::CJump::Ez},
+        {ir::RelationInst::Lt, nasm::CJump::Ge},
+        {ir::RelationInst::Le, nasm::CJump::Gt},
+        {ir::RelationInst::Gt, nasm::CJump::Le},
+        {ir::RelationInst::Ge, nasm::CJump::Lt},
+    };
+
+    text.emplaceInst<nasm::CJump>(
+        opMap.at(p->getOp()),
+        std::make_shared<nasm::Label>(".L" +
+                                      std::to_string(br->getElse()->getID())));
+    if (br->getThen()->getID() != nextBB)
+      text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
+          ".L" + std::to_string(br->getThen()->getID())));
+    return true;
+  }
+
+  auto dest = nasm::dyc<nasm::Register>(ctx.getAddr(p->getDest()));
+  text.emplaceInst<nasm::Mov>(dest, std::make_shared<nasm::NumericConstant>(0));
+  static const SmallMap<ir::RelationInst::OpType, nasm::Set::OpType> mp{
+      {ir::RelationInst::Eq, nasm::Set::Eq},
+      {ir::RelationInst::Ne, nasm::Set::Ne},
+      {ir::RelationInst::Lt, nasm::Set::Lt},
+      {ir::RelationInst::Le, nasm::Set::Le},
+      {ir::RelationInst::Gt, nasm::Set::Gt},
+      {ir::RelationInst::Ge, nasm::Set::Ge},
+  };
+  text.emplaceInst<nasm::Mov>(nasm::rax(),
+                              std::make_shared<nasm::NumericConstant>(0));
+  text.emplaceInst<nasm::Set>(mp.at(p->getOp()), nasm::rax());
+  text.emplaceInst<nasm::Mov>(dest, nasm::rax());
+  return false;
+}
+
+// return whether the next instruction should be skipped
+bool genInstruction(nasm::Section &text, Context &ctx,
                     const std::shared_ptr<ir::IRInst> &inst,
-                    const std::size_t nextBB) {
+                    const std::size_t nextBB,
+                    const std::shared_ptr<ir::IRInst> &nextInst) {
   if (ir::dyc<ir::Comment>(inst) || ir::dyc<ir::AttachedComment>(inst)) {
-    return;
+    return false;
   }
 
   if (auto p = ir::dyc<ir::Alloca>(inst)) {
     ctx.addStackVar(p->getDest()->getIdentifier());
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::Jump>(inst)) {
     text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
         ".L" + std::to_string(p->getLabel()->getID())));
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::Store>(inst)) {
     genStore(text, ctx, p);
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::Load>(inst)) {
     genLoad(text, ctx, p);
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::ArithBinaryInst>(inst)) {
     if (p->getOp() == ir::ArithBinaryInst::Mod ||
@@ -223,7 +298,7 @@ void genInstruction(nasm::Section &text, Context &ctx,
         text.emplaceInst<nasm::Mov>(dest, nasm::rax());
       text.emplaceInst<nasm::Mov>(nasm::rdx(), rdxCopy);
       text.emplaceInst<nasm::Mov>(nasm::rax(), raxCopy);
-      return;
+      return false;
     }
     if (p->getOp() == ir::ArithBinaryInst::Shr ||
         p->getOp() == ir::ArithBinaryInst::Shl) {
@@ -237,7 +312,7 @@ void genInstruction(nasm::Section &text, Context &ctx,
                                              : nasm::BinaryInst::Sal,
                                          dest, nasm::rcx());
       text.emplaceInst<nasm::Mov>(nasm::rcx(), rcxCopy);
-      return;
+      return false;
     }
 
     static const SmallMap<ir::ArithBinaryInst::OpType, nasm::BinaryInst::OpType>
@@ -253,35 +328,10 @@ void genInstruction(nasm::Section &text, Context &ctx,
     text.emplaceInst<nasm::Mov>(dest, ctx.getAddr(p->getLhs()));
     text.emplaceInst<nasm::BinaryInst>(opMp.at(p->getOp()), dest,
                                        ctx.getAddr(p->getRhs()));
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::RelationInst>(inst)) {
-    auto lhs = ctx.newVirtualReg();
-    text.emplaceInst<nasm::Mov>(lhs, ctx.getAddr(p->getLhs()));
-    auto rhs = ctx.getAddr(p->getRhs());
-    if (auto labelAddr = nasm::dyc<nasm::LabelAddr>(rhs)) {
-      auto tmp = ctx.newVirtualReg();
-      text.emplaceInst<nasm::Lea>(tmp, labelAddr);
-      rhs = tmp;
-    }
-
-    text.emplaceInst<nasm::Cmp>(lhs, rhs);
-    auto dest = nasm::dyc<nasm::Register>(ctx.getAddr(p->getDest()));
-    text.emplaceInst<nasm::Mov>(dest,
-                                std::make_shared<nasm::NumericConstant>(0));
-    static const SmallMap<ir::RelationInst::OpType, nasm::Set::OpType> mp{
-        {ir::RelationInst::Eq, nasm::Set::Eq},
-        {ir::RelationInst::Ne, nasm::Set::Ne},
-        {ir::RelationInst::Lt, nasm::Set::Lt},
-        {ir::RelationInst::Le, nasm::Set::Le},
-        {ir::RelationInst::Gt, nasm::Set::Gt},
-        {ir::RelationInst::Ge, nasm::Set::Ge},
-    };
-    text.emplaceInst<nasm::Mov>(nasm::rax(),
-                                std::make_shared<nasm::NumericConstant>(0));
-    text.emplaceInst<nasm::Set>(mp.at(p->getOp()), nasm::rax());
-    text.emplaceInst<nasm::Mov>(dest, nasm::rax());
-    return;
+    return genRelation(text, ctx, p, nextInst, nextBB);
   }
   if (auto p = ir::dyc<ir::Branch>(inst)) {
     auto lhs = ctx.newVirtualReg();
@@ -294,7 +344,7 @@ void genInstruction(nasm::Section &text, Context &ctx,
     if (p->getThen()->getID() != nextBB)
       text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
           ".L" + std::to_string(p->getThen()->getID())));
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::Ret>(inst)) {
     if (p->getVal()) {
@@ -306,16 +356,16 @@ void genInstruction(nasm::Section &text, Context &ctx,
     }
     text.emplaceInst<nasm::Leave>();
     text.emplaceInst<nasm::Ret>();
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::Call>(inst)) {
     genCall(text, ctx, p);
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::Malloc>(inst)) {
     genCall(text, ctx,
             std::make_shared<ir::Call>(p->getDest(), "malloc", p->getSize()));
-    return;
+    return false;
   }
   if (auto p = ir::dyc<ir::ArithUnaryInst>(inst)) {
     auto dest = nasm::dyc<nasm::Register>(ctx.getAddr(p->getDest()));
@@ -325,7 +375,7 @@ void genInstruction(nasm::Section &text, Context &ctx,
       text.emplaceInst<nasm::UnaryInst>(nasm::UnaryInst::Neg, dest);
     else
       text.emplaceInst<nasm::UnaryInst>(nasm::UnaryInst::Not, dest);
-    return;
+    return false;
   }
   assert(false);
 }
@@ -333,8 +383,18 @@ void genInstruction(nasm::Section &text, Context &ctx,
 void genBasicBlock(nasm::Section &text, Context &ctx, const ir::BasicBlock &bb,
                    const std::size_t nextBB) {
   text.labelThisLine(".L" + std::to_string(bb.getLabelID()));
-  for (auto &inst : bb.getInsts())
-    genInstruction(text, ctx, inst, nextBB);
+  for (auto iter = bb.getInsts().begin(), end = bb.getInsts().end();
+       iter != end; ++iter) {
+    auto next = iter;
+    next++;
+    bool skipNext =
+        genInstruction(text, ctx, *iter, nextBB, next == end ? nullptr : *next);
+    if (skipNext) {
+      ++iter;
+      if (iter == end)
+        break;
+    }
+  }
 }
 
 void genFunction(nasm::Section &text, Context &ctx,
@@ -344,6 +404,10 @@ void genFunction(nasm::Section &text, Context &ctx,
   text.emplaceInst<nasm::Mov>(nasm::rbp(), nasm::rsp());
 
   for (auto &reg : CalleeSave) {
+    if (reg->getIdentifier() == "rbp") {
+      ctx.setPRegAddr(reg, reg);
+      continue;
+    }
     auto bak = ctx.newVirtualReg();
     text.emplaceInst<nasm::Mov>(bak, reg);
     ctx.setPRegAddr(reg, bak);
@@ -416,6 +480,7 @@ nasm::Section genTextSection(const ir::Module &irModule) {
     if (func.isExternalFunc())
       continue;
     Context ctx(text);
+    ctx.init(func);
     genFunction(text, ctx, func);
   }
   return text;

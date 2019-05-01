@@ -122,8 +122,12 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
     return opName.at(p->getOp()) + " al";
   }
   if (auto p = dyc<CJump>(inst)) {
-    assert(p->getOp() == CJump::Ez);
-    return "jz " + fmtAddr(p->getLabel());
+    static const SmallMap<CJump::OpType, std::string> opName{
+        {CJump::OpType::Ez, "jz"}, {CJump::OpType::Ne, "jne"},
+        {CJump::OpType::Lt, "jl"}, {CJump::OpType::Le, "jle"},
+        {CJump::OpType::Gt, "jg"}, {CJump::OpType::Ge, "jge"},
+    };
+    return opName.at(p->getOp()) + " " + fmtAddr(p->getLabel());
   }
   if (auto p = dyc<UnaryInst>(inst)) {
     if (p->getOp() == UnaryInst::Neg)
@@ -142,7 +146,6 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
   if (auto p = dyc<IDiv>(inst)) {
     return "idiv " + fmtAddr(p->getRhs());
   }
-  std::cerr << typeid(*inst).name() << std::endl;
   assert(false);
 }
 
