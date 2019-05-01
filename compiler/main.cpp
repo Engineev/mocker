@@ -6,6 +6,7 @@
 #include "ast/ast_node.h"
 #include "codegen/naive_instruction_selection.h"
 #include "codegen/naive_register_allocation.h"
+#include "codegen/peephole.h"
 #include "codegen/register_allocation.h"
 #include "ir/helper.h"
 #include "ir/printer.h"
@@ -14,17 +15,18 @@
 #include "ir_builder/builder.h"
 #include "ir_builder/builder_context.h"
 #include "nasm/printer.h"
+#include "nasm/stats.h"
 #include "optim/constant_propagation.h"
 #include "optim/copy_propagation.h"
 #include "optim/dead_code_elimination.h"
 #include "optim/function_inline.h"
+#include "optim/global_value_numbering.h"
+#include "optim/local_value_numbering.h"
 #include "optim/module_simplification.h"
 #include "optim/optimizer.h"
-#include "optim/global_value_numbering.h"
 #include "optim/promote_global_variables.h"
 #include "optim/simplify_cfg.h"
 #include "optim/ssa.h"
-#include "optim/local_value_numbering.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
 #include "semantic/semantic_checker.h"
@@ -37,6 +39,8 @@ void optimize(mocker::ir::Module &module);
 mocker::nasm::Module codegen(const mocker::ir::Module &irModule);
 
 void printIRStats(const mocker::ir::Stats &stats);
+
+void printNasmStats(const mocker::nasm::Stats &stats);
 
 void runOptsUntilFixedPoint(mocker::ir::Module &module);
 
@@ -61,8 +65,9 @@ int main(int argc, char **argv) {
     std::ofstream fout(argv[3]);
     mocker::nasm::printModule(nasmModule, fout);
     fout.close();
+  } else {
+    mocker::nasm::printModule(nasmModule, std::cout);
   }
-  mocker::nasm::printModule(nasmModule, std::cout);
 
   return 0;
 }
@@ -112,7 +117,7 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
-//  runOptsUntilFixedPoint(module);
+  //  runOptsUntilFixedPoint(module);
   runOptPasses<RewriteBranches>(module);
   runOptPasses<SimplifyPhiFunctions>(module);
   runOptPasses<MergeBlocks>(module);
@@ -143,9 +148,17 @@ void optimize(mocker::ir::Module &module) {
 mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
   using namespace mocker;
   auto res = runNaiveInstructionSelection(irModule);
-  // nasm::printModule(res);
+  std::cerr << "\nNASM:\n";
+  std::cerr << "After instruction selection:\n";
+  printNasmStats(nasm::Stats(res));
+
   res = allocateRegisters(res);
-  //  res = allocateRegistersNaively(res);
+  std::cerr << "\nAfter register allocation:\n";
+  printNasmStats(nasm::Stats(res));
+
+  res = runPeepholeOptimization(res);
+  std::cerr << "\nAfter peephole optimization:\n";
+  printNasmStats(nasm::Stats(res));
   return res;
 }
 
@@ -173,7 +186,7 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
     optimizable |= runOptPasses<GlobalValueNumbering>(module);
-//    optimizable |= runOptPasses<LocalValueNumbering>(module);
+    //    optimizable |= runOptPasses<LocalValueNumbering>(module);
 
     // std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
@@ -198,4 +211,11 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     // std::cerr << optimizable;
     ir::verifyModule(module);
   }
+}
+
+void printNasmStats(const mocker::nasm::Stats &stats) {
+  using namespace mocker::nasm;
+  std::cerr << "#Jump = " << stats.countJumps() << std::endl;
+  std::cerr << "#insts = " << stats.countInsts() << std::endl;
+  std::cerr << "#MemOperation = " << stats.countMemOperation() << std::endl;
 }

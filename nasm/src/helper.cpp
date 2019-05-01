@@ -128,6 +128,31 @@ getDefinedRegs(const std::shared_ptr<Inst> &inst) {
   assert(false);
 }
 
+std::vector<std::shared_ptr<EffectiveAddr>>
+getInvolvedMem(const std::shared_ptr<Inst> &inst) {
+  std::vector<std::shared_ptr<EffectiveAddr>> res;
+
+  if (auto p = dyc<Mov>(inst)) {
+    if (auto m = dyc<EffectiveAddr>(p->getOperand()))
+      res.emplace_back(m);
+    if (auto m = dyc<EffectiveAddr>(p->getDest()))
+      res.emplace_back(m);
+    return res;
+  }
+
+  if (auto p = dyc<Lea>(inst)) {
+    return {dyc<EffectiveAddr>(p->getAddr())};
+  }
+
+  if (auto p = dyc<BinaryInst>(inst)) {
+    if (auto m = dyc<EffectiveAddr>(p->getRhs()))
+      res.emplace_back(m);
+    return res;
+  }
+
+  return {};
+}
+
 std::shared_ptr<Addr> replaceRegs(const std::shared_ptr<Addr> &addr,
                                   const RegMap<std::shared_ptr<Register>> &mp) {
   auto getIfExists = [&mp](const std::shared_ptr<Register> &p) {

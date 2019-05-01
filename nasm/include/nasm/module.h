@@ -95,6 +95,10 @@ public:
 
   Section &getSection(const std::string &name) { return sections.at(name); }
 
+  const Section &getSection(const std::string &name) const {
+    return sections.at(name);
+  }
+
 private:
   std::vector<std::shared_ptr<Directive>> directives;
   std::unordered_map<std::string, Section> sections;

@@ -161,7 +161,8 @@ void genCall(nasm::Section &text, Context &ctx,
 }
 
 void genInstruction(nasm::Section &text, Context &ctx,
-                    const std::shared_ptr<ir::IRInst> &inst) {
+                    const std::shared_ptr<ir::IRInst> &inst,
+                    const std::size_t nextBB) {
   if (ir::dyc<ir::Comment>(inst) || ir::dyc<ir::AttachedComment>(inst)) {
     return;
   }
@@ -273,10 +274,11 @@ void genInstruction(nasm::Section &text, Context &ctx,
     text.emplaceInst<nasm::Cmp>(lhs,
                                 std::make_shared<nasm::NumericConstant>(0));
     text.emplaceInst<nasm::CJump>(
-        nasm::CJump::Nz, std::make_shared<nasm::Label>(
-                             ".L" + std::to_string(p->getThen()->getID())));
-    text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
-        ".L" + std::to_string(p->getElse()->getID())));
+        nasm::CJump::Ez, std::make_shared<nasm::Label>(
+                             ".L" + std::to_string(p->getElse()->getID())));
+    if (p->getThen()->getID() != nextBB)
+      text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
+          ".L" + std::to_string(p->getThen()->getID())));
     return;
   }
   if (auto p = ir::dyc<ir::Ret>(inst)) {
@@ -314,11 +316,11 @@ void genInstruction(nasm::Section &text, Context &ctx,
   assert(false);
 }
 
-void genBasicBlock(nasm::Section &text, Context &ctx,
-                   const ir::BasicBlock &bb) {
+void genBasicBlock(nasm::Section &text, Context &ctx, const ir::BasicBlock &bb,
+                   const std::size_t nextBB) {
   text.labelThisLine(".L" + std::to_string(bb.getLabelID()));
   for (auto &inst : bb.getInsts())
-    genInstruction(text, ctx, inst);
+    genInstruction(text, ctx, inst, nextBB);
 }
 
 void genFunction(nasm::Section &text, Context &ctx,
@@ -365,8 +367,13 @@ void genFunction(nasm::Section &text, Context &ctx,
     ctx.setIrRegAddr(reg, addrReg);
   }
 
-  for (auto &bb : func.getBBs())
-    genBasicBlock(text, ctx, bb);
+  for (auto iter = func.getBBs().begin(), end = func.getBBs().end();
+       iter != end; ++iter) {
+    auto next = iter;
+    next++;
+    genBasicBlock(text, ctx, *iter,
+                  next == end ? (std::size_t)-1 : next->getLabelID());
+  }
 }
 
 } // namespace

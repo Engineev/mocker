@@ -122,8 +122,8 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
     return opName.at(p->getOp()) + " al";
   }
   if (auto p = dyc<CJump>(inst)) {
-    assert(p->getOp() == CJump::Nz);
-    return "jnz " + fmtAddr(p->getLabel());
+    assert(p->getOp() == CJump::Ez);
+    return "jz " + fmtAddr(p->getLabel());
   }
   if (auto p = dyc<UnaryInst>(inst)) {
     if (p->getOp() == UnaryInst::Neg)

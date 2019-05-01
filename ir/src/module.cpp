@@ -1,5 +1,6 @@
 #include "module.h"
 
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 #include <string>
@@ -94,6 +95,12 @@ std::vector<std::size_t> FunctionModule::getPredcessors(std::size_t bb) const {
 
 std::shared_ptr<Reg> FunctionModule::makeTempLocalReg(const std::string &hint) {
   return std::make_shared<Reg>(hint + "_" + std::to_string(tempRegCounter++));
+}
+
+void FunctionModule::sortBasicBlocks() {
+  bbs.sort([](const BasicBlock &lhs, const BasicBlock &rhs) {
+    return lhs.getLabelID() < rhs.getLabelID();
+  });
 }
 
 FunctionModule &Module::addFunc(std::string ident, FunctionModule func) {

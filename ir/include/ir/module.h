@@ -30,6 +30,8 @@ public:
 
   std::size_t getLabelID() const { return labelID; }
 
+  void setLabelID(std::size_t label) { labelID = label; }
+
   const InstList &getInsts() const { return insts; }
 
   InstList &getMutableInsts() { return insts; }
@@ -65,6 +67,8 @@ public:
   BBLIter pushBackBB();
 
   BBLIter insertBBAfter(BBLIter iter);
+
+  void sortBasicBlocks();
 
   const std::vector<std::string> &getArgs() const { return args; }
 

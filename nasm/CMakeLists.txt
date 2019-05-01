@@ -4,6 +4,7 @@ add_library(${PROJECT_NAME}-nasm
   ${CMAKE_CURRENT_LIST_DIR}/include/nasm/inst.h
   ${CMAKE_CURRENT_LIST_DIR}/include/nasm/module.h
   ${CMAKE_CURRENT_LIST_DIR}/include/nasm/printer.h
+  ${CMAKE_CURRENT_LIST_DIR}/include/nasm/stats.h
 
   ${CMAKE_CURRENT_LIST_DIR}/src/helper.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/module.cpp

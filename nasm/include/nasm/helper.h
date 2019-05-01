@@ -24,6 +24,9 @@ getUsedRegs(const std::shared_ptr<Inst> &inst);
 std::vector<std::shared_ptr<Register>>
 getDefinedRegs(const std::shared_ptr<Inst> &inst);
 
+std::vector<std::shared_ptr<EffectiveAddr>>
+getInvolvedMem(const std::shared_ptr<Inst> &inst);
+
 std::shared_ptr<Addr> replaceRegs(const std::shared_ptr<Addr> &addr,
                                   const RegMap<std::shared_ptr<Register>> &mp);
 

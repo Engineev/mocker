@@ -9,6 +9,7 @@ set(HEADERS
   codegen/naive_instruction_selection.h
   codegen/naive_register_allocation.h
   codegen/nasm_cfg.h
+  codegen/peephole.h
   codegen/register_allocation.h
 
   common/defs.h
@@ -50,6 +51,7 @@ set(SOURCES
   codegen/naive_instruction_selection.cpp
   codegen/naive_register_allocation.cpp
   codegen/nasm_cfg.cpp
+  codegen/peephole.cpp
   codegen/register_allocation.cpp
 
   ir_builder/build.cpp
