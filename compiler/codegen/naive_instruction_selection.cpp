@@ -190,15 +190,24 @@ bool genRelation(nasm::Section &text, Context &ctx,
                  const std::shared_ptr<ir::IRInst> &nextInst,
                  std::size_t nextBB) {
   bool skipNext = true;
-  auto br = ir::dyc<ir::Branch>(nextInst);
-  if (!br)
-    skipNext = false;
-  auto irDest = p->getDest();
-  auto condition = ir::dycLocalReg(br->getCondition());
-  if (!condition || condition->getIdentifier() != irDest->getIdentifier())
-    skipNext = false;
-  if (ctx.getUses(irDest).size() > 1)
-    skipNext = false;
+  while (true) {
+    auto br = ir::dyc<ir::Branch>(nextInst);
+    if (!br) {
+      skipNext = false;
+      break;
+    }
+    auto irDest = p->getDest();
+    auto condition = ir::dycLocalReg(br->getCondition());
+    if (!condition || condition->getIdentifier() != irDest->getIdentifier()) {
+      skipNext = false;
+      break;
+    }
+    if (ctx.getUses(irDest).size() > 1) {
+      skipNext = false;
+      break;
+    }
+    break;
+  }
 
   auto lhs = ctx.getAddr(p->getLhs());
   if (!nasm::dyc<nasm::Register>(lhs)) {
@@ -221,6 +230,7 @@ bool genRelation(nasm::Section &text, Context &ctx,
         {ir::RelationInst::Ge, nasm::CJump::Lt},
     };
 
+    auto br = ir::dyc<ir::Branch>(nextInst);
     text.emplaceInst<nasm::CJump>(
         opMap.at(p->getOp()),
         std::make_shared<nasm::Label>(".L" +
