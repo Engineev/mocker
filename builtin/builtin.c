@@ -3,12 +3,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+void *__alloc(size_t sz) {
+  if (sz >= 128)
+    return malloc(sz);
+
+  const CHUNK_SIZE = 128 * 1024;
+  static char *storage = NULL;
+  static size_t used = CHUNK_SIZE;
+  if (used + sz > CHUNK_SIZE) {
+    storage = malloc(CHUNK_SIZE);
+    used = 0;
+  }
+
+  void *res = storage + used;
+  used += sz;
+  return res;
+}
+
 void *__string__add(void *lhs, void *rhs) {
   uint64_t lhs_len = *((int64_t *)lhs - 1);
   uint64_t rhs_len = *((int64_t *)rhs - 1);
   uint64_t length = lhs_len + rhs_len;
 
-  char *res_inst_ptr = (char *)malloc(length + 8);
+  char *res_inst_ptr = (char *)__alloc(length + 8);
   *(int64_t *)res_inst_ptr = length;
   res_inst_ptr += 8;
 
@@ -19,7 +36,7 @@ void *__string__add(void *lhs, void *rhs) {
 
 void *__string__substring(void *ptr, int64_t left, int64_t right) {
   int len = right - left;
-  char *res_inst_ptr = (char *)malloc(len + 8);
+  char *res_inst_ptr = (char *)__alloc(len + 8);
   *(int64_t *)(res_inst_ptr) = len;
   res_inst_ptr += 8;
 
@@ -73,7 +90,7 @@ void *getString() {
   scanf("%256s", buffer);
 
   uint64_t len = strlen(buffer);
-  char *res_inst_ptr = (char *)malloc(8 + len);
+  char *res_inst_ptr = (char *)__alloc(8 + len);
   *(int64_t *)res_inst_ptr = len;
   res_inst_ptr += 8;
   memcpy(res_inst_ptr, buffer, len);
@@ -85,7 +102,7 @@ void *toString(int64_t val) {
   sprintf(buffer, "%ld", val);
   int64_t len = strlen(buffer);
 
-  char *res_inst_ptr = (char *)malloc(8 + len);
+  char *res_inst_ptr = (char *)__alloc(8 + len);
   *(int64_t *)(res_inst_ptr) = len;
   res_inst_ptr += 8;
   memcpy(res_inst_ptr, buffer, len);
