@@ -25,7 +25,7 @@ set(HEADERS
 
   optim/analysis/defuse.h
   optim/analysis/dominance.h
-  optim/analysis/func_global_var.h
+  optim/analysis/func_attr.h
   optim/constant_propagation.h
   optim/copy_propagation.h
   optim/dead_code_elimination.h
@@ -66,7 +66,7 @@ set(SOURCES
   ir_builder/preprocessor.cpp
 
   optim/analysis/dominance.cpp
-  optim/analysis/func_global_var.cpp
+  optim/analysis/func_attr.cpp
   optim/constant_propagation.cpp
   optim/copy_propagation.cpp
   optim/dead_code_elimination.cpp

@@ -13,44 +13,46 @@
 namespace mocker {
 namespace detail {
 
-template <class Pass>
-bool runOptPassImpl(ir::Module &module, BasicBlockPass *) {
+template <class Pass, class... Args>
+bool runOptPassImpl(ir::Module &module, BasicBlockPass *, Args &&... args) {
   auto res = false;
   for (auto &func : module.getFuncs()) {
     if (func.second.isExternalFunc())
       continue;
     for (auto &bb : func.second.getMutableBBs()) {
-      res |= Pass{bb}();
+      res |= Pass{bb, std::forward<Args>(args)...}();
     }
   }
   return res;
 }
 
-template <class Pass> bool runOptPassImpl(ir::Module &module, FuncPass *) {
+template <class Pass, class... Args>
+bool runOptPassImpl(ir::Module &module, FuncPass *, Args &&... args) {
   auto res = false;
   for (auto &func : module.getFuncs()) {
     if (func.second.isExternalFunc())
       continue;
-    res |= Pass{func.second}();
+    res |= Pass{func.second, std::forward<Args>(args)...}();
   }
   return res;
 }
 
-template <class Pass> bool runOptPassImpl(ir::Module &module, ModulePass *) {
-  return Pass{module}();
+template <class Pass, class... Args>
+bool runOptPassImpl(ir::Module &module, ModulePass *, Args &&... args) {
+  return Pass{module, std::forward<Args>(args)...}();
 }
 
 } // namespace detail
 
-template <class Pass> bool runOptPasses(ir::Module &module) {
+template <class Pass, class... Args>
+bool runOptPasses(ir::Module &module, Args &&... args) {
   for (auto &func : module.getFuncs())
     func.second.buildContext();
-  auto res = detail::runOptPassImpl<Pass>(module, (Pass *)(nullptr));
+  auto res = detail::runOptPassImpl<Pass>(module, (Pass *)(nullptr),
+                                          std::forward<Args>(args)...);
   for (auto &func : module.getFuncs())
     func.second.buildContext();
-#ifndef DISABLE_VERIFICATION
   ir::verifyModule(module);
-#endif
   return res;
 }
 

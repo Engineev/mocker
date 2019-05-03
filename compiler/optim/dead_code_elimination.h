@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "analysis/dominance.h"
+#include "analysis/func_attr.h"
 #include "ir/ir_inst.h"
 #include "opt_pass.h"
 
@@ -13,7 +14,7 @@ namespace mocker {
 
 class DeadCodeElimination : public FuncPass {
 public:
-  explicit DeadCodeElimination(ir::FunctionModule &func);
+  DeadCodeElimination(ir::FunctionModule &func, const FuncAttr &funcAttr);
 
   bool operator()() override;
 
@@ -27,11 +28,13 @@ private:
   void sweep();
 
 private:
+  const FuncAttr &funcAttr;
+
   DominatorTree rdt;
   std::queue<std::shared_ptr<ir::IRInst>> worklist;
   std::unordered_map<ir::InstID, std::size_t> residingBB;
   std::unordered_set<ir::InstID> useful;
-  std::unordered_set<std::size_t> usefulBB;  // contains a useful instruction
+  std::unordered_set<std::size_t> usefulBB; // contains a useful instruction
   std::size_t cnt = 0;
 };
 

@@ -9,6 +9,14 @@ template <class Set, class T> void unionSet(Set &s, const T &xs) {
   }
 }
 
+template <class Set, class Iterable> void subSet(Set &s, const Iterable &o) {
+  for (auto &v : o) {
+    auto iter = s.find(v);
+    if (iter != s.end())
+      s.erase(iter);
+  }
+}
+
 template <class Set, class T> Set intersectSets(const Set &s, const T &xs) {
   Set res;
   for (auto &x : xs) {

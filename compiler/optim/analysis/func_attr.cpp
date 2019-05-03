@@ -1,4 +1,4 @@
-#include "func_global_var.h"
+#include "func_attr.h"
 
 #include <queue>
 
@@ -44,15 +44,30 @@ buildCallGraph(const ir::Module &module) {
 
 } // namespace
 
-void FuncGlobalVar::init(const ir::Module &module) {
+void FuncAttr::init(const ir::Module &module) {
+  buildGlobalVarInfo(module);
+  for (auto &kv : module.getFuncs()) {
+    if (kv.second.isExternalFunc())
+      continue;
+  }
+}
+
+std::unordered_set<std::string>
+FuncAttr::getInvolvedGlobalVars(const std::string &funcName) const {
+  auto res = globalVarUses.at(funcName);
+  unionSet(res, globalVarDefs.at(funcName));
+  return res;
+}
+
+void FuncAttr::buildGlobalVarInfo(const ir::Module &module) {
   const auto CallGraph = buildCallGraph(module);
 
   // initialize
   for (auto &kv : module.getFuncs()) {
-    use[kv.first] = def[kv.first] = {};
+    globalVarUses[kv.first] = globalVarDefs[kv.first] = {};
     auto &func = kv.second;
-    auto &fUse = use[kv.first];
-    auto &fDef = def[kv.first];
+    auto &fUse = globalVarUses[kv.first];
+    auto &fDef = globalVarDefs[kv.first];
 
     auto update = [&fUse, &fDef](const std::shared_ptr<ir::IRInst> &inst) {
       if (auto p = ir::dyc<ir::Store>(inst)) {
@@ -82,17 +97,17 @@ void FuncGlobalVar::init(const ir::Module &module) {
     auto funcName = worklist.front();
     worklist.pop();
     const auto &Callers = CallGraph.at(funcName);
-    const auto &usedByCallee = use.at(funcName);
-    const auto &defedByCallee = def.at(funcName);
+    const auto &usedByCallee = globalVarUses.at(funcName);
+    const auto &defedByCallee = globalVarDefs.at(funcName);
     for (auto &caller : Callers) {
-      auto &usedByCaller = use.at(caller);
+      auto &usedByCaller = globalVarUses.at(caller);
       std::size_t originalSize = usedByCaller.size();
       unionSet(usedByCaller, usedByCallee);
       std::size_t newSize = usedByCaller.size();
       if (originalSize != newSize)
         worklist.emplace(caller);
 
-      auto &defedByCaller = def.at(caller);
+      auto &defedByCaller = globalVarDefs.at(caller);
       originalSize = defedByCaller.size();
       unionSet(defedByCaller, defedByCallee);
       newSize = defedByCaller.size();
@@ -102,11 +117,18 @@ void FuncGlobalVar::init(const ir::Module &module) {
   }
 }
 
-std::unordered_set<std::string>
-FuncGlobalVar::getInvolved(const std::string &funcName) const {
-  auto res = use.at(funcName);
-  unionSet(res, def.at(funcName));
-  return res;
+bool FuncAttr::isPureFunc(const ir::FunctionModule &func) {
+  for (auto &bb : func.getBBs()) {
+    for (auto &inst : bb.getInsts()) {
+      if (ir::dyc<ir::Store>(inst))
+        return false;
+      if (auto call = ir::dyc<ir::Call>(inst)) {
+        if (call->getFuncName() != func.getIdentifier())
+          return false;
+      }
+    }
+  }
+  return true;
 }
 
 } // namespace mocker

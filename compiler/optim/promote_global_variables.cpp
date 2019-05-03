@@ -23,11 +23,12 @@ bool PromoteGlobalVariables::operator()() {
 }
 
 void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
-  const auto &Use = funcGlobalVar.getUse(func.getIdentifier());
-  const auto &Def = funcGlobalVar.getDef(func.getIdentifier());
+  const auto &Use = funcGlobalVar.getGlobalVarUses(func.getIdentifier());
+  const auto &Def = funcGlobalVar.getGlobalVarDefs(func.getIdentifier());
 
   std::unordered_map<std::string, std::shared_ptr<ir::Reg>> aliasReg;
-  for (const auto &name : funcGlobalVar.getInvolved(func.getIdentifier())) {
+  for (const auto &name :
+       funcGlobalVar.getInvolvedGlobalVars(func.getIdentifier())) {
     assert(name != "@null");
     aliasReg[name] = func.makeTempLocalReg("alias" + name);
   }
@@ -103,12 +104,14 @@ void PromoteGlobalVariables::promoteGlobalVariables(ir::FunctionModule &func) {
       }
 
       if (auto call = ir::dyc<ir::Call>(*iter)) {
-        const auto &usedByCallee = funcGlobalVar.getUse(call->getFuncName());
+        const auto &usedByCallee =
+            funcGlobalVar.getGlobalVarUses(call->getFuncName());
         for (auto &toBeStored : intersectSets(Def, usedByCallee)) {
           reStore(iter, toBeStored);
         }
 
-        const auto &defedByCallee = funcGlobalVar.getDef(call->getFuncName());
+        const auto &defedByCallee =
+            funcGlobalVar.getGlobalVarDefs(call->getFuncName());
         for (auto &reg : intersectSets(Use, defedByCallee)) {
           reLoad(iter, reg);
         }

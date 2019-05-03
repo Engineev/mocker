@@ -3,7 +3,7 @@
 
 #include "opt_pass.h"
 
-#include "analysis/func_global_var.h"
+#include "optim/analysis/func_attr.h"
 
 namespace mocker {
 
@@ -18,7 +18,7 @@ public:
 private:
   void promoteGlobalVariables(ir::FunctionModule &func);
 
-  FuncGlobalVar funcGlobalVar;
+  FuncAttr funcGlobalVar;
 };
 
 } // namespace mocker

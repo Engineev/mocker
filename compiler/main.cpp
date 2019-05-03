@@ -159,7 +159,9 @@ void optimize(mocker::ir::Module &module) {
   for (int i = 0; i < 3; ++i) {
     runOptPasses<SimplifyPhiFunctions>(module);
     runOptPasses<MergeBlocks>(module);
-    runOptPasses<DeadCodeElimination>(module);
+    FuncAttr funcAttr;
+    funcAttr.init(module);
+    runOptPasses<DeadCodeElimination>(module, funcAttr);
     runOptPasses<RemoveUnreachableBlocks>(module);
   }
 
@@ -228,7 +230,9 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     // std::cerr << optimizable;
     optimizable |= runOptPasses<RemoveTrivialBlocks>(module);
     // std::cerr << optimizable;
-    optimizable |= runOptPasses<DeadCodeElimination>(module);
+    FuncAttr funcAttr;
+    funcAttr.init(module);
+    runOptPasses<DeadCodeElimination>(module, funcAttr);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
     // std::cerr << optimizable;
     ir::verifyModule(module);

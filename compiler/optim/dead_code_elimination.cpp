@@ -10,8 +10,8 @@
 
 namespace mocker {
 
-DeadCodeElimination::DeadCodeElimination(ir::FunctionModule &func)
-    : FuncPass(func) {}
+DeadCodeElimination::DeadCodeElimination(ir::FunctionModule &func, const FuncAttr & funcAttr)
+    : FuncPass(func), funcAttr(funcAttr) {}
 
 bool DeadCodeElimination::operator()() {
   rdt.init(func, true);
@@ -33,9 +33,11 @@ bool DeadCodeElimination::isParameter(const std::string &identifier) {
 }
 
 void DeadCodeElimination::init() {
-  auto isCritical = [](const std::shared_ptr<ir::IRInst> &inst) -> bool {
-    return ir::dyc<ir::Ret>(inst) || ir::dyc<ir::Store>(inst) ||
-           ir::dyc<ir::Call>(inst);
+  auto isCritical = [this](const std::shared_ptr<ir::IRInst> &inst) -> bool {
+    if (auto call = ir::dyc<ir::Call>(inst)) {
+      return !funcAttr.isPure(call->getFuncName());
+    }
+    return ir::dyc<ir::Ret>(inst) || ir::dyc<ir::Store>(inst);
   };
 
   for (auto &bb : func.getBBs()) {
