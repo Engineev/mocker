@@ -47,7 +47,16 @@ void printNasmStats(const mocker::nasm::Stats &stats);
 void runOptsUntilFixedPoint(mocker::ir::Module &module);
 
 int main(int argc, char **argv) {
+  bool semanticOnly = false;
+  for (int i = 0; i < argc; ++i) {
+    if (std::string(argv[i]) == "--semantic")
+      semanticOnly = true;
+  }
+
   auto irModule = runFrontend(argv[1]);
+
+  if (semanticOnly)
+    return 0;
 
   mocker::ir::Stats stats(irModule);
   assert(stats.countInsts<mocker::ir::Phi>() == 0);
