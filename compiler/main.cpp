@@ -24,6 +24,7 @@
 #include "optim/global_const_inline.h"
 #include "optim/global_value_numbering.h"
 #include "optim/local_value_numbering.h"
+#include "optim/loopinv.h"
 #include "optim/module_simplification.h"
 #include "optim/optimizer.h"
 #include "optim/promote_global_variables.h"
@@ -121,7 +122,6 @@ void optimize(mocker::ir::Module &module) {
   runOptPasses<GlobalConstantInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
-  // runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
   runOptPasses<PromoteGlobalVariables>(module);
   ir::verifyModule(module);
@@ -140,6 +140,10 @@ void optimize(mocker::ir::Module &module) {
 
   runOptPasses<SSAConstruction>(module);
 
+  runOptsUntilFixedPoint(module);
+  FuncAttr funcAttr;
+  funcAttr.init(module);
+  runOptPasses<LoopInvariantCodeMotion>(module, funcAttr);
   runOptsUntilFixedPoint(module);
 
   std::cerr << "\nBefore SSA destruction:\n";
@@ -198,43 +202,39 @@ void printIRStats(const mocker::ir::Stats &stats) {
 
 void runOptsUntilFixedPoint(mocker::ir::Module &module) {
   using namespace mocker;
+  std::size_t cnt = 0;
 
   bool optimizable = true;
   while (optimizable) {
+    ++cnt;
     optimizable = false;
-    // std::cerr << "\n=======\n";
-    // std::cerr << optimizable;
 
     optimizable |= runOptPasses<RewriteBranches>(module);
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
     optimizable |= runOptPasses<GlobalValueNumbering>(module);
-    //    optimizable |= runOptPasses<LocalValueNumbering>(module);
+    // optimizable |= runOptPasses<LocalValueNumbering>(module);
 
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<SparseSimpleConstantPropagation>(module);
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<CopyPropagation>(module);
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
+    optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
     optimizable |= runOptPasses<RewriteBranches>(module);
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-    // std::cerr << optimizable;
     optimizable |= runOptPasses<RemoveTrivialBlocks>(module);
-    // std::cerr << optimizable;
+    optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
+    optimizable |= runOptPasses<MergeBlocks>(module);
+    optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
     FuncAttr funcAttr;
     funcAttr.init(module);
-    runOptPasses<DeadCodeElimination>(module, funcAttr);
+    optimizable |= runOptPasses<DeadCodeElimination>(module, funcAttr);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-    // std::cerr << optimizable;
+
     ir::verifyModule(module);
   }
 }

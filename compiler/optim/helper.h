@@ -33,6 +33,10 @@ std::shared_ptr<ir::IRInst>
 replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
                        std::size_t oldLabel, std::size_t newLabel);
 
+void simplifyPhiFunctions(ir::BasicBlock &bb);
+
+bool isParameter(const ir::FunctionModule &func, const std::string &identifier);
+
 } // namespace mocker
 
 #endif // MOCKER_OPTIM_HELPER_H

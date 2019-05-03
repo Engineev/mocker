@@ -10,7 +10,8 @@
 
 namespace mocker {
 
-DeadCodeElimination::DeadCodeElimination(ir::FunctionModule &func, const FuncAttr & funcAttr)
+DeadCodeElimination::DeadCodeElimination(ir::FunctionModule &func,
+                                         const FuncAttr &funcAttr)
     : FuncPass(func), funcAttr(funcAttr) {}
 
 bool DeadCodeElimination::operator()() {

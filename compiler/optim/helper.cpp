@@ -91,6 +91,7 @@ replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
     return std::make_shared<ir::Jump>(std::make_shared<ir::Label>(newLabel));
   }
   if (auto p = ir::dyc<ir::Branch>(inst)) {
+    assert(p->getThen()->getID() != p->getElse()->getID());
     if (p->getThen()->getID() == oldLabel)
       return std::make_shared<ir::Branch>(p->getCondition(),
                                           std::make_shared<ir::Label>(newLabel),
@@ -102,6 +103,38 @@ replaceTerminatorLabel(const std::shared_ptr<ir::IRInst> &inst,
     assert(false);
   }
   assert(false);
+}
+
+void simplifyPhiFunctions(ir::BasicBlock &bb) {
+  // find the insertion point
+  auto insertionPoint = bb.getMutableInsts().begin();
+  while (ir::dyc<ir::Phi>(*insertionPoint))
+    ++insertionPoint;
+
+  for (auto &inst : bb.getMutableInsts()) {
+    auto phi = ir::dyc<ir::Phi>(inst);
+    if (!phi)
+      break;
+
+    if (phi->getOptions().size() == 1) {
+      auto assign = std::make_shared<ir::Assign>(phi->getDest(),
+                                                 phi->getOptions()[0].first);
+      inst = std::make_shared<ir::Deleted>();
+      bb.getMutableInsts().emplace(insertionPoint, std::move(assign));
+    }
+  }
+}
+
+bool isParameter(const ir::FunctionModule &func,
+                 const std::string &identifier) {
+  if (!std::isdigit(identifier[0]))
+    return false;
+
+  std::size_t ed = 0;
+  auto n = std::stoll(identifier, &ed);
+  if (ed != identifier.size())
+    return false;
+  return n < (int)func.getArgs().size();
 }
 
 } // namespace mocker

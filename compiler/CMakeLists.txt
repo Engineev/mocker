@@ -26,6 +26,7 @@ set(HEADERS
   optim/analysis/defuse.h
   optim/analysis/dominance.h
   optim/analysis/func_attr.h
+  optim/analysis/loop_tree.h
   optim/constant_propagation.h
   optim/copy_propagation.h
   optim/dead_code_elimination.h
@@ -67,6 +68,7 @@ set(SOURCES
 
   optim/analysis/dominance.cpp
   optim/analysis/func_attr.cpp
+  optim/analysis/loop_tree.cpp
   optim/constant_propagation.cpp
   optim/copy_propagation.cpp
   optim/dead_code_elimination.cpp
@@ -75,6 +77,7 @@ set(SOURCES
   optim/global_value_numbering.cpp
   optim/helper.cpp
   optim/local_value_numbering.cpp
+  optim/loopinv.cpp
   optim/module_simplification.cpp
   optim/promote_global_variables.cpp
   optim/simplify_cfg.cpp

@@ -49,6 +49,8 @@ void FuncAttr::init(const ir::Module &module) {
   for (auto &kv : module.getFuncs()) {
     if (kv.second.isExternalFunc())
       continue;
+    if (isPureFunc(kv.second))
+      pureFuncs.emplace(kv.first);
   }
 }
 
