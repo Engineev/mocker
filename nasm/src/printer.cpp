@@ -78,15 +78,21 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
   }
   if (auto p = dyc<BinaryInst>(inst)) {
     if (p->getType() == BinaryInst::Sal || p->getType() == BinaryInst::Sar) {
+      auto rhs = p->getRhs();
+      if (nasm::dyc<nasm::Register>(rhs)) {
+        assert(nasm::dyc<nasm::Register>(p->getRhs())->getIdentifier() ==
+               "rcx");
+        return (p->getType() == BinaryInst::Sal ? "sal " : "sar ") +
+               fmtAddr(p->getLhs()) + ", cl";
+      }
       return (p->getType() == BinaryInst::Sal ? "sal " : "sar ") +
-             fmtAddr(p->getLhs()) + ", cl";
+             fmtAddr(p->getLhs()) + ", " + fmtAddr(p->getRhs());
     }
 
     static SmallMap<BinaryInst::OpType, std::string> opName{
         {BinaryInst::BitOr, "or"s}, {BinaryInst::BitAnd, "and"s},
         {BinaryInst::Xor, "xor"s},  {BinaryInst::Add, "add"s},
         {BinaryInst::Sub, "sub"s},  {BinaryInst::Mul, "imul"s},
-        //        {BinaryInst::Sal, "sal"s},  {BinaryInst::Sar, "sar"s},
     };
     return opName.at(p->getType()) + " " + fmtAddr(p->getLhs()) + ", " +
            fmtAddr(p->getRhs());

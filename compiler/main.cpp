@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "ast/ast_node.h"
+#include "codegen/instruction_selection.h"
 #include "codegen/naive_instruction_selection.h"
 #include "codegen/naive_register_allocation.h"
 #include "codegen/peephole.h"
@@ -98,7 +99,9 @@ mocker::ir::Module runFrontend(const std::string &srcPath) {
 
 void optimize(mocker::ir::Module &module) {
   // ATTENTION!
-  // *
+  // * Unreachable blocks should be removed as soon as possible since every
+  //   pass that uses the dominator tree requires such blocks having been
+  //   removed.
 
   using namespace mocker;
 
@@ -142,11 +145,22 @@ void optimize(mocker::ir::Module &module) {
 
   std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);
+
+  runOptPasses<SSAConstruction>(module);
+  for (int i = 0; i < 3; ++i) {
+    runOptPasses<SimplifyPhiFunctions>(module);
+    runOptPasses<MergeBlocks>(module);
+    runOptPasses<DeadCodeElimination>(module);
+    runOptPasses<RemoveUnreachableBlocks>(module);
+  }
+
+  std::cerr << "\nAfter SSA reconstruction:\n";
+  printIRStats(stats);
 }
 
 mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
   using namespace mocker;
-  auto res = runNaiveInstructionSelection(irModule);
+  auto res = runInstructionSelection(irModule);
   std::cerr << "\nNASM:\n";
   std::cerr << "After instruction selection:\n";
   printNasmStats(nasm::Stats(res));

@@ -5,12 +5,14 @@ set(HEADERS
   ast/helper.h
 
   codegen/helper.h
+  codegen/instruction_selection.h
   codegen/liveness.h
   codegen/naive_instruction_selection.h
   codegen/naive_register_allocation.h
   codegen/nasm_cfg.h
   codegen/peephole.h
   codegen/register_allocation.h
+  codegen/vreg_assignment.h
 
   common/defs.h
   common/error.h
@@ -49,12 +51,14 @@ set(HEADERS
   semantic/sym_tbl.h
 )
 set(SOURCES
+  codegen/instruction_selection.cpp
   codegen/liveness.cpp
   codegen/naive_instruction_selection.cpp
   codegen/naive_register_allocation.cpp
   codegen/nasm_cfg.cpp
   codegen/peephole.cpp
   codegen/register_allocation.cpp
+  codegen/vreg_assignment.cpp
 
   ir_builder/build.cpp
   ir_builder/builder.cpp
