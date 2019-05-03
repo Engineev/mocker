@@ -384,7 +384,7 @@ ir::InstListIter genInst(nasm::Section &text, FuncSelectionContext &ctx,
   }
   if (auto p = ir::dyc<ir::Malloc>(inst)) {
     genCall(text, ctx,
-            std::make_shared<ir::Call>(p->getDest(), "malloc", p->getSize()));
+            std::make_shared<ir::Call>(p->getDest(), "__alloc", p->getSize()));
     return nextIter;
   }
 
@@ -509,6 +509,7 @@ nasm::Module runInstructionSelection(const ir::Module &irModule) {
   res.emplaceDirective<nasm::Default>("rel");
   res.emplaceDirective<nasm::Global>("main");
   res.emplaceDirective<nasm::Extern>("malloc");
+  res.emplaceDirective<nasm::Extern>("__alloc");
   for (auto &kv : irModule.getFuncs()) {
     if (kv.second.isExternalFunc())
       res.emplaceDirective<nasm::Extern>(renameIdentifier(kv.first));

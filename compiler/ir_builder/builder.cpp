@@ -162,31 +162,12 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
 }
 
 void Builder::operator()(const ast::FuncCallExpr &node) const {
-  std::shared_ptr<Addr> dest =
-      node.identifier->val != "print" && (bool)ctx.getExprType(node.getID())
-          ? ctx.makeTempLocalReg()
-          : nullptr;
   std::string funcName = node.identifier->val;
   if (funcName == "print" || funcName == "println") {
-    if (translatePrint(node))
-      return;
+    translatePrint(node);
+    return;
   }
-
-  std::vector<std::shared_ptr<Addr>> args;
-  if (funcName.at(0) == '#') {
-    visit(*node.instance);
-    args.emplace_back(ctx.getExprAddr(node.instance->getID()));
-  }
-  for (auto &arg : node.args) {
-    visit(*arg);
-    args.emplace_back(ctx.getExprAddr(arg->getID()));
-  }
-
-  ctx.emplaceInst<Call>(std::static_pointer_cast<ir::Reg>(dest), funcName,
-                        args);
-
-  if (dest)
-    ctx.setExprAddr(node.getID(), dest);
+  translateCall(node);
 }
 
 void Builder::operator()(const ast::NewExpr &node) const {
@@ -690,21 +671,14 @@ std::shared_ptr<Addr> Builder::translateNewArray(
 }
 
 void Builder::addBuiltinAndExternal() const {
-  //    BuilderContext::ClassLayout strLayout;
-  //    strLayout.size = 16;
-  //    ctx.addClassLayout("string", std::move(strLayout));
-  //    BuilderContext::ClassLayout arrayLayout;
-  //    arrayLayout.size = 16;
-  //    ctx.addClassLayout("_array_", std::move(arrayLayout));
-
   // null
   ctx.addGlobalVar("@null");
-  //  ctx.emplaceGlobalInitInst<Malloc>(std::make_shared<GlobalReg>("@null"),
-  //                                    makeILit(1));
 
   auto add = [this](std::string name, std::vector<std::string> args) {
     ctx.addFunc(FunctionModule(std::move(name), std::move(args), true));
   };
+
+  add("__alloc", {"sz"});
 
   // extern C
   add("memcpy", {"dest", "src", "count"});
@@ -716,6 +690,7 @@ void Builder::addBuiltinAndExternal() const {
   add("getInt", {});
   add("toString", {"i"});
   add("_printInt", {"x"});
+  add("_printlnInt", {"x"});
 
   // builtin functions of string
   add("#string#_ctor_", {"this"});
@@ -749,42 +724,64 @@ void Builder::addGlobalVariable(
   ctx.emplaceGlobalInitInst<Call>(funcName);
 }
 
-bool Builder::translatePrint(const ast::FuncCallExpr &print) const {
-  if (print.identifier->val == "println") {
-    auto printContent = std::make_shared<ast::FuncCallExpr>(
-        nullptr, std::make_shared<ast::Identifier>("print"), print.args);
-    visit(*printContent);
-    auto printNewline = std::make_shared<ast::FuncCallExpr>(
-        nullptr, std::make_shared<ast::Identifier>("print"),
-        std::vector<std::shared_ptr<ast::Expression>>{
-            std::make_shared<ast::StringLitExpr>("\n")});
-    visit(*printNewline);
-    return true;
+void Builder::translateCall(const ast::FuncCallExpr &node) const {
+  std::shared_ptr<Addr> dest = node.identifier->val != "print" &&
+                                       node.identifier->val != "println" &&
+                                       (bool)ctx.getExprType(node.getID())
+                                   ? ctx.makeTempLocalReg()
+                                   : nullptr;
+
+  std::string funcName = node.identifier->val;
+  std::vector<std::shared_ptr<Addr>> args;
+  if (funcName.at(0) == '#') {
+    visit(*node.instance);
+    args.emplace_back(ctx.getExprAddr(node.instance->getID()));
+  }
+  for (auto &arg : node.args) {
+    visit(*arg);
+    args.emplace_back(ctx.getExprAddr(arg->getID()));
   }
 
+  ctx.emplaceInst<Call>(std::static_pointer_cast<ir::Reg>(dest), funcName,
+                        args);
+
+  if (dest)
+    ctx.setExprAddr(node.getID(), dest);
+}
+
+void Builder::translatePrint(const ast::FuncCallExpr &print) const {
   auto val = print.args.at(0);
-  if (auto p = std::dynamic_pointer_cast<ast::FuncCallExpr>(val)) {
-    if (p->identifier->val != "toString")
-      return false;
-    visit(*p->args.at(0));
-    auto arg = ctx.getExprAddr(p->args.at(0)->getID());
-    ctx.emplaceInst<Call>("_printInt", arg);
-    return true;
+  bool newline = (print.identifier->val == "println");
+
+  // can be converted to printInt ?
+  while (true) {
+    auto toString = std::dynamic_pointer_cast<ast::FuncCallExpr>(val);
+    if (!toString || toString->identifier->val != "toString")
+      break;
+    visit(*toString->args.at(0));
+    auto arg = ctx.getExprAddr(toString->args.at(0)->getID());
+    ctx.emplaceInst<Call>(newline ? "_printlnInt" : "_printInt", arg);
+    return;
   }
-  if (auto p = std::dynamic_pointer_cast<ast::BinaryExpr>(val)) {
-    if (p->op != ast::BinaryExpr::Add)
-      return false;
+
+  // can be split into two print's ?
+  while (true) {
+    auto concat = std::dynamic_pointer_cast<ast::BinaryExpr>(val);
+    if (!concat || concat->op != ast::BinaryExpr::Add)
+      break;
     auto printLhs = std::make_shared<ast::FuncCallExpr>(
         nullptr, std::make_shared<ast::Identifier>("print"),
-        std::vector<std::shared_ptr<ast::Expression>>{p->lhs});
-    visit(*printLhs);
+        std::vector<std::shared_ptr<ast::Expression>>{concat->lhs});
+    translatePrint(*printLhs);
     auto printRhs = std::make_shared<ast::FuncCallExpr>(
-        nullptr, std::make_shared<ast::Identifier>("print"),
-        std::vector<std::shared_ptr<ast::Expression>>{p->rhs});
-    visit(*printRhs);
-    return true;
+        nullptr,
+        std::make_shared<ast::Identifier>(newline ? "println" : "print"),
+        std::vector<std::shared_ptr<ast::Expression>>{concat->rhs});
+    translatePrint(*printRhs);
+    return;
   }
-  return false;
+
+  translateCall(print);
 }
 
 std::shared_ptr<Reg>

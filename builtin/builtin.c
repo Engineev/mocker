@@ -7,7 +7,7 @@ void *__alloc(size_t sz) {
   if (sz >= 128)
     return malloc(sz);
 
-  const CHUNK_SIZE = 128 * 1024;
+  const size_t CHUNK_SIZE = 2048;
   static char *storage = NULL;
   static size_t used = CHUNK_SIZE;
   if (used + sz > CHUNK_SIZE) {
@@ -83,7 +83,26 @@ void print(void *ptr) {
   printf("%.*s", (int)len, (char *)ptr);
 }
 
-void _printInt(int x) { printf("%d", x); }
+void _printInt(int num) {
+  if (num == 0)
+    putchar('0');
+  if (num < 0) {
+    num = -num;
+    putchar('-');
+  }
+  int digits[10], len = 0;
+  while (num > 0) {
+    digits[len++] = num % 10;
+    num /= 10;
+  }
+  for (int i = len - 1; i >= 0; --i)
+    putchar('0' + digits[i]);
+}
+
+void _printlnInt(int x) {
+  _printInt(x);
+  putchar('\n');
+}
 
 void *getString() {
   char buffer[256];

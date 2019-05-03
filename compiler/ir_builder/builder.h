@@ -123,7 +123,9 @@ private:
 
   void addGlobalVariable(const std::shared_ptr<ast::VarDecl> &decl) const;
 
-  bool translatePrint(const ast::FuncCallExpr &print) const;
+  void translateCall(const ast::FuncCallExpr &call) const;
+
+  void translatePrint(const ast::FuncCallExpr &print) const;
 
 private:
   std::shared_ptr<Reg> getMemberElementPtr(const std::shared_ptr<Addr> &base,
