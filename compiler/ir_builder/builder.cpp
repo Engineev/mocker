@@ -10,11 +10,13 @@ namespace ir {
 
 void Builder::operator()(const ast::IntLitExpr &node) const {
   ctx.setExprAddr(node.getID(), std::make_shared<IntLiteral>(node.val));
+  ctx.markExprTrivial(node);
 }
 
 void Builder::operator()(const ast::BoolLitExpr &node) const {
   ctx.setExprAddr(node.getID(),
                   std::make_shared<IntLiteral>((Integer)node.val));
+  ctx.markExprTrivial(node);
 }
 
 void Builder::operator()(const ast::StringLitExpr &node) const {
@@ -32,9 +34,14 @@ void Builder::operator()(const ast::IdentifierExpr &node) const {
   auto dest = ctx.makeTempLocalReg();
   ctx.setExprAddr(node.getID(), dest);
   ctx.emplaceInst<Load>(dest, makeReg(node.identifier->val));
+  ctx.markExprTrivial(node);
 }
 
 void Builder::operator()(const ast::UnaryExpr &node) const {
+  Defer defer([&node, this] {
+    if (ctx.isTrivial(node.operand))
+      ctx.markExprTrivial(node);
+  });
   // arithmetic
   if (node.op == ast::UnaryExpr::BitNot || node.op == ast::UnaryExpr::Neg) {
     visit(*node.operand);
@@ -96,6 +103,12 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
     ctx.setExprAddr(node.getID(), val);
     return;
   }
+
+  Defer defer([&node, this] {
+    if (ctx.isTrivial(node.lhs) && ctx.isTrivial(node.rhs))
+      ctx.markExprTrivial(node);
+  });
+
   // Eq, Ne, Lt, Gt, Le, Ge,
   if (ast::BinaryExpr::Eq <= node.op && node.op <= ast::BinaryExpr::Ge) {
     auto op = (RelationInst::OpType)(RelationInst::Eq +
@@ -112,44 +125,7 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
   }
   if (node.op == ast::BinaryExpr::LogicalAnd ||
       node.op == ast::BinaryExpr::LogicalOr) {
-    auto originBB = ctx.getCurBasicBlock();
-    auto originLabel = getBBLabel(originBB);
-    FunctionModule &func = ctx.getCurFunc();
-
-    auto boolExpAddr = ctx.makeTempLocalReg("boolExpAddr");
-    ctx.appendInstFront(func.getFirstBB(),
-                        std::make_shared<Alloca>(boolExpAddr));
-
-    auto rhsFirstBB = func.insertBBAfter(originBB);
-    auto rhsFirstLabel = getBBLabel(rhsFirstBB);
-    auto successorBB = func.insertBBAfter(rhsFirstBB);
-    auto successorLabel = getBBLabel(successorBB);
-
-    visit(*node.lhs);
-    auto lhsVal = ctx.getExprAddr(node.lhs->getID());
-    ctx.emplaceInst<Store>(boolExpAddr, lhsVal);
-
-    if (node.op == ast::BinaryExpr::LogicalAnd) {
-      ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()), rhsFirstLabel,
-                              successorLabel);
-    } else {
-      ctx.emplaceInst<Branch>(ctx.getExprAddr(node.lhs->getID()),
-                              successorLabel, rhsFirstLabel);
-    }
-
-    ctx.setCurBasicBlock(rhsFirstBB);
-    visit(*node.rhs);
-    auto rhsVal = ctx.getExprAddr(node.rhs->getID());
-    ctx.emplaceInst<Store>(boolExpAddr, rhsVal);
-
-    //    auto rhsLastBB = ctx.getCurBasicBlock();
-    ctx.emplaceInst<Jump>(successorLabel);
-
-    ctx.setCurBasicBlock(successorBB);
-    auto val = ctx.makeTempLocalReg("v");
-    ctx.setExprAddr(node.getID(), val);
-
-    ctx.emplaceInst<Load>(val, boolExpAddr);
+    translateLogicBinary(node);
     return;
   }
   // string
@@ -473,6 +449,62 @@ Builder::splitMemberVarIdent(const std::string &ident) const {
   std::string className(ident.begin() + 1, iter);
   std::string varName(iter + 1, ident.end());
   return {className, varName};
+}
+
+void Builder::translateLogicBinary(const ast::BinaryExpr &node) const {
+  auto originBB = ctx.getCurBasicBlock();
+  auto originLabel = getBBLabel(originBB);
+  FunctionModule &func = ctx.getCurFunc();
+
+  auto boolExpAddr = ctx.makeTempLocalReg("boolExpAddr");
+  ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(boolExpAddr));
+
+  visit(*node.lhs);
+  auto lhsVal = ctx.getExprAddr(node.lhs->getID());
+  ctx.emplaceInst<Store>(boolExpAddr, lhsVal);
+  auto lhsLastBB = ctx.getCurBasicBlock();
+
+  auto rhsFirstBB = func.insertBBAfter(originBB);
+  auto rhsFirstLabel = getBBLabel(rhsFirstBB);
+  ctx.setCurBasicBlock(rhsFirstBB);
+  visit(*node.rhs);
+  auto rhsVal = ctx.getExprAddr(node.rhs->getID());
+  ctx.emplaceInst<Store>(boolExpAddr, rhsVal);
+
+  auto successorBB = func.pushBackBB();
+  auto successorLabel = getBBLabel(successorBB);
+  ctx.emplaceInst<Jump>(successorLabel);
+
+  if (!ctx.isTrivial(node.rhs)) {
+    if (node.op == ast::BinaryExpr::LogicalAnd) {
+      ctx.appendInst(lhsLastBB, std::make_shared<Branch>(
+                                    ctx.getExprAddr(node.lhs->getID()),
+                                    rhsFirstLabel, successorLabel));
+    } else {
+      ctx.appendInst(lhsLastBB, std::make_shared<Branch>(
+                                    ctx.getExprAddr(node.lhs->getID()),
+                                    successorLabel, rhsFirstLabel));
+    }
+
+    ctx.setCurBasicBlock(successorBB);
+    auto val = ctx.makeTempLocalReg("v");
+    ctx.setExprAddr(node.getID(), val);
+    ctx.emplaceInst<Load>(val, boolExpAddr);
+    return;
+  }
+
+  ctx.appendInst(lhsLastBB, std::make_shared<Jump>(rhsFirstLabel));
+  ctx.setCurBasicBlock(successorBB);
+
+  rhsVal = ctx.getExprAddr(node.rhs->getID());
+  auto val = ctx.makeTempLocalReg("v");
+  ctx.setExprAddr(node.getID(), val);
+  ctx.emplaceInst<ArithBinaryInst>(val,
+                                   node.op == ast::BinaryExpr::LogicalAnd
+                                       ? ArithBinaryInst::BitAnd
+                                       : ArithBinaryInst::BitOr,
+                                   lhsVal, rhsVal);
+  ctx.markExprTrivial(node);
 }
 
 void Builder::translateLoop(

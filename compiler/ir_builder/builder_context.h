@@ -99,6 +99,14 @@ public:
         std::make_shared<Inst>(std::forward<Args>(args)...));
   }
 
+  void markExprTrivial(const ast::Expression &node) {
+    trivialExpr.emplace(node.getID());
+  }
+
+  bool isTrivial(const std::shared_ptr<ast::Expression> &node) const {
+    return trivialExpr.find(node->getID()) != trivialExpr.end();
+  }
+
 private:
   ASTIDMap<std::shared_ptr<Addr>> exprAddr;
   const ASTIDMap<std::shared_ptr<ast::Type>> &exprType;
@@ -107,6 +115,8 @@ private:
   // The key is <class name> + '_' + <variable name>
   std::unordered_map<std::string, ClassLayout> classLayout;
   std::unordered_map<std::string, std::shared_ptr<Reg>> strLits;
+
+  std::unordered_set<ast::NodeID> trivialExpr;
 
   Module module;
 

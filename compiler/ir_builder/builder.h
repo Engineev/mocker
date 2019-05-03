@@ -108,6 +108,8 @@ private:
   std::pair<std::string, std::string>
   splitMemberVarIdent(const std::string &ident) const;
 
+  void translateLogicBinary(const ast::BinaryExpr &node) const;
+
   void
   translateLoop(const std::shared_ptr<ast::Expression> &condition,
                 const std::shared_ptr<ast::Statement> &body,
