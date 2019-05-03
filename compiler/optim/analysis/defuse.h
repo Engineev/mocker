@@ -51,4 +51,46 @@ private:
 
 } // namespace mocker
 
+namespace mocker {
+
+class UseDefChain {
+public:
+  class Def {
+  public:
+    Def(std::size_t bbLabel, std::shared_ptr<ir::IRInst> inst)
+        : bbLabel(bbLabel), inst(std::move(inst)) {}
+    Def(const Def &) = default;
+    Def &operator=(const Def &) = default;
+    ~Def() = default;
+
+    const std::size_t getBBLabel() const { return bbLabel; }
+
+    const std::shared_ptr<ir::IRInst> &getInst() const { return inst; }
+
+  private:
+    std::size_t bbLabel = 0;
+    std::shared_ptr<ir::IRInst> inst;
+  };
+
+  void init(const ir::FunctionModule &func) {
+    for (auto &bb : func.getBBs()) {
+      for (auto &inst : bb.getInsts()) {
+        auto dest = ir::getDest(inst);
+        if (!dest)
+          continue;
+        chain.emplace(std::make_pair(dest, Def(bb.getLabelID(), inst)));
+      }
+    }
+  }
+
+  const Def &getDef(const std::shared_ptr<ir::Reg> &reg) const {
+    return chain.at(reg);
+  }
+
+private:
+  ir::RegMap<Def> chain;
+};
+
+} // namespace mocker
+
 #endif // MOCKER_DEFUSE_H
