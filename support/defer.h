@@ -7,15 +7,21 @@ namespace mocker {
 
 class Defer {
 public:
+  Defer() = default;
   Defer(std::function<void()> action) : action(std::move(action)) {}
-
   Defer(const Defer &) = delete;
   Defer(Defer &&o) noexcept {
     action = o.action;
     o.action = nullptr;
   };
   Defer &operator=(const Defer &) = delete;
-  Defer &operator=(Defer &&o) noexcept = delete;
+  Defer &operator=(Defer &&o) noexcept {
+    if (this == &o)
+      return *this;
+    action = o.action;
+    o.action = nullptr;
+    return *this;
+  };
 
   ~Defer() {
     if (action != nullptr)
@@ -28,7 +34,7 @@ public:
   }
 
 private:
-  std::function<void()> action;
+  std::function<void()> action = nullptr;
 };
 
 } // namespace mocker

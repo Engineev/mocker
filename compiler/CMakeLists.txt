@@ -7,7 +7,6 @@ set(HEADERS
   codegen/helper.h
   codegen/instruction_selection.h
   codegen/liveness.h
-  codegen/naive_instruction_selection.h
   codegen/naive_register_allocation.h
   codegen/nasm_cfg.h
   codegen/peephole.h
@@ -27,6 +26,7 @@ set(HEADERS
   optim/analysis/dominance.h
   optim/analysis/func_attr.h
   optim/analysis/loop_tree.h
+  optim/codegen_prepare.h
   optim/constant_propagation.h
   optim/copy_propagation.h
   optim/dead_code_elimination.h
@@ -54,7 +54,6 @@ set(HEADERS
 set(SOURCES
   codegen/instruction_selection.cpp
   codegen/liveness.cpp
-  codegen/naive_instruction_selection.cpp
   codegen/naive_register_allocation.cpp
   codegen/nasm_cfg.cpp
   codegen/peephole.cpp
@@ -69,6 +68,7 @@ set(SOURCES
   optim/analysis/dominance.cpp
   optim/analysis/func_attr.cpp
   optim/analysis/loop_tree.cpp
+  optim/codegen_prepare.cpp
   optim/constant_propagation.cpp
   optim/copy_propagation.cpp
   optim/dead_code_elimination.cpp

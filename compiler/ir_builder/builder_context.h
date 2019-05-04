@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "ast/ast_node.h"
+#include "defer.h"
 #include "ir/ir_inst.h"
 #include "ir/module.h"
 
@@ -107,7 +108,29 @@ public:
     return trivialExpr.find(node->getID()) != trivialExpr.end();
   }
 
+  // Auxiliary information for the translation of logical binary nodes
+  struct LogicalExprInfo {
+    bool empty = true;
+    // the blocks to go when the result is true/false
+    BBLIter trueNext, falseNext;
+
+    bool inCondition = false;
+  };
+
+  void checkLogicalExpr(const ast::Expression &node) {
+    if (logicalExprInfo.empty)
+      return;
+    emplaceInst<Branch>(
+        getExprAddr(node.getID()),
+        std::make_shared<Label>(logicalExprInfo.trueNext->getLabelID()),
+        std::make_shared<Label>(logicalExprInfo.falseNext->getLabelID()));
+  }
+
+  LogicalExprInfo &getLogicalExprInfo() { return logicalExprInfo; }
+
 private:
+  LogicalExprInfo logicalExprInfo;
+
   ASTIDMap<std::shared_ptr<Addr>> exprAddr;
   const ASTIDMap<std::shared_ptr<ast::Type>> &exprType;
   InstIDMap<BBLIter> bbReside;

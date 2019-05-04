@@ -5,7 +5,6 @@
 
 #include "ast/ast_node.h"
 #include "codegen/instruction_selection.h"
-#include "codegen/naive_instruction_selection.h"
 #include "codegen/naive_register_allocation.h"
 #include "codegen/peephole.h"
 #include "codegen/register_allocation.h"
@@ -17,6 +16,7 @@
 #include "ir_builder/builder_context.h"
 #include "nasm/printer.h"
 #include "nasm/stats.h"
+#include "optim/codegen_prepare.h"
 #include "optim/constant_propagation.h"
 #include "optim/copy_propagation.h"
 #include "optim/dead_code_elimination.h"
@@ -168,6 +168,8 @@ void optimize(mocker::ir::Module &module) {
     runOptPasses<DeadCodeElimination>(module, funcAttr);
     runOptPasses<RemoveUnreachableBlocks>(module);
   }
+
+  runOptPasses<CodegenPreparation>(module);
 
   std::cerr << "\nAfter SSA reconstruction:\n";
   printIRStats(stats);

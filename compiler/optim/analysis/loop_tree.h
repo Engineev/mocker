@@ -22,12 +22,16 @@ public:
   // inner loops first traversal
   std::vector<std::size_t> postOrder() const;
 
+  bool isLoopHeader(std::size_t n) const {
+    return loops.at(n).size() != 1;
+  }
+
 private:
   void buildDepth();
 
 private:
   // The mapping from the headers to the union of the natural loops
-  // If loops[x] is empty, then x is not a header of any loop.
+  // If loops[x] is contains only itself, then x is not a header of any loop.
   std::unordered_map<std::size_t, std::unordered_set<std::size_t>> loops;
 
   // The loop tree, where each loop is represented by its header.

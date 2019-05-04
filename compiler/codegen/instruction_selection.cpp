@@ -200,7 +200,8 @@ bool genRelation(nasm::Section &text, FuncSelectionContext &ctx,
     }
     auto irDest = p->getDest();
     auto condition = ir::dycLocalReg(br->getCondition());
-    if (!condition || condition->getIdentifier() != irDest->getIdentifier()) {
+    if (!condition || condition->getIdentifier() != irDest->getIdentifier() ||
+        (nextBB != br->getThen()->getID() && nextBB != br->getElse()->getID())) {
       skipNext = false;
       break;
     }
@@ -221,9 +222,15 @@ bool genRelation(nasm::Section &text, FuncSelectionContext &ctx,
   text.emplaceInst<nasm::Cmp>(lhs, rhs);
 
   if (skipNext) {
-    // Note that the values of this map is the counterpart of the key since it
-    // is used to jump to the else-branch
-    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType> opMap{
+    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType> Jump2ThenMap{
+        {ir::RelationInst::Eq, nasm::CJump::Ez},
+        {ir::RelationInst::Ne, nasm::CJump::Ne},
+        {ir::RelationInst::Lt, nasm::CJump::Lt},
+        {ir::RelationInst::Le, nasm::CJump::Le},
+        {ir::RelationInst::Gt, nasm::CJump::Gt},
+        {ir::RelationInst::Ge, nasm::CJump::Ge},
+    };
+    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType> Jump2ElseMap{
         {ir::RelationInst::Eq, nasm::CJump::Ne},
         {ir::RelationInst::Ne, nasm::CJump::Ez},
         {ir::RelationInst::Lt, nasm::CJump::Ge},
@@ -233,13 +240,18 @@ bool genRelation(nasm::Section &text, FuncSelectionContext &ctx,
     };
 
     auto br = ir::dyc<ir::Branch>(nextInst);
+    if (br->getThen()->getID() == nextBB) {  // fall through to then
+      text.emplaceInst<nasm::CJump>(
+          Jump2ElseMap.at(p->getOp()),
+          std::make_shared<nasm::Label>(".L" +
+              std::to_string(br->getElse()->getID())));
+      return true;
+    }
+    // fall through to else
     text.emplaceInst<nasm::CJump>(
-        opMap.at(p->getOp()),
+        Jump2ThenMap.at(p->getOp()),
         std::make_shared<nasm::Label>(".L" +
-                                      std::to_string(br->getElse()->getID())));
-    if (br->getThen()->getID() != nextBB)
-      text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
-          ".L" + std::to_string(br->getThen()->getID())));
+            std::to_string(br->getThen()->getID())));
     return true;
   }
 
@@ -265,12 +277,25 @@ void genBranch(nasm::Section &text, FuncSelectionContext &ctx,
   auto lhs = ctx.newVirtualReg();
   text.emplaceInst<nasm::Mov>(lhs, ctx.getIrAddr(inst->getCondition()));
   text.emplaceInst<nasm::Cmp>(lhs, std::make_shared<nasm::NumericConstant>(0));
+
+  if (inst->getThen()->getID() == nextBB) {
+    text.emplaceInst<nasm::CJump>(
+        nasm::CJump::Ez, std::make_shared<nasm::Label>(
+            ".L" + std::to_string(inst->getElse()->getID())));
+    return;
+  }
+  if (inst->getElse()->getID() == nextBB) {
+    text.emplaceInst<nasm::CJump>(
+        nasm::CJump::Ne, std::make_shared<nasm::Label>(
+            ".L" + std::to_string(inst->getThen()->getID())));
+    return;
+  }
+
   text.emplaceInst<nasm::CJump>(
       nasm::CJump::Ez, std::make_shared<nasm::Label>(
                            ".L" + std::to_string(inst->getElse()->getID())));
-  if (inst->getThen()->getID() != nextBB)
-    text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
-        ".L" + std::to_string(inst->getThen()->getID())));
+  text.emplaceInst<nasm::Jmp>(std::make_shared<nasm::Label>(
+      ".L" + std::to_string(inst->getThen()->getID())));
 }
 
 void genCall(nasm::Section &text, FuncSelectionContext &ctx,
