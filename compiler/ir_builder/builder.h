@@ -108,6 +108,8 @@ private:
   std::pair<std::string, std::string>
   splitMemberVarIdent(const std::string &ident) const;
 
+  void translateEscapedLogicBinary(const ast::BinaryExpr &node) const;
+
   void translateLogicBinary(const ast::BinaryExpr &node) const;
 
   void

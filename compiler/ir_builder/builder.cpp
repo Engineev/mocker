@@ -469,7 +469,69 @@ Builder::splitMemberVarIdent(const std::string &ident) const {
   return {className, varName};
 }
 
+void Builder::translateEscapedLogicBinary(
+    const mocker::ast::BinaryExpr &node) const {
+  auto originBB = ctx.getCurBasicBlock();
+  auto originLabel = getBBLabel(originBB);
+  FunctionModule &func = ctx.getCurFunc();
+
+  auto boolExpAddr = ctx.makeTempLocalReg("boolExpAddr");
+  ctx.appendInstFront(func.getFirstBB(), std::make_shared<Alloca>(boolExpAddr));
+
+  visit(*node.lhs);
+  auto lhsVal = ctx.getExprAddr(node.lhs->getID());
+  ctx.emplaceInst<Store>(boolExpAddr, lhsVal);
+  auto lhsLastBB = ctx.getCurBasicBlock();
+
+  auto rhsFirstBB = func.insertBBAfter(originBB);
+  auto rhsFirstLabel = getBBLabel(rhsFirstBB);
+  ctx.setCurBasicBlock(rhsFirstBB);
+  visit(*node.rhs);
+  auto rhsVal = ctx.getExprAddr(node.rhs->getID());
+  ctx.emplaceInst<Store>(boolExpAddr, rhsVal);
+
+  auto successorBB = func.pushBackBB();
+  auto successorLabel = getBBLabel(successorBB);
+  ctx.emplaceInst<Jump>(successorLabel);
+
+  if (!ctx.isTrivial(node.rhs)) {
+    if (node.op == ast::BinaryExpr::LogicalAnd) {
+      ctx.appendInst(lhsLastBB, std::make_shared<Branch>(
+                                    ctx.getExprAddr(node.lhs->getID()),
+                                    rhsFirstLabel, successorLabel));
+    } else {
+      ctx.appendInst(lhsLastBB, std::make_shared<Branch>(
+                                    ctx.getExprAddr(node.lhs->getID()),
+                                    successorLabel, rhsFirstLabel));
+    }
+
+    ctx.setCurBasicBlock(successorBB);
+    auto val = ctx.makeTempLocalReg("v");
+    ctx.setExprAddr(node.getID(), val);
+    ctx.emplaceInst<Load>(val, boolExpAddr);
+    return;
+  }
+
+  ctx.appendInst(lhsLastBB, std::make_shared<Jump>(rhsFirstLabel));
+  ctx.setCurBasicBlock(successorBB);
+
+  rhsVal = ctx.getExprAddr(node.rhs->getID());
+  auto val = ctx.makeTempLocalReg("v");
+  ctx.setExprAddr(node.getID(), val);
+  ctx.emplaceInst<ArithBinaryInst>(val,
+                                   node.op == ast::BinaryExpr::LogicalAnd
+                                       ? ArithBinaryInst::BitAnd
+                                       : ArithBinaryInst::BitOr,
+                                   lhsVal, rhsVal);
+  ctx.markExprTrivial(node);
+}
+
 void Builder::translateLogicBinary(const ast::BinaryExpr &node) const {
+  if (!ctx.getLogicalExprInfo().inCondition) {
+    translateEscapedLogicBinary(node);
+    return;
+  }
+
   auto originBB = ctx.getCurBasicBlock();
   auto originLabel = getBBLabel(originBB);
   FunctionModule &func = ctx.getCurFunc();

@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "helper.h"
 #include "ir/helper.h"
 #include "set_operation.h"
 
@@ -31,6 +32,15 @@ std::vector<std::size_t> getPreOrder(const ir::FunctionModule &func) {
 } // namespace
 
 bool CodegenPreparation::operator()() {
+  sortBlocks();
+  func.buildContext();
+  for (auto &bb : func.getMutableBBs())
+    scheduleCmps(bb);
+  removeDeletedInsts(func);
+  return false;
+}
+
+void CodegenPreparation::sortBlocks() {
   loopTree.init(func);
 
   const auto PreOrder = getPreOrder(func);
@@ -82,7 +92,35 @@ bool CodegenPreparation::operator()() {
     }
   }
   func.getMutableBBs() = std::move(newBBs);
-  return false;
+}
+
+void CodegenPreparation::scheduleCmps(ir::BasicBlock &bb) {
+  auto br = ir::dyc<ir::Branch>(bb.getInsts().back());
+  if (!br)
+    return;
+  auto condition = ir::dycLocalReg(br->getCondition());
+  if (!condition)
+    return;
+
+  auto riter = (++bb.getMutableInsts().rbegin());
+  auto rend = bb.getMutableInsts().rend();
+  for (; riter != rend; ++riter) {
+    auto operands = ir::getOperandsUsed(*riter);
+    for (auto &operand : operands) {
+      auto reg = ir::dycLocalReg(operand);
+      if (reg && reg->getIdentifier() == condition->getIdentifier())
+        return;
+    }
+
+    auto def = ir::getDest(*riter);
+    if (def && def->getIdentifier() == condition->getIdentifier())
+      break;
+  }
+  if (riter == rend)
+    return;
+
+  bb.appendInstBeforeTerminator(*riter);
+  *riter = std::make_shared<ir::Deleted>();
 }
 
 } // namespace mocker

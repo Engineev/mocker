@@ -14,6 +14,11 @@ public:
   bool operator()() override;
 
 private:
+  void sortBlocks();
+
+  void scheduleCmps(ir::BasicBlock &bb);
+
+private:
   LoopTree loopTree;
 };
 
