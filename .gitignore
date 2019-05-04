@@ -5,6 +5,5 @@ build*/
 .vscode/
 .vs/
 program.in
-mocker-c
 a.asm
 *.a
