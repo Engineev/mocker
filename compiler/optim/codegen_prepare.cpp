@@ -150,7 +150,8 @@ void CodegenPreparation::naiveStrengthReduction() {
         continue;
       auto lhs = binary->getLhs(), rhs = binary->getRhs();
       // Associativity is required here
-      if (ir::dyc<ir::IntLiteral>(lhs))
+      if (ir::dyc<ir::IntLiteral>(lhs) &&
+          binary->getOp() != ir::ArithBinaryInst::Div)
         std::swap(lhs, rhs);
       auto lit = ir::dyc<ir::IntLiteral>(rhs);
 
@@ -172,7 +173,7 @@ void CodegenPreparation::naiveStrengthReduction() {
 
       if (binary->getOp() == ir::ArithBinaryInst::Add && lit &&
           lit->getVal() == 0) {
-        inst = std::make_shared<ir::Deleted>();
+        inst = std::make_shared<ir::Assign>(binary->getDest(), lhs);
         continue;
       }
     }
