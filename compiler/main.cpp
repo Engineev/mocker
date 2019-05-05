@@ -119,7 +119,9 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
+  runOptPasses<SparseSimpleConstantPropagation>(module);
   runOptPasses<GlobalConstantInline>(module);
+  runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
@@ -129,7 +131,6 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
 
-  //  runOptsUntilFixedPoint(module);
   runOptPasses<RewriteBranches>(module);
   runOptPasses<SimplifyPhiFunctions>(module);
   runOptPasses<MergeBlocks>(module);

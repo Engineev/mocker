@@ -5,8 +5,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include "analysis/defuse.h"
 #include "helper.h"
 #include "ir/helper.h"
+#include "ir/ir_inst.h"
+#include "optim/global_value_numbering.h"
 #include "set_operation.h"
 
 namespace mocker {
@@ -36,6 +39,8 @@ bool CodegenPreparation::operator()() {
   func.buildContext();
   for (auto &bb : func.getMutableBBs())
     scheduleCmps(bb);
+  removeDeletedInsts(func);
+  naiveStrengthReduction();
   removeDeletedInsts(func);
   return false;
 }
@@ -121,6 +126,57 @@ void CodegenPreparation::scheduleCmps(ir::BasicBlock &bb) {
 
   bb.appendInstBeforeTerminator(*riter);
   *riter = std::make_shared<ir::Deleted>();
+}
+
+namespace {
+
+int getNonzeroPos(std::uint64_t n) {
+  if (n & (n - 1))
+    return -1;
+  for (int i = 0; i < 8; ++i) {
+    if (n & (1 << i))
+      return i;
+  }
+  assert(false);
+}
+
+} // namespace
+
+void CodegenPreparation::naiveStrengthReduction() {
+  for (auto &bb : func.getMutableBBs()) {
+    for (auto &inst : bb.getMutableInsts()) {
+      auto binary = ir::dyc<ir::ArithBinaryInst>(inst);
+      if (!binary)
+        continue;
+      auto lhs = binary->getLhs(), rhs = binary->getRhs();
+      // Associativity is required here
+      if (ir::dyc<ir::IntLiteral>(lhs))
+        std::swap(lhs, rhs);
+      auto lit = ir::dyc<ir::IntLiteral>(rhs);
+
+      if (binary->getOp() == ir::ArithBinaryInst::Mul ||
+          binary->getOp() == ir::ArithBinaryInst::Div) {
+        if (!lit || lit->getVal() <= 0)
+          continue;
+        auto pos = getNonzeroPos(lit->getVal());
+        if (pos == -1)
+          continue;
+        inst = std::make_shared<ir::ArithBinaryInst>(
+            binary->getDest(),
+            binary->getOp() == ir::ArithBinaryInst::Mul
+                ? ir::ArithBinaryInst::Shl
+                : ir::ArithBinaryInst::Shr,
+            lhs, std::make_shared<ir::IntLiteral>(pos));
+        continue;
+      }
+
+      if (binary->getOp() == ir::ArithBinaryInst::Add && lit &&
+          lit->getVal() == 0) {
+        inst = std::make_shared<ir::Deleted>();
+        continue;
+      }
+    }
+  }
 }
 
 } // namespace mocker

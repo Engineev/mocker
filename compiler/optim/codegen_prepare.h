@@ -18,6 +18,8 @@ private:
 
   void scheduleCmps(ir::BasicBlock &bb);
 
+  void naiveStrengthReduction();
+
 private:
   LoopTree loopTree;
 };
