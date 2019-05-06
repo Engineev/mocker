@@ -79,6 +79,13 @@ void FunctionModule::buildContext() {
     for (auto succ : bb.getSuccessors())
       predecessors[succ].emplace_back(bb.getLabelID());
   }
+
+  for (auto &bb : bbs) {
+    if (predecessors[bb.getLabelID()].empty()) {
+      std::swap(bb, bbs.front());
+      break;
+    }
+  }
 }
 
 const BasicBlock &FunctionModule::getBasicBlock(std::size_t labelID) const {

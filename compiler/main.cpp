@@ -25,6 +25,7 @@
 #include "optim/global_value_numbering.h"
 #include "optim/local_value_numbering.h"
 #include "optim/loopinv.h"
+#include "optim/memorization.h"
 #include "optim/module_simplification.h"
 #include "optim/optimizer.h"
 #include "optim/promote_global_variables.h"
@@ -119,8 +120,15 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "Original:\n";
   printIRStats(stats);
 
+  FuncAttr funcAttr;
+
   runOptPasses<SparseSimpleConstantPropagation>(module);
   runOptPasses<GlobalConstantInline>(module);
+
+  funcAttr.init(module);
+  runOptPasses<Memorization>(module, funcAttr, module);
+  // ir::printModule(module, std::cerr);
+
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<FunctionInline>(module);
@@ -142,7 +150,6 @@ void optimize(mocker::ir::Module &module) {
   runOptPasses<SSAConstruction>(module);
 
   runOptsUntilFixedPoint(module);
-  FuncAttr funcAttr;
   funcAttr.init(module);
   runOptPasses<LoopInvariantCodeMotion>(module, funcAttr);
   runOptsUntilFixedPoint(module);
@@ -164,7 +171,6 @@ void optimize(mocker::ir::Module &module) {
   for (int i = 0; i < 3; ++i) {
     runOptPasses<SimplifyPhiFunctions>(module);
     runOptPasses<MergeBlocks>(module);
-    FuncAttr funcAttr;
     funcAttr.init(module);
     runOptPasses<DeadCodeElimination>(module, funcAttr);
     runOptPasses<RemoveUnreachableBlocks>(module);

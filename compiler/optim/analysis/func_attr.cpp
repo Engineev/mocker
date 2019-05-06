@@ -45,12 +45,23 @@ buildCallGraph(const ir::Module &module) {
 } // namespace
 
 void FuncAttr::init(const ir::Module &module) {
+  globalVarUses.clear();
+  globalVarDefs.clear();
+  pureFuncs.clear();
+
   buildGlobalVarInfo(module);
-  for (auto &kv : module.getFuncs()) {
-    if (kv.second.isExternalFunc())
-      continue;
-    if (isPureFunc(kv.second))
-      pureFuncs.emplace(kv.first);
+
+  std::size_t size = pureFuncs.size();
+  while (true) {
+    for (auto &kv : module.getFuncs()) {
+      if (kv.second.isExternalFunc())
+        continue;
+      if (isPureFunc(kv.second))
+        pureFuncs.emplace(kv.first);
+    }
+    if (size == pureFuncs.size())
+      break;
+    size = pureFuncs.size();
   }
 }
 
@@ -120,12 +131,30 @@ void FuncAttr::buildGlobalVarInfo(const ir::Module &module) {
 }
 
 bool FuncAttr::isPureFunc(const ir::FunctionModule &func) {
+  std::unordered_set<std::string> stackVar;
+  for (auto &inst : func.getBasicBlock(func.getFirstBBLabel()).getInsts()) {
+    auto alloca = ir::dyc<ir::Alloca>(inst);
+    if (!alloca)
+      continue;
+    stackVar.emplace(alloca->getDest()->getIdentifier());
+  }
+
   for (auto &bb : func.getBBs()) {
     for (auto &inst : bb.getInsts()) {
-      if (ir::dyc<ir::Store>(inst))
-        return false;
+      if (auto p = ir::dyc<ir::Store>(inst)) {
+        auto reg = ir::dycLocalReg(p->getAddr());
+        if (!reg || !isIn(stackVar, reg->getIdentifier()))
+          return false;
+      }
+      if (auto p = ir::dyc<ir::Load>(inst)) {
+        auto reg = ir::dycLocalReg(p->getAddr());
+        if (!reg || !isIn(stackVar, reg->getIdentifier()))
+          return false;
+      }
       if (auto call = ir::dyc<ir::Call>(inst)) {
-        if (call->getFuncName() != func.getIdentifier())
+        if (call->getFuncName() == func.getIdentifier())
+          continue;
+        if (!isIn(pureFuncs, call->getFuncName()))
           return false;
       }
     }
