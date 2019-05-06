@@ -153,28 +153,28 @@ L_006:  mov     rdi, r14
 ALIGN   8
 
 __string__substring:
+        sub     edx, esi
         push    r13
         push    r12
-        mov     r13, rsi
         push    rbp
         push    rbx
-        mov     ebx, edx
-        sub     ebx, esi
+        lea     ebx, [rdx+9H]
         mov     r12, rdi
-        lea     ebp, [rbx+8H]
+        mov     r13, rsi
+        lea     ebp, [rdx+1H]
+        movsxd  rbx, ebx
         sub     rsp, 8
-        movsxd  rbp, ebp
-        cmp     rbp, 127
+        cmp     rbx, 127
         ja      L_010
         mov     rcx, qword [rel used.3358]
-        lea     rdx, [rbp+rcx]
+        lea     rdx, [rbx+rcx]
         cmp     rdx, 2048
         ja      L_009
         mov     rax, qword [rel storage.3357]
 L_007:  add     rax, rcx
         mov     qword [rel used.3358], rdx
 L_008:  lea     rcx, [rax+8H]
-        movsxd  rdx, ebx
+        movsxd  rdx, ebp
         lea     rsi, [r12+r13]
         mov     qword [rax], rdx
         mov     rdi, rcx
@@ -194,7 +194,7 @@ L_008:  lea     rcx, [rax+8H]
 ALIGN   16
 L_009:  mov     edi, 2048
         call    malloc
-        mov     rdx, rbp
+        mov     rdx, rbx
         mov     qword [rel storage.3357], rax
         xor     ecx, ecx
         jmp     L_007
@@ -204,7 +204,7 @@ L_009:  mov     edi, 2048
 
 
 ALIGN   16
-L_010:  mov     rdi, rbp
+L_010:  mov     rdi, rbx
         call    malloc
         jmp     L_008
 
@@ -888,7 +888,7 @@ L_047:  mov     edx, dword [rbx]
         add     dil, al
         sbb     rbx, 3
         sub     rbx, rbp
-        lea     r12, [rbx+8H]
+        lea     r12, [rbx+0CH]
         cmp     r12, 127
         ja      L_051
         mov     rcx, qword [rel used.3358]
