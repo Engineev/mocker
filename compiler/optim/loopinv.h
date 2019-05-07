@@ -9,8 +9,8 @@
 
 #include "analysis/defuse.h"
 #include "analysis/func_attr.h"
-#include "analysis/loop_tree.h"
 #include "opt_pass.h"
+#include "optim/analysis/loop_info.h"
 
 namespace mocker {
 
@@ -26,8 +26,6 @@ private:
 
   std::size_t processLoop(std::size_t header);
 
-  std::unordered_set<ir::InstID> findCandidateCalls(std::size_t header);
-
   std::unordered_set<ir::InstID>
   findLoopInvariantComputation(std::size_t header, const UseDefChain &useDef);
 
@@ -37,7 +35,7 @@ private:
 
 private:
   const FuncAttr &funcAttr;
-  LoopTree loopTree;
+  LoopInfo loopTree;
   std::unordered_map<std::size_t, std::size_t> preHeaders;
 };
 

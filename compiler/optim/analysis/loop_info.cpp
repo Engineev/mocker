@@ -1,4 +1,4 @@
-#include "loop_tree.h"
+#include "loop_info.h"
 
 #include <cassert>
 #include <functional>
@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "defuse.h"
 #include "dominance.h"
 #include "optim/helper.h"
 #include "set_operation.h"
@@ -148,7 +149,7 @@ std::unordered_map<std::size_t, std::unordered_set<std::size_t>> buildLoopTree(
 
 } // namespace
 
-void LoopTree::init(const ir::FunctionModule &func) {
+void LoopInfo::init(const ir::FunctionModule &func) {
   root = func.getFirstBBLabel();
   auto dominatorTree = DominatorTree();
   dominatorTree.init(func);
@@ -173,7 +174,7 @@ void LoopTree::init(const ir::FunctionModule &func) {
   buildDepth();
 }
 
-std::vector<std::size_t> LoopTree::postOrder() const {
+std::vector<std::size_t> LoopInfo::postOrder() const {
   std::vector<std::size_t> res;
 
   std::unordered_set<std::size_t> visited;
@@ -192,7 +193,7 @@ std::vector<std::size_t> LoopTree::postOrder() const {
   return res;
 }
 
-void LoopTree::buildDepth() {
+void LoopInfo::buildDepth() {
   std::function<void(std::size_t, std::size_t)> dfs =
       [this, &dfs](std::size_t cur, std::size_t curDepth) {
         for (auto &node : loops.at(cur))
@@ -201,6 +202,79 @@ void LoopTree::buildDepth() {
           dfs(child, curDepth + 1);
       };
   dfs(root, 0);
+}
+
+ir::RegSet LoopInfo::findLoopInvariantVariables(const ir::FunctionModule &func,
+                                                std::size_t header,
+                                                const UseDefChain &useDef,
+                                                const FuncAttr &funcAttr) {
+  const auto &loopNodes = getLoops().at(header);
+
+  ir::RegSet res;
+
+  auto isLoopInvariant = [&res, &loopNodes, &useDef,
+                          &func](const std::shared_ptr<ir::IRInst> &inst) {
+    auto operands = ir::getOperandsUsed(inst);
+    for (auto &operand : operands) {
+      auto reg = ir::dycLocalReg(operand);
+      if (!reg) {
+        continue;
+      }
+      if (isParameter(func, reg->getIdentifier()) ||
+          reg->getIdentifier() == ".phi_nan")
+        continue;
+      if (isIn(res, reg))
+        continue;
+
+      const auto &def = useDef.getDef(reg);
+      if (isIn(loopNodes, def.getBBLabel())) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  for (auto node : loopNodes) {
+    const auto &bb = func.getBasicBlock(node);
+    for (auto &inst : bb.getInsts()) {
+      if (!ir::dyc<ir::Assign>(inst) && !ir::dyc<ir::ArithUnaryInst>(inst) &&
+          !ir::dyc<ir::ArithBinaryInst>(inst) &&
+          !ir::dyc<ir::RelationInst>(inst) && !ir::dyc<ir::Call>(inst))
+        continue;
+      if (auto call = ir::dyc<ir::Call>(inst)) {
+        if (!funcAttr.isPure(call->getFuncName()))
+          continue;
+      }
+      auto dest = ir::getDest(inst);
+      if (!dest)
+        continue;
+      if (!isLoopInvariant(inst))
+        continue;
+      if (auto call = ir::dyc<ir::Call>(inst)) {
+        if (!funcAttr.isPure(call->getFuncName()))
+          continue;
+      }
+      res.emplace(dest);
+    }
+  }
+
+  return res;
+}
+
+void LoopInfo::buildLoopInvariantVariables(const ir::FunctionModule &func,
+                                           const FuncAttr &funcAttr) {
+  UseDefChain useDef;
+  useDef.init(func);
+
+  for (auto &kv : loops) {
+    loopInvariant[kv.first] =
+        findLoopInvariantVariables(func, kv.first, useDef, funcAttr);
+  }
+}
+
+void LoopInfo::init(const ir::FunctionModule &func, const FuncAttr &funcAttr) {
+  init(func);
+  buildLoopInvariantVariables(func, funcAttr);
 }
 
 } // namespace mocker

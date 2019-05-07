@@ -7,9 +7,9 @@
 #include <iostream>
 #include <list>
 
-#include "analysis/loop_tree.h"
 #include "helper.h"
 #include "ir/helper.h"
+#include "optim/analysis/loop_info.h"
 
 namespace mocker {
 
@@ -67,7 +67,7 @@ std::size_t countInsts(const ir::FunctionModule &func, std::size_t threshold) {
   if (preCount > threshold)
     return threshold;
 
-  LoopTree loopTree;
+  LoopInfo loopTree;
   loopTree.init(func);
 
   // a^b

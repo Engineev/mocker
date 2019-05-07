@@ -3,7 +3,7 @@
 
 #include "opt_pass.h"
 
-#include "analysis/loop_tree.h"
+#include "optim/analysis/loop_info.h"
 
 namespace mocker {
 
@@ -21,7 +21,7 @@ private:
   void naiveStrengthReduction();
 
 private:
-  LoopTree loopTree;
+  LoopInfo loopTree;
 };
 
 } // namespace mocker

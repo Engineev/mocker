@@ -93,11 +93,13 @@ void LoopInvariantCodeMotion::insertPreHeaders() {
 }
 
 bool LoopInvariantCodeMotion::operator()() {
+  std::cerr << "\nLICM: " + func.getIdentifier() + "\n";
+
   loopTree.init(func);
   insertPreHeaders();
   func.buildContext();
-  LoopTree newLoopTree;
-  newLoopTree.init(func);
+  LoopInfo newLoopTree;
+  newLoopTree.init(func, funcAttr);
   loopTree = newLoopTree;
 
   auto loopHeads = loopTree.postOrder();
@@ -123,103 +125,27 @@ std::size_t LoopInvariantCodeMotion::processLoop(const std::size_t header) {
 }
 
 std::unordered_set<ir::InstID>
-LoopInvariantCodeMotion::findCandidateCalls(std::size_t header) {
-  const auto &loopNodes = loopTree.getLoops().at(header);
-
-  // First, we find all loop nodes that all paths from the header to it contain
-  // no store.
-  std::unordered_set<std::size_t> reachableNodes(loopNodes.begin(),
-                                                 loopNodes.end());
-  std::unordered_set<std::size_t> visited;
-  std::function<void(std::size_t)> filterOut =
-      [this, header, &filterOut, &reachableNodes, &visited](std::size_t cur) {
-        if (isIn(visited, cur) || cur == header)
-          return;
-        visited.emplace(cur);
-        for (auto &suc : func.getBasicBlock(cur).getSuccessors()) {
-          if (isIn(reachableNodes, suc))
-            reachableNodes.erase(reachableNodes.find(suc));
-          filterOut(suc);
-        }
-      };
-  for (auto &label : loopNodes) {
-    auto &bb = func.getBasicBlock(label);
-    for (auto &inst : bb.getInsts()) {
-      if (ir::dyc<ir::Store>(inst)) {
-        visited.clear();
-        filterOut(bb.getLabelID());
-        break;
-      }
-    }
-  }
-
-  // Then, for every reachable nodes, we collect all loads that no store exists
-  // before it in the basic block
-  std::unordered_set<ir::InstID> res;
-  for (auto node : reachableNodes) {
-    auto &bb = func.getBasicBlock(node);
-    for (auto &inst : bb.getInsts()) {
-      if (ir::dyc<ir::Load>(inst))
-        res.emplace(inst->getID());
-      if (ir::dyc<ir::Store>(inst))
-        break;
-    }
-  }
-
-  return res;
-}
-
-std::unordered_set<ir::InstID>
 LoopInvariantCodeMotion::findLoopInvariantComputation(
     std::size_t header, const UseDefChain &useDef) {
   const auto &loopNodes = loopTree.getLoops().at(header);
-  //  const auto candidateLoads = findCandidateCalls(header);
 
   std::unordered_set<ir::InstID> res;
-  auto isLoopInvariant = [&res, &loopNodes, &useDef,
-                          this](const std::shared_ptr<ir::IRInst> &inst) {
-    auto operands = ir::getOperandsUsed(inst);
-    for (auto &operand : operands) {
-      auto reg = ir::dycLocalReg(operand);
-      if (!reg) {
-        continue;
-      }
-      if (isParameter(func, reg->getIdentifier()))
-        continue;
-      const auto &def = useDef.getDef(reg);
-      if (isIn(res, def.getInst()->getID()))
-        continue;
-      if (isIn(loopNodes, def.getBBLabel())) {
-        return false;
-      }
-    }
-    return true;
-  };
 
+  auto loopInvVars = loopTree.getLoopInvariantVariables(header);
   std::queue<std::shared_ptr<ir::IRInst>> worklist;
+
+  // we only hoist Calls
 
   for (auto node : loopNodes) {
     const auto &bb = func.getBasicBlock(node);
     for (auto &inst : bb.getInsts()) {
-      if (!ir::dyc<ir::Assign>(inst) && !ir::dyc<ir::ArithUnaryInst>(inst) &&
-          !ir::dyc<ir::ArithBinaryInst>(inst) &&
-          !ir::dyc<ir::RelationInst>(inst) && !ir::dyc<ir::Call>(inst))
+      auto dest = ir::getDest(inst);
+      if (!dest || !isIn(loopInvVars, dest))
         continue;
+      res.emplace(inst->getID());
       if (auto call = ir::dyc<ir::Call>(inst)) {
-        if (!funcAttr.isPure(call->getFuncName()))
-          continue;
-      }
-      if (!isLoopInvariant(inst))
-        continue;
-      // if (ir::dyc<ir::Load>(inst)) {
-      //  worklist.emplace(inst);
-      // }
-      if (auto call = ir::dyc<ir::Call>(inst)) {
-        if (!funcAttr.isPure(call->getFuncName()))
-          continue;
         worklist.emplace(inst);
       }
-      res.emplace(inst->getID());
     }
   }
 
@@ -251,7 +177,7 @@ void LoopInvariantCodeMotion::hoist(
     for (auto &inst : bb.getMutableInsts()) {
       if (!isIn(invariant, inst->getID()))
         continue;
-      std::cerr << "... move " << ir::fmtInst(inst) << std::endl;
+      std::cerr << "hoist: " << ir::fmtInst(inst) << std::endl;
       preHeaderBB.appendInstBeforeTerminator(inst);
       inst = std::make_shared<ir::Deleted>();
     }
