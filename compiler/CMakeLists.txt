@@ -25,7 +25,7 @@ set(HEADERS
   optim/analysis/defuse.h
   optim/analysis/dominance.h
   optim/analysis/func_attr.h
-  optim/analysis/loop_tree.h
+  optim/analysis/loop_info.h
   optim/codegen_prepare.h
   optim/constant_propagation.h
   optim/copy_propagation.h
@@ -69,7 +69,7 @@ set(SOURCES
 
   optim/analysis/dominance.cpp
   optim/analysis/func_attr.cpp
-  optim/analysis/loop_tree.cpp
+  optim/analysis/loop_info.cpp
   optim/codegen_prepare.cpp
   optim/constant_propagation.cpp
   optim/copy_propagation.cpp
