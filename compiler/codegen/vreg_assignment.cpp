@@ -2,6 +2,8 @@
 
 #include "ir/helper.h"
 
+#include <iostream>
+
 namespace mocker {
 
 void VRegAssignment::init(const ir::FunctionModule &func) {
@@ -11,7 +13,7 @@ void VRegAssignment::init(const ir::FunctionModule &func) {
       if (!dest)
         continue;
       mp[dest] = std::make_shared<nasm::Register>("vir_" +
-                                                  dest->getIdentifier() + "_");
+          dest->getIdentifier() + "_");
     }
   }
 
@@ -20,11 +22,13 @@ void VRegAssignment::init(const ir::FunctionModule &func) {
       auto phi = ir::dyc<ir::Phi>(inst);
       if (!phi)
         continue;
+
       for (auto &option : phi->getOptions()) {
         auto reg = ir::dycLocalReg(option.first);
-        if (!reg)
-          continue;
-        mp[reg] = mp[phi->getDest()];
+        assert(reg);
+        if (mp[reg] != mp[phi->getDest()]) {
+          mp[reg] = mp[phi->getDest()];
+        }
       }
     }
   }

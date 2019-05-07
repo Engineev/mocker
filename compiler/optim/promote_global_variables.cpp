@@ -17,7 +17,7 @@ bool PromoteGlobalVariables::operator()() {
   funcGlobalVar.init(module);
 
   for (auto &kv : module.getFuncs())
-    if (!kv.second.isExternalFunc())
+    if (!kv.second.isExternalFunc() && kv.first != "_init_global_vars")
       promoteGlobalVariables(kv.second);
   return false;
 }

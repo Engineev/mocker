@@ -127,13 +127,17 @@ void optimize(mocker::ir::Module &module) {
 
   funcAttr.init(module);
   runOptPasses<Memorization>(module, funcAttr, module);
-  // ir::printModule(module, std::cerr);
 
-  runOptPasses<FunctionInline>(module);
-  runOptPasses<FunctionInline>(module);
+  runOptPasses<RemoveUnreachableBlocks>(module);
   runOptPasses<FunctionInline>(module);
   runOptPasses<UnusedFunctionRemoval>(module);
+  runOptPasses<FunctionInline>(module);
+  runOptPasses<UnusedFunctionRemoval>(module);
+  runOptPasses<FunctionInline>(module);
+  runOptPasses<UnusedFunctionRemoval>(module);
+
   runOptPasses<PromoteGlobalVariables>(module);
+  //  ir::printModule(module);
   ir::verifyModule(module);
 
   std::cerr << "\nAfter inline and promotion of global variables:\n";
@@ -148,6 +152,8 @@ void optimize(mocker::ir::Module &module) {
   printIRStats(stats);
 
   runOptPasses<SSAConstruction>(module);
+  funcAttr.init(module);
+  runOptPasses<DeadCodeElimination>(module, funcAttr);
 
   runOptsUntilFixedPoint(module);
   funcAttr.init(module);
@@ -167,10 +173,12 @@ void optimize(mocker::ir::Module &module) {
   std::cerr << "\nAfter optimization:\n";
   printIRStats(stats);
 
+  runOptPasses<RemoveUnreachableBlocks>(module);
   runOptPasses<SSAConstruction>(module);
   for (int i = 0; i < 3; ++i) {
     runOptPasses<SimplifyPhiFunctions>(module);
     runOptPasses<MergeBlocks>(module);
+    runOptPasses<RemoveUnreachableBlocks>(module);
     funcAttr.init(module);
     runOptPasses<DeadCodeElimination>(module, funcAttr);
     runOptPasses<RemoveUnreachableBlocks>(module);
@@ -185,13 +193,18 @@ void optimize(mocker::ir::Module &module) {
 mocker::nasm::Module codegen(const mocker::ir::Module &irModule) {
   using namespace mocker;
   auto res = runInstructionSelection(irModule);
+  //  nasm::printModule(res);
+
   std::cerr << "\nNASM:\n";
   std::cerr << "After instruction selection:\n";
   printNasmStats(nasm::Stats(res));
 
   res = allocateRegisters(res);
+  //  res = allocateRegistersNaively(res);
   std::cerr << "\nAfter register allocation:\n";
   printNasmStats(nasm::Stats(res));
+
+  //  nasm::printModule(res, std::cerr);
 
   res = runPeepholeOptimization(res);
   std::cerr << "\nAfter peephole optimization:\n";
@@ -223,7 +236,7 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
     optimizable |= runOptPasses<GlobalValueNumbering>(module);
-    // optimizable |= runOptPasses<LocalValueNumbering>(module);
+    optimizable |= runOptPasses<LocalValueNumbering>(module);
 
     optimizable |= runOptPasses<CopyPropagation>(module);
     optimizable |= runOptPasses<SparseSimpleConstantPropagation>(module);

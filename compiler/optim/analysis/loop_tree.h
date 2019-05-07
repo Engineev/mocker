@@ -26,6 +26,8 @@ public:
     return loops.at(n).size() != 1;
   }
 
+  std::size_t getDepth(std::size_t n) const { return depth.at(n); }
+
 private:
   void buildDepth();
 

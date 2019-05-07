@@ -69,6 +69,7 @@ private:
       return;
     }
     if (auto p = dycGlobalReg(reg)) {
+      assert(false);
       globalReg[p->getIdentifier()] = val;
       return;
     }

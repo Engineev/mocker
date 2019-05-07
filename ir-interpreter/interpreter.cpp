@@ -34,7 +34,7 @@ std::int64_t Interpreter::run() {
     auto &data = var.getData();
     auto res = fastMalloc(data.size());
     std::memcpy(res, data.c_str(), data.size());
-    writeReg(std::make_shared<Reg>(ident), res);
+    globalReg[ident] = (std::int64_t)(data.c_str());
   }
 
   return executeFunc("main", {});
@@ -100,7 +100,7 @@ void Interpreter::parse(const std::string &source) {
         data.push_back(char(ascii));
         nxt = lineSS.get();
       } while (nxt == ',');
-      globalVars.emplace_back(std::move(ident), std::move(data));
+      globalVars.emplace_back(ident, std::move(data));
       continue;
     }
     std::stringstream lineSS(line);
@@ -366,6 +366,10 @@ void Interpreter::initExternalFuncs() {
   // _printInt ( x )
   externalFuncs.emplace("_printInt", [this](Args args) {
     std::cout << args[0];
+    return 0;
+  });
+  externalFuncs.emplace("_printlnInt", [this](Args args) {
+    std::cout << args[0] << std::endl;
     return 0;
   });
   // getString (  )

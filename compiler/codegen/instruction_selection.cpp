@@ -128,9 +128,9 @@ void genArithBinary(nasm::Section &text, FuncSelectionContext &ctx,
 
     auto lhs = ctx.getIrAddr(inst->getLhs());
     text.emplaceInst<nasm::Mov>(nasm::rax(), lhs);
-    // text.emplaceInst<nasm::Cqo>();
-    text.emplaceInst<nasm::Mov>(nasm::rdx(),
-                                std::make_shared<nasm::NumericConstant>(0));
+    text.emplaceInst<nasm::Cqo>();
+    //    text.emplaceInst<nasm::Mov>(nasm::rdx(),
+    //                                std::make_shared<nasm::NumericConstant>(0));
 
     auto divisor = ctx.newVirtualReg();
     text.emplaceInst<nasm::Mov>(divisor, ctx.getIrAddr(inst->getRhs()));
@@ -201,7 +201,8 @@ bool genRelation(nasm::Section &text, FuncSelectionContext &ctx,
     auto irDest = p->getDest();
     auto condition = ir::dycLocalReg(br->getCondition());
     if (!condition || condition->getIdentifier() != irDest->getIdentifier() ||
-        (nextBB != br->getThen()->getID() && nextBB != br->getElse()->getID())) {
+        (nextBB != br->getThen()->getID() &&
+         nextBB != br->getElse()->getID())) {
       skipNext = false;
       break;
     }
@@ -222,36 +223,38 @@ bool genRelation(nasm::Section &text, FuncSelectionContext &ctx,
   text.emplaceInst<nasm::Cmp>(lhs, rhs);
 
   if (skipNext) {
-    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType> Jump2ThenMap{
-        {ir::RelationInst::Eq, nasm::CJump::Ez},
-        {ir::RelationInst::Ne, nasm::CJump::Ne},
-        {ir::RelationInst::Lt, nasm::CJump::Lt},
-        {ir::RelationInst::Le, nasm::CJump::Le},
-        {ir::RelationInst::Gt, nasm::CJump::Gt},
-        {ir::RelationInst::Ge, nasm::CJump::Ge},
-    };
-    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType> Jump2ElseMap{
-        {ir::RelationInst::Eq, nasm::CJump::Ne},
-        {ir::RelationInst::Ne, nasm::CJump::Ez},
-        {ir::RelationInst::Lt, nasm::CJump::Ge},
-        {ir::RelationInst::Le, nasm::CJump::Gt},
-        {ir::RelationInst::Gt, nasm::CJump::Le},
-        {ir::RelationInst::Ge, nasm::CJump::Lt},
-    };
+    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType>
+        Jump2ThenMap{
+            {ir::RelationInst::Eq, nasm::CJump::Ez},
+            {ir::RelationInst::Ne, nasm::CJump::Ne},
+            {ir::RelationInst::Lt, nasm::CJump::Lt},
+            {ir::RelationInst::Le, nasm::CJump::Le},
+            {ir::RelationInst::Gt, nasm::CJump::Gt},
+            {ir::RelationInst::Ge, nasm::CJump::Ge},
+        };
+    static const SmallMap<ir::RelationInst::OpType, nasm::CJump::OpType>
+        Jump2ElseMap{
+            {ir::RelationInst::Eq, nasm::CJump::Ne},
+            {ir::RelationInst::Ne, nasm::CJump::Ez},
+            {ir::RelationInst::Lt, nasm::CJump::Ge},
+            {ir::RelationInst::Le, nasm::CJump::Gt},
+            {ir::RelationInst::Gt, nasm::CJump::Le},
+            {ir::RelationInst::Ge, nasm::CJump::Lt},
+        };
 
     auto br = ir::dyc<ir::Branch>(nextInst);
-    if (br->getThen()->getID() == nextBB) {  // fall through to then
+    if (br->getThen()->getID() == nextBB) { // fall through to then
       text.emplaceInst<nasm::CJump>(
           Jump2ElseMap.at(p->getOp()),
-          std::make_shared<nasm::Label>(".L" +
-              std::to_string(br->getElse()->getID())));
+          std::make_shared<nasm::Label>(
+              ".L" + std::to_string(br->getElse()->getID())));
       return true;
     }
     // fall through to else
     text.emplaceInst<nasm::CJump>(
         Jump2ThenMap.at(p->getOp()),
         std::make_shared<nasm::Label>(".L" +
-            std::to_string(br->getThen()->getID())));
+                                      std::to_string(br->getThen()->getID())));
     return true;
   }
 
@@ -281,13 +284,13 @@ void genBranch(nasm::Section &text, FuncSelectionContext &ctx,
   if (inst->getThen()->getID() == nextBB) {
     text.emplaceInst<nasm::CJump>(
         nasm::CJump::Ez, std::make_shared<nasm::Label>(
-            ".L" + std::to_string(inst->getElse()->getID())));
+                             ".L" + std::to_string(inst->getElse()->getID())));
     return;
   }
   if (inst->getElse()->getID() == nextBB) {
     text.emplaceInst<nasm::CJump>(
         nasm::CJump::Ne, std::make_shared<nasm::Label>(
-            ".L" + std::to_string(inst->getThen()->getID())));
+                             ".L" + std::to_string(inst->getThen()->getID())));
     return;
   }
 

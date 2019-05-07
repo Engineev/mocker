@@ -3,18 +3,25 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cmath>
+#include <iostream>
 #include <list>
 
+#include "analysis/loop_tree.h"
 #include "helper.h"
 #include "ir/helper.h"
 
 namespace mocker {
 
-FunctionInline::FunctionInline(ir::Module &module) : ModulePass(module) {
-  buildInlineable();
-}
+FunctionInline::FunctionInline(ir::Module &module) : ModulePass(module) {}
 
 bool FunctionInline::operator()() {
+  buildInlineable();
+  std::cerr << "\nFunctionInline: ";
+  for (auto &func : inlineable) {
+    std::cerr << func << ", ";
+  }
+  std::cerr << std::endl;
   auto funcsCopy = module.getFuncs();
 
   for (auto &kv : funcsCopy) {
@@ -36,7 +43,9 @@ bool FunctionInline::operator()() {
         ++bbIter;
         continue;
       }
-
+      auto call = ir::dyc<ir::Call>(*callIter);
+      std::cerr << "inline " << call->getFuncName() << " into " << kv.first
+                << std::endl;
       bbIter = inlineFunction(func, bbIter, callIter);
     }
   }
@@ -48,19 +57,46 @@ bool FunctionInline::operator()() {
   return false;
 }
 
-void FunctionInline::buildInlineable() {
-  auto countInsts = [](const ir::FunctionModule &func) {
-    std::size_t cnt = 0;
-    for (auto &bb : func.getBBs())
-      cnt += bb.getInsts().size();
-    return cnt;
+namespace {
+
+std::size_t countInsts(const ir::FunctionModule &func, std::size_t threshold) {
+  std::size_t preCount = 0;
+  for (auto &bb : func.getBBs()) {
+    preCount += bb.getInsts().size();
+  }
+  if (preCount > threshold)
+    return threshold;
+
+  LoopTree loopTree;
+  loopTree.init(func);
+
+  // a^b
+  auto power = [threshold](std::size_t a, std::size_t b) {
+    std::size_t res = 1;
+    for (std::size_t i = 0; i < b; ++i) {
+      res *= a;
+      res = std::min<std::size_t>(res, threshold);
+    }
+    return res;
   };
 
+  std::size_t res = 0;
+  for (auto &bb : func.getBBs()) {
+    res += bb.getInsts().size() * power(10, loopTree.getDepth(bb.getLabelID()));
+  }
+
+  return res;
+}
+
+} // namespace
+
+void FunctionInline::buildInlineable() {
   for (auto &kv : module.getFuncs()) {
-    if (kv.second.isExternalFunc())
+    if (kv.second.isExternalFunc() || kv.first == "_init_global_vars")
       continue;
-    if (countInsts(kv.second) <= 100)
+    if (countInsts(kv.second, 201) <= 150) {
       inlineable.emplace(kv.first);
+    }
   }
 }
 
@@ -84,8 +120,6 @@ ir::BBLIter FunctionInline::inlineFunction(ir::FunctionModule &caller,
   auto callee = module.getFuncs().at(call->getFuncName());
   if (callee.isExternalFunc())
     return ++bbIter;
-
-  //    std::cerr << ir::fmtInst(call) << std::endl;
 
   // create a temporary variable to hold the return value
   std::shared_ptr<ir::Reg> retVal = nullptr;

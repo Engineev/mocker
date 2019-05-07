@@ -125,6 +125,9 @@ getDefinedRegs(const std::shared_ptr<Inst> &inst) {
   if (auto p = dyc<IDiv>(inst)) {
     return {rax(), rdx()};
   }
+  if (auto p = dyc<Cqo>(inst)) {
+    return {rdx()};
+  }
   assert(false);
 }
 

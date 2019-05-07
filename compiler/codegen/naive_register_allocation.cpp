@@ -132,7 +132,8 @@ void allocateMov(const std::shared_ptr<nasm::Mov> &p,
 void allocate(const std::shared_ptr<nasm::Inst> &inst,
               const RegMap<std::size_t> &offsets, nasm::Section &text) {
   if (nasm::getInvolvedRegs(inst).empty() || nasm::dyc<nasm::Call>(inst) ||
-      nasm::dyc<nasm::Leave>(inst) || nasm::dyc<nasm::Ret>(inst)) {
+      nasm::dyc<nasm::Leave>(inst) || nasm::dyc<nasm::Ret>(inst) ||
+      nasm::dyc<nasm::Cqo>(inst)) {
     text.appendInst(inst);
     return;
   }

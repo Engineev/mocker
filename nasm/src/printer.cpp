@@ -147,7 +147,7 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
     assert(false);
   }
   if (auto p = dyc<Cqo>(inst)) {
-    return "cqto";
+    return "cqo";
   }
   if (auto p = dyc<IDiv>(inst)) {
     return "idiv " + fmtAddr(p->getRhs());

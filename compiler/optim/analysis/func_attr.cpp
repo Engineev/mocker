@@ -101,33 +101,65 @@ void FuncAttr::buildGlobalVarInfo(const ir::Module &module) {
     }
   }
 
-  // update the result iteratively
-  std::queue<std::string> worklist;
-  for (auto &kv : module.getFuncs())
-    worklist.emplace(kv.first);
 
-  while (!worklist.empty()) {
-    auto funcName = worklist.front();
-    worklist.pop();
-    const auto &Callers = CallGraph.at(funcName);
-    const auto &usedByCallee = globalVarUses.at(funcName);
-    const auto &defedByCallee = globalVarDefs.at(funcName);
-    for (auto &caller : Callers) {
-      auto &usedByCaller = globalVarUses.at(caller);
-      std::size_t originalSize = usedByCaller.size();
-      unionSet(usedByCaller, usedByCallee);
-      std::size_t newSize = usedByCaller.size();
-      if (originalSize != newSize)
-        worklist.emplace(caller);
-
-      auto &defedByCaller = globalVarDefs.at(caller);
-      originalSize = defedByCaller.size();
-      unionSet(defedByCaller, defedByCallee);
-      newSize = defedByCaller.size();
-      if (originalSize != newSize)
-        worklist.emplace(caller);
+  auto fixedPoint = [](const std::unordered_map<std::string, std::unordered_set<std::string>> & lhs,
+  std::unordered_map<std::string, std::unordered_set<std::string>> & rhs) {
+    for (auto & kv : lhs) {
+      if (kv.second.size() != rhs[kv.first].size())
+        return false;
     }
+    return true;
+  };
+
+  auto defBak = globalVarDefs;
+  auto useBak = globalVarUses;
+  while (true) {
+
+    for (auto &kv : module.getFuncs()) {
+      const auto &Callers = CallGraph.at(kv.first);
+      const auto &usedByCallee = globalVarUses.at(kv.first);
+      const auto &defedByCallee = globalVarDefs.at(kv.first);
+      for (auto &caller : Callers) {
+        auto &usedByCaller = globalVarUses.at(caller);
+        unionSet(usedByCaller, usedByCallee);
+        auto &defedByCaller = globalVarDefs.at(caller);
+        unionSet(defedByCaller, defedByCallee);
+      }
+    }
+
+    if (fixedPoint(defBak, globalVarDefs) && fixedPoint(useBak, globalVarUses))
+      break;
+    defBak = globalVarDefs;
+    useBak = globalVarUses;
   }
+
+  // update the result iteratively
+//  std::queue<std::string> worklist;
+//  for (auto &kv : module.getFuncs())
+//    worklist.emplace(kv.first);
+//
+//  while (!worklist.empty()) {
+//    auto funcName = worklist.front();
+//    worklist.pop();
+//    const auto &Callers = CallGraph.at(funcName);
+//    const auto &usedByCallee = globalVarUses.at(funcName);
+//    const auto &defedByCallee = globalVarDefs.at(funcName);
+//    for (auto &caller : Callers) {
+//      auto &usedByCaller = globalVarUses.at(caller);
+//      std::size_t originalSize = usedByCaller.size();
+//      unionSet(usedByCaller, usedByCallee);
+//      std::size_t newSize = usedByCaller.size();
+//      if (originalSize != newSize)
+//        worklist.emplace(caller);
+//
+//      auto &defedByCaller = globalVarDefs.at(caller);
+//      originalSize = defedByCaller.size();
+//      unionSet(defedByCaller, defedByCallee);
+//      newSize = defedByCaller.size();
+//      if (originalSize != newSize)
+//        worklist.emplace(caller);
+//    }
+//  }
 }
 
 bool FuncAttr::isPureFunc(const ir::FunctionModule &func) {
