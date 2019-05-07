@@ -12,6 +12,9 @@
 #include "optim/global_value_numbering.h"
 #include "set_operation.h"
 
+#include "ir/printer.h"
+#include <iostream>
+
 namespace mocker {
 namespace {
 
@@ -107,6 +110,7 @@ void CodegenPreparation::scheduleCmps(ir::BasicBlock &bb) {
   if (!condition)
     return;
 
+  // find the instruction that define the condition reg
   auto riter = (++bb.getMutableInsts().rbegin());
   auto rend = bb.getMutableInsts().rend();
   for (; riter != rend; ++riter) {
@@ -117,13 +121,22 @@ void CodegenPreparation::scheduleCmps(ir::BasicBlock &bb) {
         return;
     }
 
-    auto def = ir::getDest(*riter);
+    auto defInst = *riter;
+    if (ir::dyc<ir::Call>(defInst) || ir::dyc<ir::Load>(defInst))
+      return;
+    if (ir::dyc<ir::Phi>(defInst) &&
+        !ir::dyc<ir::Phi>(*(++bb.getInsts().rbegin()))) {
+      return;
+    }
+
+    auto def = ir::getDest(defInst);
     if (def && def->getIdentifier() == condition->getIdentifier())
       break;
   }
   if (riter == rend)
     return;
 
+  //  std::cerr << ir::fmtInst(*riter) << std::endl;
   bb.appendInstBeforeTerminator(*riter);
   *riter = std::make_shared<ir::Deleted>();
 }
