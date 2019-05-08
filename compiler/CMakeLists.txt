@@ -41,6 +41,7 @@ set(HEADERS
   optim/opt_pass.h
   optim/optimizer.h
   optim/promote_global_variables.h
+  optim/reassociation.h
   optim/simplify_cfg.h
   optim/ssa.h
 
@@ -83,6 +84,7 @@ set(SOURCES
   optim/memorization.cpp
   optim/module_simplification.cpp
   optim/promote_global_variables.cpp
+  optim/reassociation.cpp
   optim/simplify_cfg.cpp
   optim/ssa.cpp
 

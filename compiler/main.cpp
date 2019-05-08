@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "optim/reassociation.h"
 #include "ast/ast_node.h"
 #include "codegen/instruction_selection.h"
 #include "codegen/naive_register_allocation.h"
@@ -239,9 +240,9 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-//    ir::printModule(module);
+    if (cnt == 1)
+      runOptPasses<Reassociation>(module);
     optimizable |= runOptPasses<GlobalValueNumbering>(module);
-//    ir::printModule(module);
     optimizable |= runOptPasses<LocalValueNumbering>(module);
 
     optimizable |= runOptPasses<CopyPropagation>(module);
