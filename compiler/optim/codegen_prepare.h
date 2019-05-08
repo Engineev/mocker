@@ -20,6 +20,11 @@ private:
 
   void naiveStrengthReduction();
 
+  // remove sequences like:
+  // x = load addr
+  // store addr x
+  void removeRedundantLoadStore(ir::BasicBlock & bb);
+
 private:
   LoopInfo loopTree;
 };

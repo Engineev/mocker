@@ -45,6 +45,9 @@ bool CodegenPreparation::operator()() {
   removeDeletedInsts(func);
   naiveStrengthReduction();
   removeDeletedInsts(func);
+  for (auto &bb : func.getMutableBBs())
+    removeRedundantLoadStore(bb);
+  removeDeletedInsts(func);
   return false;
 }
 
@@ -190,6 +193,27 @@ void CodegenPreparation::naiveStrengthReduction() {
         continue;
       }
     }
+  }
+}
+
+void CodegenPreparation::removeRedundantLoadStore(ir::BasicBlock &bb) {
+  auto iter = bb.getMutableInsts().begin();
+  auto nextIter = iter;
+  nextIter++;
+
+  for (auto end = bb.getMutableInsts().end(); nextIter != end;
+       ++iter, ++nextIter) {
+    auto load = ir::dyc<ir::Load>(*iter);
+    auto store = ir::dyc<ir::Store>(*nextIter);
+    if (!load || !store)
+      continue;
+    auto lAddr = ir::dyc<ir::Reg>(load->getAddr());
+    auto sAddr = ir::dyc<ir::Reg>(store->getAddr());
+    assert(lAddr && sAddr);
+    if (lAddr->getIdentifier() != sAddr->getIdentifier())
+      continue;
+    *iter = std::make_shared<ir::Deleted>();
+    *nextIter = std::make_shared<ir::Deleted>();
   }
 }
 

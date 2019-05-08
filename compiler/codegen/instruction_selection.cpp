@@ -473,14 +473,22 @@ void genFunction(nasm::Section &text, FuncSelectionContext &ctx,
         dest, std::make_shared<nasm::MemoryAddr>(nasm::rbp(), (i - 4) * 8));
   }
 
-  std::vector<std::shared_ptr<ir::Reg>> globalVars;
+  ir::RegSet globalVars;
   for (auto &bb : func.getBBs()) {
     for (auto &inst : bb.getInsts()) {
+      if (ir::dyc<ir::Load>(inst))
+        continue;
+      if (auto p = ir::dyc<ir::Store>(inst)) {
+        if (auto reg = ir::dycGlobalReg(p->getVal()))
+          globalVars.emplace(reg);
+        continue;
+      }
+
       auto operands = ir::getOperandsUsed(inst);
       for (auto &operand : operands) {
         auto reg = ir::dycGlobalReg(operand);
         if (reg)
-          globalVars.emplace_back(reg);
+          globalVars.emplace(reg);
       }
     }
   }
