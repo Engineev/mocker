@@ -101,6 +101,7 @@ void Builder::operator()(const ast::UnaryExpr &node) const {
 }
 
 void Builder::operator()(const ast::BinaryExpr &node) const {
+  using namespace std::string_literals;
   if (node.op == ast::BinaryExpr::Assign) {
     visit(*node.rhs);
     auto rhsVal = ctx.getExprAddr(node.rhs->getID());
@@ -129,8 +130,8 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
 
   // Eq, Ne, Lt, Gt, Le, Ge,
   if (ast::BinaryExpr::Eq <= node.op && node.op <= ast::BinaryExpr::Ge) {
-    auto op = (RelationInst::OpType)(RelationInst::Eq +
-                                     (node.op - ast::BinaryExpr::Eq));
+    auto op = (RelationInst::OpType) (RelationInst::Eq +
+        (node.op - ast::BinaryExpr::Eq));
     auto val = ctx.makeTempLocalReg("resV");
     ctx.setExprAddr(node.getID(), val);
 
@@ -142,7 +143,24 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
     visit(*node.rhs);
     ctx.getLogicalExprInfo().empty = bak;
     auto rhs = ctx.getExprAddr(node.rhs->getID());
-    ctx.emplaceInst<RelationInst>(val, op, lhs, rhs);
+
+    if (isStrTy(ctx.getExprType(node.lhs->getID()))) {
+      static SmallMap<ast::BinaryExpr::OpType, std::string> opMap{
+          {ast::BinaryExpr::Eq, "#string#equal"s},
+          {ast::BinaryExpr::Ne, "#string#inequal"},
+          {ast::BinaryExpr::Le, "#string#less_equal"},
+          {ast::BinaryExpr::Lt, "#string#less"},
+          {ast::BinaryExpr::Ge, "#string#less_equal"},
+          {ast::BinaryExpr::Gt, "#string#less"},
+      };
+      if (node.op == ast::BinaryExpr::Ge || node.op == ast::BinaryExpr::Gt) {
+        std::swap(lhs, rhs);
+      }
+      ctx.emplaceInst<Call>(val, opMap.at(node.op), lhs, rhs);
+    } else {
+      ctx.emplaceInst<RelationInst>(val, op, lhs, rhs);
+    }
+
     ctx.checkLogicalExpr(node);
     return;
   }
@@ -807,6 +825,10 @@ void Builder::addBuiltinAndExternal() const {
   add("#string#parseInt", {"this"});
   add("#string#ord", {"this", "pos"});
   add("#string#add", {"lhs", "rhs"});
+  add("#string#equal", {"lhs", "rhs"});
+  add("#string#inequal", {"lhs", "rhs"});
+  add("#string#less_equal", {"lhs", "rhs"});
+  add("#string#less", {"lhs", "rhs"});
 
   // builtin functions of array
   add("#_array_#_ctor_", {"this", "arraySize", "elementSize"});

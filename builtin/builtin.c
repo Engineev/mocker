@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+void* __alloc(size_t sz) {
+  return malloc(sz);
+}
+
 void *__string__add(void *lhs, void *rhs) {
   uint64_t lhs_len = *((int64_t *)lhs - 1);
   uint64_t rhs_len = *((int64_t *)rhs - 1);
@@ -28,9 +32,9 @@ void *__string__substring(void *ptr, int64_t left, int64_t right) {
   return res_inst_ptr;
 }
 
-// int64_t __string__ord(void *ptr, int64_t pos) {
-//   return (int64_t) * ((char *)ptr + pos);
-// }
+int64_t __string__ord(void *ptr, int64_t pos) {
+  return (int64_t) * ((char *)ptr + pos);
+}
 
 int64_t __string__parseInt(void *ptr) {
   uint64_t len = *((int64_t *)ptr - 1);
@@ -38,6 +42,33 @@ int64_t __string__parseInt(void *ptr) {
   buffer[len] = 0;
   memcpy(buffer, ptr, len);
   return strtol(buffer, NULL, 10);
+}
+
+int64_t __string__equal(void *lhs, void *rhs) {
+  uint64_t lhs_len = *((int64_t *)lhs - 1);
+  uint64_t rhs_len = *((int64_t *)rhs - 1);
+  if (lhs_len != rhs_len)
+    return 0;
+  int res = memcmp(lhs, rhs, lhs_len);
+  return !res;
+}
+
+int64_t __string__inequal(void *lhs, void *rhs) {
+  return !__string__equal(lhs, rhs);
+}
+
+int64_t __string__less(void *lhs, void *rhs) {
+  uint64_t lhs_len = *((int64_t *)lhs - 1);
+  uint64_t rhs_len = *((int64_t *)rhs - 1);
+  uint64_t len = lhs_len < rhs_len ? lhs_len : rhs_len;
+  int res = memcmp(lhs, rhs, len);
+  if (res == 0)
+    return lhs_len < rhs_len ? 1 : 0;
+  return res < 0;
+}
+
+int64_t __string__less_equal(void *lhs, void *rhs) {
+  return __string__equal(lhs, rhs) || __string__less(lhs, rhs);
 }
 
 void __string___ctor_(void *ptr) { *(uint64_t *)ptr = 0; }
