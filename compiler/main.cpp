@@ -155,6 +155,10 @@ void optimize(mocker::ir::Module &module) {
   funcAttr.init(module);
   runOptPasses<DeadCodeElimination>(module, funcAttr);
 
+  runOptPasses<RewriteBranches>(module);
+  runOptPasses<SimplifyPhiFunctions>(module);
+  runOptPasses<MergeBlocks>(module);
+  runOptPasses<RemoveUnreachableBlocks>(module);
   runOptsUntilFixedPoint(module);
   funcAttr.init(module);
   runOptPasses<LoopInvariantCodeMotion>(module, funcAttr);

@@ -134,9 +134,29 @@ LoopInvariantCodeMotion::findLoopInvariantComputation(
   auto loopInvVars = loopTree.getLoopInvariantVariables(header);
   std::queue<std::shared_ptr<ir::IRInst>> worklist;
 
-  // we only hoist Calls
+  // we only hoist Calls that can not be avoided
+  auto &headerBB = func.getBasicBlock(header);
+  auto br = ir::dyc<ir::Branch>(headerBB.getInsts().back());
+  auto thenLabel = br->getThen()->getID(), elseLabel = br->getElse()->getID();
 
-  for (auto node : loopNodes) {
+  if (isIn(loopNodes, elseLabel))
+    std::swap(thenLabel, elseLabel);
+
+  if (isIn(loopNodes, elseLabel))
+    return {};
+
+  std::vector<std::size_t> mustPass;
+  std::function<void(std::size_t)> visit = [&visit, &mustPass,
+                                            this](std::size_t cur) {
+    mustPass.emplace_back(cur);
+    auto succs = func.getBasicBlock(cur).getSuccessors();
+    if (succs.size() != 1)
+      return;
+    visit(succs.at(0));
+  };
+  visit(thenLabel);
+
+  for (auto &node : mustPass) {
     const auto &bb = func.getBasicBlock(node);
     for (auto &inst : bb.getInsts()) {
       auto dest = ir::getDest(inst);
