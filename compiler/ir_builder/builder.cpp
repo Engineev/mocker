@@ -130,8 +130,8 @@ void Builder::operator()(const ast::BinaryExpr &node) const {
 
   // Eq, Ne, Lt, Gt, Le, Ge,
   if (ast::BinaryExpr::Eq <= node.op && node.op <= ast::BinaryExpr::Ge) {
-    auto op = (RelationInst::OpType) (RelationInst::Eq +
-        (node.op - ast::BinaryExpr::Eq));
+    auto op = (RelationInst::OpType)(RelationInst::Eq +
+                                     (node.op - ast::BinaryExpr::Eq));
     auto val = ctx.makeTempLocalReg("resV");
     ctx.setExprAddr(node.getID(), val);
 
@@ -256,7 +256,10 @@ void Builder::operator()(const ast::VarDeclStmt &node) const {
   ctx.emplaceInst<Store>(makeReg(name), makeReg("@null"));
 }
 
-void Builder::operator()(const ast::ExprStmt &node) const { visit(*node.expr); }
+void Builder::operator()(const ast::ExprStmt &node) const {
+  if (!ctx.canSkip(node.expr->getID()))
+    visit(*node.expr);
+}
 
 void Builder::operator()(const ast::ReturnStmt &node) const {
   if (node.expr)
@@ -288,8 +291,9 @@ void Builder::operator()(const ast::BreakStmt &node) const {
 }
 
 void Builder::operator()(const ast::CompoundStmt &node) const {
-  for (auto &stmt : node.stmts)
+  for (auto &stmt : node.stmts) {
     visit(*stmt);
+  }
 }
 
 void Builder::operator()(const ast::IfStmt &node) const {

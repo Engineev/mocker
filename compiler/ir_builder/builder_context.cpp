@@ -8,15 +8,6 @@
 namespace mocker {
 namespace ir {
 
-BuilderContext::BuilderContext(
-    const BuilderContext::ASTIDMap<std::shared_ptr<mocker::ast::Type>>
-        &exprType)
-    : exprType(exprType) {
-  auto &initGlobalVars = module.addFunc(
-      "_init_global_vars", FunctionModule{"_init_global_vars", {}});
-  initGlobalVars.pushBackBB();
-}
-
 std::shared_ptr<Reg> BuilderContext::makeTempLocalReg(const std::string &hint) {
   return curFunc->makeTempLocalReg(hint);
 }

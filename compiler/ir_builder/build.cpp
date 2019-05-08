@@ -4,14 +4,18 @@
 #include "builder_context.h"
 #include "preprocessor.h"
 
+#include <iostream>
+
 namespace mocker {
 
 ir::Module buildIR(const std::shared_ptr<ast::ASTRoot> &ast,
                    const SemanticContext &semanticCtx) {
   renameASTIdentifiers(ast, semanticCtx.scopeResiding,
                        semanticCtx.associatedDecl, semanticCtx.exprType);
+  auto pureFuncs = findPureFunctions(ast);
+  auto redundantNode = findRedundantNodes(ast, semanticCtx.exprType, pureFuncs);
 
-  ir::BuilderContext IRCtx(semanticCtx.exprType);
+  ir::BuilderContext IRCtx(semanticCtx.exprType, redundantNode);
   ast->accept(ir::Builder(IRCtx));
   auto res = IRCtx.getResult();
 

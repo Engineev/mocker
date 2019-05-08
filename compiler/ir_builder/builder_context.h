@@ -20,8 +20,13 @@ class BuilderContext {
   template <class V> using InstIDMap = std::unordered_map<InstID, V>;
 
 public:
-  explicit BuilderContext(
-      const ASTIDMap<std::shared_ptr<mocker::ast::Type>> &exprType);
+  BuilderContext(const ASTIDMap<std::shared_ptr<mocker::ast::Type>> &exprType,
+                 const std::unordered_set<ast::NodeID> &doNotTranslate)
+      : exprType(exprType), doNotTranslate(doNotTranslate) {
+    auto &initGlobalVars = module.addFunc(
+        "_init_global_vars", FunctionModule{"_init_global_vars", {}});
+    initGlobalVars.pushBackBB();
+  }
 
   Module &getResult();
 
@@ -128,6 +133,10 @@ public:
 
   LogicalExprInfo &getLogicalExprInfo() { return logicalExprInfo; }
 
+  bool canSkip(ast::NodeID id) const {
+    return doNotTranslate.find(id) != doNotTranslate.end();
+  }
+
 private:
   LogicalExprInfo logicalExprInfo;
 
@@ -146,6 +155,8 @@ private:
   std::size_t strLitCounter = 0;
   BBLIter curBasicBlock;
   FunctionModule *curFunc = nullptr;
+
+  const std::unordered_set<ast::NodeID> &doNotTranslate;
 };
 
 } // namespace ir
