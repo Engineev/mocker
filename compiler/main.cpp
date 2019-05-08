@@ -235,7 +235,9 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
+//    ir::printModule(module);
     optimizable |= runOptPasses<GlobalValueNumbering>(module);
+//    ir::printModule(module);
     optimizable |= runOptPasses<LocalValueNumbering>(module);
 
     optimizable |= runOptPasses<CopyPropagation>(module);

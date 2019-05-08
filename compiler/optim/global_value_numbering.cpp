@@ -9,7 +9,8 @@
 #include "set_operation.h"
 #include "small_map.h"
 
-//#include <iostream>
+#include "ir/printer.h"
+#include <iostream>
 
 namespace mocker {
 namespace detail {
@@ -34,146 +35,76 @@ void ValueNumberTable::set(const std::shared_ptr<ir::Reg> &reg,
   assert(success);
 }
 
-InstHash::Key InstHash::operator()(const std::shared_ptr<ir::IRInst> &inst) {
-  if (auto p = ir::dyc<ir::Assign>(inst)) {
-    auto &entry = history[p->getDest()] = getOrSet(p->getOperand());
-    return entry.toString();
-  }
+namespace {
 
-  if (auto p = ir::dyc<ir::ArithUnaryInst>(inst)) {
-    return hashArithUnary(p);
-  }
-
-  if (auto p = ir::dyc<ir::ArithBinaryInst>(inst)) {
-    return hashArithBinary(p);
-  }
-
-  if (auto p = ir::dyc<ir::RelationInst>(inst)) {
-    return hashRelation(p);
-  }
+std::string hash(const std::shared_ptr<ir::Addr> &addr) {
+  if (auto p = ir::dyc<ir::IntLiteral>(addr))
+    return "int:" + std::to_string(p->getVal());
+  if (auto p = ir::dycGlobalReg(addr))
+    return "global:" + p->getIdentifier();
+  if (auto p = ir::dycLocalReg(addr))
+    return "local:" + p->getIdentifier();
   assert(false);
 }
 
-InstHash::Key
-InstHash::hashArithUnary(const std::shared_ptr<ir::ArithUnaryInst> &inst) {
-  auto dest = inst->getDest();
-  auto &entry = history[dest];
-  auto operand = inst->getOperand();
-  auto operandEntry = getOrSet(operand);
+} // namespace
 
-  if (auto litP = ir::dyc<ir::IntLiteral>(operand)) {
-    auto lit = litP->getVal();
-    entry.clear();
-    if (inst->getOp() == ir::ArithUnaryInst::Neg)
-      lit = -lit;
-    else
-      lit = ~(std::uint64_t)lit;
-    entry.addLit(lit);
-    return entry.toString();
-  }
-
-  auto reg = ir::dyc<ir::Reg>(operand);
-  if (inst->getOp() == ir::ArithUnaryInst::BitNot) {
-    entry.update(dest);
-    return "~" + operandEntry.toString();
-  }
-
-  // Neg
-  entry = operandEntry;
-  entry.neg();
-  return entry.toString();
-}
-
-InstHash::Key
-InstHash::hashArithBinary(const std::shared_ptr<ir::ArithBinaryInst> &inst) {
-  if (inst->getOp() == ir::ArithBinaryInst::Add ||
-      inst->getOp() == ir::ArithBinaryInst::Sub)
-    return hashAddSub(inst);
-
+InstHash::Key InstHash::operator()(const std::shared_ptr<ir::IRInst> &inst) {
   using namespace std::string_literals;
-  static const SmallMap<ir::ArithBinaryInst::OpType, std::string> names{
-      {ir::ArithBinaryInst::BitOr, "|"s}, {ir::ArithBinaryInst::BitAnd, "&"s},
-      {ir::ArithBinaryInst::Xor, "^"s},   {ir::ArithBinaryInst::Shl, "<<"s},
-      {ir::ArithBinaryInst::Shr, ">>"s},  {ir::ArithBinaryInst::Mul, "*"s},
-      {ir::ArithBinaryInst::Div, "/"s},   {ir::ArithBinaryInst::Mod, "%"s}};
-  static const SmallMap<ir::ArithBinaryInst::OpType, int> commutative{
-      {ir::ArithBinaryInst::BitOr, 0}, {ir::ArithBinaryInst::BitAnd, 0},
-      {ir::ArithBinaryInst::Xor, 0},   {ir::ArithBinaryInst::Add, 0},
-      {ir::ArithBinaryInst::Mul, 0},
-  };
 
-  auto op = inst->getOp();
-  auto dest = inst->getDest();
-  auto &entry = history[dest];
-  auto lhs = inst->getLhs(), rhs = inst->getRhs();
-  auto lhsEntry = getOrSet(lhs), rhsEntry = getOrSet(rhs);
-
-  if (commutative.in(op) && lhsEntry > rhsEntry)
-    std::swap(lhsEntry, rhsEntry);
-
-  if ((op == ir::ArithBinaryInst::Mul || op == ir::ArithBinaryInst::BitAnd) &&
-      ((lhsEntry.isLiteral() && !lhsEntry.getLiteral()) ||
-       (rhsEntry.isLiteral() && !rhsEntry.getLiteral()))) {
-    entry = History(0);
-    return entry.toString();
+  if (auto p = ir::dyc<ir::Assign>(inst)) {
+    return hash(p->getOperand());
   }
-
-  entry.update(dest);
-  return lhsEntry.toString() + names.at(op) + rhsEntry.toString();
-}
-
-InstHash::Key
-InstHash::hashAddSub(const std::shared_ptr<ir::ArithBinaryInst> &inst) {
-  assert(inst->getOp() == ir::ArithBinaryInst::Add ||
-         inst->getOp() == ir::ArithBinaryInst::Sub);
-  auto dest = inst->getDest();
-  assert(!isIn(history, dest));
-  auto &entry = history[dest];
-
-  auto lhs = inst->getLhs(), rhs = inst->getRhs();
-  bool isAddition = inst->getOp() == ir::ArithBinaryInst::Add;
-
-  entry.update(lhs);
-  entry.update(rhs, isAddition);
-  return entry.toString();
-}
-
-InstHash::Key
-InstHash::hashRelation(const std::shared_ptr<ir::RelationInst> &inst) {
-  auto op = inst->getOp();
-  auto dest = inst->getDest();
-  auto &entry = history[dest];
-  auto lhs = inst->getLhs(), rhs = inst->getRhs();
-  auto lhsEntry = getOrSet(lhs), rhsEntry = getOrSet(rhs);
-
-  if (lhsEntry == rhsEntry) {
-    if (op == ir::RelationInst::Eq || op == ir::RelationInst::Le ||
-        op == ir::RelationInst::Ge)
-      entry = History(1);
-    else
-      entry = History(0);
-    return entry.toString();
+  if (auto p = ir::dyc<ir::ArithUnaryInst>(inst)) {
+    return (p->getOp() == ir::ArithUnaryInst::Neg ? "-"s : "~"s) +
+           hash(p->getOperand());
   }
-
-  using namespace std::string_literals;
-  static const SmallMap<ir::RelationInst::OpType, std::string> names{
-      {ir::RelationInst::Eq, "=="s}, {ir::RelationInst::Ne, "!="s},
-      {ir::RelationInst::Lt, "<"s},  {ir::RelationInst::Gt, ">"s},
-      {ir::RelationInst::Le, "<="s}, {ir::RelationInst::Ge, ">="s}};
-
-  if (lhsEntry > rhsEntry &&
-      (op == ir::RelationInst::Eq || op == ir::RelationInst::Ne))
-    std::swap(lhsEntry, rhsEntry);
-  if (op == ir::RelationInst::Ge) {
-    std::swap(lhsEntry, rhsEntry);
-    op = ir::RelationInst::Le;
-  } else if (op == ir::RelationInst::Gt) {
-    std::swap(lhsEntry, rhsEntry);
-    op = ir::RelationInst::Lt;
+  if (auto p = ir::dyc<ir::ArithBinaryInst>(inst)) {
+    static const SmallMap<ir::ArithBinaryInst::OpType, std::string> names{
+        {ir::ArithBinaryInst::BitOr, "|"s}, {ir::ArithBinaryInst::BitAnd, "&"s},
+        {ir::ArithBinaryInst::Xor, "^"s},   {ir::ArithBinaryInst::Shl, "<<"s},
+        {ir::ArithBinaryInst::Shr, ">>"s},  {ir::ArithBinaryInst::Add, "+"s},
+        {ir::ArithBinaryInst::Sub, "-"s},   {ir::ArithBinaryInst::Mul, "*"s},
+        {ir::ArithBinaryInst::Div, "/"s},   {ir::ArithBinaryInst::Mod, "%"s}};
+    static const SmallMap<ir::ArithBinaryInst::OpType, int> associative{
+        {ir::ArithBinaryInst::BitOr, 0}, {ir::ArithBinaryInst::BitAnd, 0},
+        {ir::ArithBinaryInst::Xor, 0},   {ir::ArithBinaryInst::Add, 0},
+        {ir::ArithBinaryInst::Mul, 0},
+    };
+    auto lhs = hash(p->getLhs()), rhs = hash(p->getRhs());
+    if (associative.in(p->getOp()) && lhs > rhs)
+      std::swap(lhs, rhs);
+    return names.at(p->getOp()) + lhs + "," + rhs;
   }
+  if (auto p = ir::dyc<ir::RelationInst>(inst)) {
+    static const SmallMap<ir::RelationInst::OpType, std::string> names{
+        {ir::RelationInst::Eq, "=="s}, {ir::RelationInst::Ne, "!="s},
+        {ir::RelationInst::Lt, "<"s},  {ir::RelationInst::Gt, ">"s},
+        {ir::RelationInst::Le, "<="s}, {ir::RelationInst::Ge, ">="s}};
+    auto op = p->getOp();
+    auto lhs = hash(p->getLhs()), rhs = hash(p->getRhs());
+    if (op == ir::RelationInst::Gt)
+      return "<" + rhs + "," + lhs;
+    if (op == ir::RelationInst::Ge)
+      return "<=" + rhs + "," + lhs;
 
-  entry.update(dest);
-  return lhsEntry.toString() + names.at(op) + rhsEntry.toString();
+    if ((op == ir::RelationInst::Eq || op == ir::RelationInst::Ne) && lhs > rhs)
+      std::swap(lhs, rhs);
+    return names.at(op) + lhs + "," + rhs;
+  }
+  if (auto p = ir::dyc<ir::Phi>(inst)) {
+    std::string res = "phi,";
+    auto options = p->getOptions();
+    std::sort(options.begin(), options.end(),
+              [](const ir::Phi::Option &lhs, const ir::Phi::Option &rhs) {
+                return lhs.second->getID() < rhs.second->getID();
+              });
+    for (auto &option : options)
+      res += "(" + hash(option.first) + "," +
+             std::to_string(option.second->getID()) + ")";
+    return res;
+  }
+  assert(false);
 }
 
 } // namespace detail
@@ -222,46 +153,6 @@ std::shared_ptr<ir::Addr> uniquePhiValues(const std::shared_ptr<ir::Phi> &phi) {
   return res;
 }
 
-// If the options of this phi-functions are the same with some previous one,
-// then return the destination of that phi-function, otherwise nullptr
-template <class Iter>
-std::shared_ptr<ir::Reg>
-getReusablePhiResult(const std::shared_ptr<ir::Phi> &phi, Iter beg, Iter end) {
-  auto sortOptions = [](const std::vector<ir::Phi::Option> &options) {
-    auto res = options;
-    std::sort(res.begin(), res.end(),
-              [](const ir::Phi::Option &lhs, const ir::Phi::Option &rhs) {
-                return lhs.second->getID() < rhs.second->getID();
-              });
-    return res;
-  };
-
-  auto sortedOptions = sortOptions(phi->getOptions());
-
-  auto isSame = [&sortedOptions,
-                 sortOptions](const std::shared_ptr<ir::Phi> &o) {
-    auto oOptions = sortOptions(o->getOptions());
-    if (sortedOptions.size() != oOptions.size())
-      return false;
-    for (std::size_t i = 0, sz = oOptions.size(); i != sz; ++i) {
-      if (!areSameAddrs(sortedOptions[i].first, oOptions[i].first))
-        return false;
-    }
-    return true;
-  };
-
-  for (auto iter = beg; iter != end; ++iter) {
-    auto &inst = *iter;
-    if (ir::dyc<ir::Deleted>(inst))
-      continue;
-    auto oPhi = ir::dyc<ir::Phi>(inst);
-    assert(oPhi);
-    if (isSame(oPhi))
-      return oPhi->getDest();
-  }
-  return nullptr;
-}
-
 } // namespace
 
 void GlobalValueNumbering::doValueNumbering(
@@ -277,21 +168,29 @@ void GlobalValueNumbering::doValueNumbering(
     const auto phi = ir::dyc<ir::Phi>(inst);
     if (!phi)
       break;
+
+    if (!canProcessPhi(phi, valueNumber)) {
+      valueNumber.set(phi->getDest(), phi->getDest());
+      continue;
+    }
+
     if (auto val = uniquePhiValues(phi)) { // phi is meaningless
       valueNumber.set(phi->getDest(), val);
       inst = std::make_shared<ir::Deleted>();
       ++cnt;
       continue;
     }
-    if (auto val =
-            getReusablePhiResult(phi, bb.getMutableInsts().begin(), iter)) {
-      valueNumber.set(phi->getDest(), val);
+
+    auto key = instHash(inst);
+    if (isIn(exprReg, key)) { // reusable
+      valueNumber.set(phi->getDest(), exprReg.at(key));
       inst = std::make_shared<ir::Deleted>();
       ++cnt;
       continue;
     }
+
     valueNumber.set(phi->getDest(), phi->getDest());
-    // TODO: add p to the hash table ?
+    exprReg[key] = phi->getDest();
   }
 
   for (auto End = bb.getMutableInsts().end(); iter != End; ++iter) {
@@ -309,15 +208,17 @@ void GlobalValueNumbering::doValueNumbering(
       valueNumber.set(dest, dest);
       continue;
     }
+    // Do not value number relation instructions.
+    // [cf. instruction_selection.cpp, genRelation]
+    if (ir::dyc<ir::RelationInst>(inst)) {
+      valueNumber.set(dest, dest);
+      continue;
+    }
 
     auto key = instHash(inst);
-    // std::cerr << dest->getIdentifier() << " = " << key << std::endl;
     if (isIn(exprReg, key)) {
       auto res = exprReg.at(key);
       valueNumber.set(dest, res);
-
-      auto tmp = valueNumber.get(dest);
-
       inst = std::make_shared<ir::Deleted>();
       ++cnt;
       continue;
@@ -342,6 +243,8 @@ void GlobalValueNumbering::doValueNumbering(
   for (auto sucLabel : bb.getSuccessors()) {
     auto &sucBB = func.getMutableBasicBlock(sucLabel);
     for (auto &inst : sucBB.getMutableInsts()) {
+      if (ir::dyc<ir::Deleted>(inst))
+        continue;
       auto phi = ir::dyc<ir::Phi>(inst);
       if (!phi)
         break;
@@ -351,6 +254,16 @@ void GlobalValueNumbering::doValueNumbering(
 
   for (auto c : dominatorTree.getChildren(bbLabel))
     doValueNumbering(c, valueNumber, instHash, exprReg);
+}
+
+bool GlobalValueNumbering::canProcessPhi(
+    const std::shared_ptr<ir::Phi> &phi,
+    const detail::ValueNumberTable &vn) const {
+  for (auto &option : phi->getOptions()) {
+    if (!vn.has(option.first))
+      return false;
+  }
+  return true;
 }
 
 } // namespace mocker

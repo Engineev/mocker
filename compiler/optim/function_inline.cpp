@@ -92,7 +92,7 @@ std::size_t countInsts(const ir::FunctionModule &func, std::size_t threshold) {
 
 void FunctionInline::buildInlineable() {
   for (auto &kv : module.getFuncs()) {
-    if (kv.second.isExternalFunc() || kv.first == "_init_global_vars")
+    if (kv.second.isExternalFunc())
       continue;
     if (countInsts(kv.second, 201) <= 150) {
       inlineable.emplace(kv.first);
