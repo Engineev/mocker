@@ -72,6 +72,12 @@ public:
 
   void popLoopSuccessor();
 
+  const std::shared_ptr<Label> &getCurLoopUpdate() const;
+
+  void pushLoopUpdate(std::shared_ptr<Label> update);
+
+  void popLoopUpdate();
+
   FunctionModule &addFunc(FunctionModule func);
 
   struct ClassLayout {
@@ -143,7 +149,7 @@ private:
   ASTIDMap<std::shared_ptr<Addr>> exprAddr;
   const ASTIDMap<std::shared_ptr<ast::Type>> &exprType;
   InstIDMap<BBLIter> bbReside;
-  std::stack<std::shared_ptr<Label>> loopEntry, loopSuccessor;
+  std::stack<std::shared_ptr<Label>> loopEntry, loopSuccessor, loopUpdate;
   // The key is <class name> + '_' + <variable name>
   std::unordered_map<std::string, ClassLayout> classLayout;
   std::unordered_map<std::string, std::shared_ptr<Reg>> strLits;

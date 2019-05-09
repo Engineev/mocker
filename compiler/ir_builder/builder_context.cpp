@@ -74,6 +74,17 @@ void BuilderContext::pushLoopSuccessor(std::shared_ptr<Label> successor) {
 
 void BuilderContext::popLoopSuccessor() { loopSuccessor.pop(); }
 
+const std::shared_ptr<Label> &BuilderContext::getCurLoopUpdate() const {
+  assert(!loopUpdate.empty());
+  return loopUpdate.top();
+}
+
+void BuilderContext::pushLoopUpdate(std::shared_ptr<Label> update) {
+  loopUpdate.emplace(std::move(update));
+}
+
+void BuilderContext::popLoopUpdate() { loopUpdate.pop(); }
+
 FunctionModule &BuilderContext::addFunc(FunctionModule func) {
   auto ident = func.getIdentifier();
   curFunc = &module.addFunc(std::move(ident), std::move(func));
