@@ -272,8 +272,7 @@ void Builder::operator()(const ast::ContinueStmt &node) const {
   auto originBB = ctx.getCurBasicBlock();
   FunctionModule &func = ctx.getCurFunc();
 
-  auto loopEntry = ctx.getCurLoopEntry();
-  ctx.emplaceInst<Jump>(loopEntry);
+  ctx.emplaceInst<Jump>(ctx.getCurLoopUpdate());
 
   auto successorBB = func.insertBBAfter(originBB);
   ctx.setCurBasicBlock(successorBB);
@@ -631,11 +630,13 @@ void Builder::translateLoop(
   auto bodyLabel = getBBLabel(bodyFirstBB);
   auto successorBB = func.insertBBAfter(bodyFirstBB);
   auto successorLabel = getBBLabel(successorBB);
+  auto updateBB = func.pushBackBB();
+  auto updateLabel = getBBLabel(updateBB);
   auto defer2 =
       Defer([this, &successorBB] { ctx.setCurBasicBlock(successorBB); });
 
-  auto jump = std::make_shared<Jump>(conditionLabel);
-  ctx.appendInst(originBB, jump);
+  auto jump2Cond = std::make_shared<Jump>(conditionLabel);
+  ctx.appendInst(originBB, jump2Cond);
 
   // condition
   ctx.setCurBasicBlock(conditionFirstBB);
@@ -654,23 +655,25 @@ void Builder::translateLoop(
   }
   ctx.pushLoopEntry(conditionLabel);
   ctx.pushLoopSuccessor(successorLabel);
+  ctx.pushLoopUpdate(updateLabel);
+
   auto pop = std::shared_ptr<void>(nullptr, [this](void *) {
     ctx.popLoopEntry();
     ctx.popLoopSuccessor();
+    ctx.popLoopUpdate();
   });
 
   // body
   ctx.setCurBasicBlock(bodyFirstBB);
   visit(*body);
-  // e.g while (...) return;
-  if (ctx.getCurBasicBlock()->isCompleted())
-    return;
+  auto bodyLastBB = ctx.getCurBasicBlock();
+  if (!bodyLastBB->isCompleted())
+    ctx.appendInst(std::make_shared<ir::Jump>(updateLabel));
+
+  ctx.setCurBasicBlock(updateBB);
   if (update)
     visit(*update);
-  auto bodyLastBB = ctx.getCurBasicBlock();
-
-  // br & jump
-  ctx.appendInst(bodyLastBB, jump);
+  ctx.appendInst(updateBB, jump2Cond);
 }
 
 std::shared_ptr<Addr> Builder::translateNewArray(
