@@ -37,6 +37,9 @@ void simplifyPhiFunctions(ir::BasicBlock &bb);
 
 bool isParameter(const ir::FunctionModule &func, const std::string &identifier);
 
+bool areSameAddrs(const std::shared_ptr<ir::Addr> &lhs,
+                  const std::shared_ptr<ir::Addr> &rhs);
+
 } // namespace mocker
 
 #endif // MOCKER_OPTIM_HELPER_H

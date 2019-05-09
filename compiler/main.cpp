@@ -3,7 +3,6 @@
 #include <iostream>
 #include <sstream>
 
-#include "optim/reassociation.h"
 #include "ast/ast_node.h"
 #include "codegen/instruction_selection.h"
 #include "codegen/naive_register_allocation.h"
@@ -24,12 +23,14 @@
 #include "optim/function_inline.h"
 #include "optim/global_const_inline.h"
 #include "optim/global_value_numbering.h"
+#include "optim/induction_variable.h"
 #include "optim/local_value_numbering.h"
 #include "optim/loopinv.h"
 #include "optim/memorization.h"
 #include "optim/module_simplification.h"
 #include "optim/optimizer.h"
 #include "optim/promote_global_variables.h"
+#include "optim/reassociation.h"
 #include "optim/simplify_cfg.h"
 #include "optim/ssa.h"
 #include "parse/lexer.h"
@@ -138,8 +139,6 @@ void optimize(mocker::ir::Module &module) {
   runOptPasses<UnusedFunctionRemoval>(module);
 
   runOptPasses<PromoteGlobalVariables>(module);
-  //  ir::printModule(module);
-  ir::verifyModule(module);
 
   std::cerr << "\nAfter inline and promotion of global variables:\n";
   printIRStats(stats);
@@ -231,6 +230,7 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
   using namespace mocker;
   std::size_t cnt = 0;
 
+  FuncAttr funcAttr;
   bool optimizable = true;
   while (optimizable) {
     ++cnt;
@@ -240,7 +240,11 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-    if (cnt == 1)
+
+    runOptPasses<CopyPropagation>(module);
+    funcAttr.init(module);
+    runOptPasses<InductionVariable>(module, funcAttr);
+    if (cnt <= 2)
       runOptPasses<Reassociation>(module);
     optimizable |= runOptPasses<GlobalValueNumbering>(module);
     optimizable |= runOptPasses<LocalValueNumbering>(module);
@@ -259,7 +263,6 @@ void runOptsUntilFixedPoint(mocker::ir::Module &module) {
     optimizable |= runOptPasses<SimplifyPhiFunctions>(module);
     optimizable |= runOptPasses<MergeBlocks>(module);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);
-    FuncAttr funcAttr;
     funcAttr.init(module);
     optimizable |= runOptPasses<DeadCodeElimination>(module, funcAttr);
     optimizable |= runOptPasses<RemoveUnreachableBlocks>(module);

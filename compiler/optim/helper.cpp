@@ -137,4 +137,19 @@ bool isParameter(const ir::FunctionModule &func,
   return n < (int)func.getArgs().size();
 }
 
+bool areSameAddrs(const std::shared_ptr<ir::Addr> &lhs,
+                  const std::shared_ptr<ir::Addr> &rhs) {
+  auto lhsReg = ir::dyc<ir::Reg>(lhs);
+  auto lhsLit = ir::dyc<ir::IntLiteral>(lhs);
+  assert(lhsReg || lhsLit);
+  auto rhsReg = ir::dyc<ir::Reg>(rhs);
+  auto rhsLit = ir::dyc<ir::IntLiteral>(rhs);
+  assert(rhsReg || rhsLit);
+  if (lhsLit && rhsLit)
+    return lhsLit->getVal() == rhsLit->getVal();
+  if (lhsReg && rhsReg)
+    return lhsReg->getIdentifier() == rhsReg->getIdentifier();
+  return false;
+}
+
 } // namespace mocker

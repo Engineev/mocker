@@ -34,6 +34,7 @@ set(HEADERS
   optim/global_const_inline.h
   optim/global_value_numbering.h
   optim/helper.h
+  optim/induction_variable.h
   optim/local_value_numbering.h
   optim/loopinv.cpp
   optim/memorization.cpp
@@ -79,6 +80,7 @@ set(SOURCES
   optim/global_constant_inline.cpp
   optim/global_value_numbering.cpp
   optim/helper.cpp
+  optim/induction_variable.cpp
   optim/local_value_numbering.cpp
   optim/loopinv.cpp
   optim/memorization.cpp

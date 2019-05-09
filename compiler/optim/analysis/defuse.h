@@ -30,6 +30,13 @@ public:
   void init(const ir::FunctionModule &func) {
     for (auto &bb : func.getBBs()) {
       for (auto &inst : bb.getInsts()) {
+        if (auto dest = ir::getDest(inst))
+          chain[dest] = {};
+      }
+    }
+
+    for (auto &bb : func.getBBs()) {
+      for (auto &inst : bb.getInsts()) {
         auto operands = ir::getOperandsUsed(inst);
         for (auto &operand : operands) {
           auto reg = ir::dycLocalReg(operand);
