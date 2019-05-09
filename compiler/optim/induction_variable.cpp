@@ -156,12 +156,12 @@ void InductionVariable::processLoop(std::size_t header) {
     newName[iter->first] = reuse;
   }
 
-  std::cerr << "reusing: ";
-  for (auto &kv : newName) {
-    std::cerr << ir::fmtAddr(kv.first) << " <- " << ir::fmtAddr(kv.second)
-              << ", ";
-  }
-  std::cerr << std::endl;
+//  std::cerr << "reusing: ";
+//  for (auto &kv : newName) {
+//    std::cerr << ir::fmtAddr(kv.first) << " <- " << ir::fmtAddr(kv.second)
+//              << ", ";
+//  }
+//  std::cerr << std::endl;
 
   // Finally, we replace the phi functions by assignment
   auto &bb = func.getMutableBasicBlock(header);

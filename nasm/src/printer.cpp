@@ -147,9 +147,29 @@ std::string fmtInst(const std::shared_ptr<Inst> &inst) {
     assert(false);
   }
   if (auto p = dyc<Cqo>(inst)) {
+    return "cdq";
     return "cqo";
   }
   if (auto p = dyc<IDiv>(inst)) {
+    static const nasm::RegMap<std::string> name {
+        {rax(), "eax"},
+        {rcx(), "ecx"},
+        {rdx(), "edx"},
+        {rbx(), "ebx"},
+        {rsp(), "esp"},
+        {rbp(), "ebp"},
+        {rsi(), "esi"},
+        {rdi(), "edi"},
+        {r8(), "r8d"},
+        {r9(), "r9d"},
+        {r10(), "r10d"},
+        {r11(), "r11d"},
+        {r12(), "r12d"},
+        {r13(), "r13d"},
+        {r14(), "r14d"},
+        {r15(), "r15d"},
+    };
+    return "idiv " + name.at(dyc<Register>(p->getRhs()));
     return "idiv " + fmtAddr(p->getRhs());
   }
   assert(false);
