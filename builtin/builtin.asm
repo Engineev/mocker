@@ -95,20 +95,20 @@ __string__add:
 ALIGN   16
 
 __string__substring:
-        sub     edx, esi
+        sub     rdx, rsi
         push    r12
         push    rbp
-        lea     ebp, [rdx+1H]
         push    rbx
-        add     edx, 9
         mov     rbx, rdi
-        movsxd  rdi, edx
+        mov     rdi, rdx
+        add     rdi, 9
+        lea     rbp, [rdx+1H]
         mov     r12, rsi
         call    malloc
         lea     rcx, [rax+8H]
-        movsxd  rdx, ebp
         lea     rsi, [rbx+r12]
-        mov     qword [rax], rdx
+        mov     qword [rax], rbp
+        mov     rdx, rbp
         mov     rdi, rcx
         call    memcpy
         pop     rbx
@@ -116,8 +116,6 @@ __string__substring:
         pop     r12
         ret
 
-
-        nop
 
 
 
@@ -234,32 +232,26 @@ __string__less:
         mov     rdx, rbx
         cmovbe  rdx, rbp
         call    memcmp
-        test    eax, eax
-        jz      L_004
-        add     rsp, 8
-        cdqe
+        movsxd  rdx, eax
+        mov     rax, rdx
         shr     rax, 63
+        test    rdx, rdx
+        jnz     L_004
+        xor     eax, eax
+        cmp     rbp, rbx
+        setb    al
+L_004:  add     rsp, 8
         pop     rbx
         pop     rbp
         ret
+
 
 
 
 
 
 ALIGN   8
-L_004:  xor     eax, eax
-        cmp     rbp, rbx
-        setb    al
-        add     rsp, 8
-        pop     rbx
-        pop     rbp
-        ret
 
-
-        nop
-
-ALIGN   16
 __string__less_equal:
         push    r13
         push    r12
@@ -278,27 +270,15 @@ L_005:  cmp     rbx, rbp
         cmovbe  rdx, rbx
         mov     rdi, r12
         call    memcmp
-        test    eax, eax
-        jz      L_006
-        add     rsp, 8
-        cdqe
-        pop     rbx
+        movsxd  rdx, eax
+        mov     rax, rdx
         shr     rax, 63
-        pop     rbp
-        pop     r12
-        pop     r13
-        ret
-
-
-
-
-
-
-ALIGN   16
-L_006:  xor     eax, eax
+        test    rdx, rdx
+        jnz     L_006
+        xor     eax, eax
         cmp     rbx, rbp
         setb    al
-        add     rsp, 8
+L_006:  add     rsp, 8
         pop     rbx
         pop     rbp
         pop     r12
@@ -361,13 +341,14 @@ getInt:
 ALIGN   8
 L_008:  mov     rdi, qword [rel stdin]
         cmp     bl, 45
-        cmove   ebp, r12d
+        cmove   rbp, r12
         call    _IO_getc
         movsx   ebx, al
         sub     eax, 48
         cmp     al, 9
         ja      L_008
 L_009:  sub     ebx, 48
+        movsxd  rbx, ebx
         jmp     L_011
 
 
@@ -375,30 +356,32 @@ L_009:  sub     ebx, 48
 
 
 ALIGN   8
-L_010:  lea     eax, [rbx+rbx*4]
-        lea     ebx, [rdx+rax*2-30H]
+L_010:  lea     rax, [rbx+rbx*4]
+        lea     rbx, [rdx+rax*2-30H]
 L_011:  mov     rdi, qword [rel stdin]
         call    _IO_getc
-        movsx   edx, al
+        movsx   rdx, al
         sub     eax, 48
         cmp     al, 9
         jbe     L_010
-        mov     eax, ebx
-        neg     eax
-        test    ebp, ebp
-        cmovne  ebx, eax
-        mov     eax, ebx
+        mov     rax, rbx
+        neg     rax
+        test    rbp, rbp
+        cmovne  rbx, rax
+        mov     rax, rbx
         pop     rbx
         pop     rbp
         pop     r12
         ret
 
 
+        nop
 
 
 
 
-ALIGN   8
+
+ALIGN   16
 
 print:
         mov     rdx, qword [rdi-8H]
@@ -418,149 +401,157 @@ ALIGN   8
 _printInt:
         push    rbp
         push    rbx
-        sub     rsp, 56
+        sub     rsp, 104
 
 
         mov     rax, qword [fs:abs 28H]
-        mov     qword [rsp+28H], rax
+        mov     qword [rsp+58H], rax
         xor     eax, eax
-        test    edi, edi
+        test    rdi, rdi
         je      L_016
-        mov     ebx, edi
+        mov     rbx, rdi
         js      L_015
-L_012:  mov     eax, ebx
-        mov     esi, 3435973837
-        mov     edi, ebx
-        mul     esi
-        mov     ecx, edx
-        shr     ecx, 3
-        lea     eax, [rcx+rcx*4]
-        add     eax, eax
-        sub     edi, eax
-        test    ecx, ecx
-        mov     dword [rsp], edi
+L_012:  mov     rax, rbx
+        mov     rsi, qword 0CCCCCCCCCCCCCCCDH
+        mov     rdi, rbx
+        mul     rsi
+        mov     rcx, rdx
+        shr     rcx, 3
+        lea     rax, [rcx+rcx*4]
+        add     rax, rax
+        sub     rdi, rax
+        test    rcx, rcx
+        mov     qword [rsp], rdi
         je      L_018
-        mov     eax, ecx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mov     dword [rsp+4H], ecx
-        mov     ecx, 1374389535
-        mul     ecx
-        mov     ecx, edx
-        shr     ecx, 5
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, rbx
+        shr     rdx, 2
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rdx
+        mov     qword [rsp+8H], rcx
+        mov     rcx, qword 28F5C28F5C28F5C3H
+        mul     rcx
+        mov     rcx, rdx
+        shr     rcx, 2
+        test    rcx, rcx
         je      L_019
-        mov     eax, ecx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 274877907
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+8H], ecx
-        shr     edx, 6
-        test    edx, edx
-        mov     ecx, edx
+        mov     rax, rcx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, rbx
+        shr     rdx, 3
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rdx
+        mov     qword [rsp+10H], rcx
+        mov     rcx, qword 20C49BA5E353F7CFH
+        mul     rcx
+        mov     rcx, rdx
+        shr     rcx, 4
+        test    rcx, rcx
         je      L_020
-        mov     eax, edx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 3518437209
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+0CH], ecx
-        mov     ecx, edx
-        shr     ecx, 13
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 346DC5D63886594BH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+18H], rcx
+        mov     rcx, rdx
+        shr     rcx, 11
+        test    rcx, rcx
         je      L_017
-        mov     eax, ecx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, ebx
-        shr     edx, 5
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, edx
-        mov     dword [rsp+10H], ecx
-        mov     ecx, 175921861
-        mul     ecx
-        mov     ecx, edx
-        shr     ecx, 7
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, rbx
+        shr     rdx, 5
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rdx
+        mov     qword [rsp+20H], rcx
+        mov     rcx, qword 0A7C5AC471B47843H
+        mul     rcx
+        mov     rcx, rdx
+        shr     rcx, 7
+        test    rcx, rcx
         je      L_021
-        mov     eax, ecx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 1125899907
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+14H], ecx
-        shr     edx, 18
-        test    edx, edx
-        mov     ecx, edx
+        mov     rax, rcx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 431BDE82D7B634DBH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+28H], rcx
+        shr     rdx, 18
+        test    rdx, rdx
+        mov     rcx, rdx
         je      L_022
-        mov     eax, edx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 1801439851
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+18H], ecx
-        mov     ecx, edx
-        shr     ecx, 22
-        test    ecx, ecx
+        mov     rax, rdx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 0D6BF94D5E57A42BDH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+30H], rcx
+        mov     rcx, rdx
+        shr     rcx, 23
+        test    rcx, rcx
         je      L_024
-        mov     eax, ecx
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 1441151881
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+1CH], ecx
-        shr     edx, 25
-        test    edx, edx
-        mov     ecx, edx
+        mov     rax, rcx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 0ABCC77118461CEFDH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+38H], rcx
+        shr     rdx, 26
+        test    rdx, rdx
+        mov     rcx, rdx
         je      L_025
-        mov     eax, edx
-        shr     ebx, 9
-        mul     esi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 281475
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+20H], ecx
-        shr     edx, 7
-        test    edx, edx
+        mov     rax, rdx
+        shr     rbx, 9
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 44B82FA09B5A53H
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+40H], rcx
+        mov     rbx, rdx
+        shr     rbx, 11
+        test    rbx, rbx
         je      L_023
-        mov     dword [rsp+24H], edx
+        mov     rax, rbx
+        mul     rsi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        add     rax, rax
+        sub     rbx, rax
         mov     eax, 10
-L_013:  sub     eax, 1
-        lea     rbp, [rsp-4H]
-        cdqe
-        shl     rax, 2
-        lea     rbx, [rsp+rax]
+        mov     qword [rsp+48H], rbx
+L_013:  lea     rbx, [rsp+rax*8-8H]
+        lea     rbp, [rsp-8H]
 
 
 
@@ -568,17 +559,17 @@ L_013:  sub     eax, 1
 ALIGN   8
 L_014:  mov     eax, dword [rbx]
         mov     rsi, qword [rel stdout]
-        sub     rbx, 4
+        sub     rbx, 8
         lea     edi, [rax+30H]
         call    _IO_putc
         cmp     rbx, rbp
         jnz     L_014
-        mov     rax, qword [rsp+28H]
+        mov     rax, qword [rsp+58H]
 
 
         xor     rax, qword [fs:abs 28H]
         jne     L_026
-        add     rsp, 56
+        add     rsp, 104
         pop     rbx
         pop     rbp
         ret
@@ -590,17 +581,22 @@ L_014:  mov     eax, dword [rbx]
 ALIGN   8
 L_015:  mov     rsi, qword [rel stdout]
         mov     edi, 45
-        neg     ebx
+        neg     rbx
         call    _IO_putc
         jmp     L_012
 
-L_016:  mov     rax, qword [rsp+28H]
+
+
+
+
+ALIGN   8
+L_016:  mov     rax, qword [rsp+58H]
 
 
         xor     rax, qword [fs:abs 28H]
         jne     L_026
         mov     rsi, qword [rel stdout]
-        add     rsp, 56
+        add     rsp, 104
         mov     edi, 48
         pop     rbx
         pop     rbp
@@ -675,152 +671,165 @@ ALIGN   8
 _printlnInt:
         push    rbp
         push    rbx
-        sub     rsp, 56
+        sub     rsp, 104
         mov     rsi, qword [rel stdout]
 
 
         mov     rax, qword [fs:abs 28H]
-        mov     qword [rsp+28H], rax
+        mov     qword [rsp+58H], rax
         xor     eax, eax
-        test    edi, edi
+        test    rdi, rdi
         je      L_031
-        mov     ebx, edi
+        mov     rbx, rdi
         js      L_030
-L_027:  mov     eax, ebx
-        mov     edi, 3435973837
-        mul     edi
-        mov     ecx, edx
-        mov     edx, ebx
-        shr     ecx, 3
-        lea     eax, [rcx+rcx*4]
-        add     eax, eax
-        sub     edx, eax
-        test    ecx, ecx
-        mov     dword [rsp], edx
+L_027:  mov     rax, rbx
+        mov     rdi, qword 0CCCCCCCCCCCCCCCDH
+        mul     rdi
+        mov     rcx, rdx
+        mov     rdx, rbx
+        shr     rcx, 3
+        lea     rax, [rcx+rcx*4]
+        add     rax, rax
+        sub     rdx, rax
+        test    rcx, rcx
+        mov     qword [rsp], rdx
         je      L_034
-        mov     eax, ecx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mov     dword [rsp+4H], ecx
-        mov     ecx, 1374389535
-        mul     ecx
-        mov     ecx, edx
-        shr     ecx, 5
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, rbx
+        shr     rdx, 2
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rdx
+        mov     qword [rsp+8H], rcx
+        mov     rcx, qword 28F5C28F5C28F5C3H
+        mul     rcx
+        mov     rcx, rdx
+        shr     rcx, 2
+        test    rcx, rcx
         je      L_035
-        mov     eax, ecx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 274877907
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+8H], ecx
-        mov     ecx, edx
-        shr     ecx, 6
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, rbx
+        shr     rdx, 3
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rdx
+        mov     qword [rsp+10H], rcx
+        mov     rcx, qword 20C49BA5E353F7CFH
+        mul     rcx
+        mov     rcx, rdx
+        shr     rcx, 4
+        test    rcx, rcx
         je      L_036
-        mov     eax, ecx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 3518437209
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+0CH], ecx
-        mov     ecx, edx
-        shr     ecx, 13
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 346DC5D63886594BH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+18H], rcx
+        mov     rcx, rdx
+        shr     rcx, 11
+        test    rcx, rcx
         je      L_033
-        mov     eax, ecx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, ebx
-        shr     edx, 5
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, edx
-        mov     dword [rsp+10H], ecx
-        mov     ecx, 175921861
-        mul     ecx
-        shr     edx, 7
-        test    edx, edx
-        mov     ecx, edx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, rbx
+        shr     rdx, 5
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rdx
+        mov     qword [rsp+20H], rcx
+        mov     rcx, qword 0A7C5AC471B47843H
+        mul     rcx
+        mov     rcx, rdx
+        shr     rcx, 7
+        test    rcx, rcx
         je      L_037
-        mov     eax, edx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 1125899907
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+14H], ecx
-        mov     ecx, edx
-        shr     ecx, 18
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 431BDE82D7B634DBH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+28H], rcx
+        mov     rcx, rdx
+        shr     rcx, 18
+        test    rcx, rcx
         je      L_038
-        mov     eax, ecx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 1801439851
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+18H], ecx
-        mov     ecx, edx
-        shr     ecx, 22
-        test    ecx, ecx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 0D6BF94D5E57A42BDH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+30H], rcx
+        mov     rcx, rdx
+        shr     rcx, 23
+        test    rcx, rcx
         je      L_040
-        mov     eax, ecx
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 1441151881
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+1CH], ecx
-        shr     edx, 25
-        test    edx, edx
-        mov     ecx, edx
+        mov     rax, rcx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 0ABCC77118461CEFDH
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+38H], rcx
+        mov     rcx, rdx
+        shr     rcx, 26
+        test    rcx, rcx
         je      L_041
-        mov     eax, edx
-        shr     ebx, 9
-        mul     edi
-        shr     edx, 3
-        lea     eax, [rdx+rdx*4]
-        mov     edx, 281475
-        add     eax, eax
-        sub     ecx, eax
-        mov     eax, ebx
-        mul     edx
-        mov     dword [rsp+20H], ecx
-        shr     edx, 7
-        test    edx, edx
+        mov     rax, rcx
+        shr     rbx, 9
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        mov     rdx, qword 44B82FA09B5A53H
+        add     rax, rax
+        sub     rcx, rax
+        mov     rax, rbx
+        mul     rdx
+        mov     qword [rsp+40H], rcx
+        mov     rbx, rdx
+        shr     rbx, 11
+        test    rbx, rbx
         je      L_039
-        mov     dword [rsp+24H], edx
+        mov     rax, rbx
+        mul     rdi
+        shr     rdx, 3
+        lea     rax, [rdx+rdx*4]
+        add     rax, rax
+        sub     rbx, rax
         mov     eax, 10
-L_028:  sub     eax, 1
-        lea     rbp, [rsp-4H]
-        cdqe
-        shl     rax, 2
-        lea     rbx, [rsp+rax]
+        mov     qword [rsp+48H], rbx
+L_028:  lea     rbx, [rsp+rax*8-8H]
+        lea     rbp, [rsp-8H]
+
+
+
+
+ALIGN   8
 L_029:  mov     eax, dword [rbx]
-        sub     rbx, 4
+        sub     rbx, 8
         lea     edi, [rax+30H]
         call    _IO_putc
         cmp     rbx, rbp
@@ -834,7 +843,7 @@ L_029:  mov     eax, dword [rbx]
 
 ALIGN   8
 L_030:  mov     edi, 45
-        neg     ebx
+        neg     rbx
         call    _IO_putc
         mov     rsi, qword [rel stdout]
         jmp     L_027
@@ -843,16 +852,16 @@ L_030:  mov     edi, 45
 
 
 
-ALIGN   16
+ALIGN   8
 L_031:  mov     edi, 48
         call    _IO_putc
         mov     rsi, qword [rel stdout]
-L_032:  mov     rax, qword [rsp+28H]
+L_032:  mov     rax, qword [rsp+58H]
 
 
         xor     rax, qword [fs:abs 28H]
         jne     L_042
-        add     rsp, 56
+        add     rsp, 104
         mov     edi, 10
         pop     rbx
         pop     rbp
