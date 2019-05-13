@@ -329,6 +329,51 @@ void genCall(nasm::Section &text, FuncSelectionContext &ctx,
   }
 }
 
+bool tryCombineMemInst(nasm::Section &text, FuncSelectionContext &ctx,
+                       const std::shared_ptr<ir::ArithBinaryInst> &shl,
+                       const std::shared_ptr<ir::ArithBinaryInst> &add,
+                       const std::shared_ptr<ir::IRInst> &memOp) {
+  if (shl->getOp() != ir::ArithBinaryInst::Shl)
+    return false;
+  auto lit = ir::dyc<ir::IntLiteral>(shl->getRhs());
+  if (!lit || lit->getVal() != 3)
+    return false;
+  auto offsetDefined = shl->getDest();
+  if (ctx.getUses(offsetDefined).size() > 1)
+    return false;
+  auto pos = ctx.getIrAddr(shl->getLhs());
+
+  if (add->getOp() != ir::ArithBinaryInst::Add)
+    return false;
+  auto offsetUsed = ir::dycLocalReg(add->getRhs());
+  if (!offsetUsed ||
+      offsetDefined->getIdentifier() != offsetDefined->getIdentifier())
+    return false;
+  auto ptrDefined = add->getDest();
+  if (ctx.getUses(ptrDefined).size() > 1)
+    return false;
+  auto base = ctx.getIrAddr(add->getLhs());
+
+  auto load = ir::dyc<ir::Load>(memOp);
+  auto store = ir::dyc<ir::Store>(memOp);
+  if (!store && !load)
+    return false;
+  auto addr = load ? ir::dyc<ir::Reg>(load->getAddr())
+                   : ir::dyc<ir::Reg>(store->getAddr());
+  if (addr->getIdentifier() != ptrDefined->getIdentifier())
+    return false;
+
+  auto effectiveAddr = std::make_shared<nasm::MemoryAddr>(
+      nasm::dyc<nasm::Register>(base), nasm::dyc<nasm::Register>(pos), 8, 0);
+  if (load) {
+    text.emplaceInst<nasm::Mov>(ctx.getIrAddr(load->getDest()), effectiveAddr);
+  } else {
+    text.emplaceInst<nasm::Mov>(effectiveAddr, ctx.getIrAddr(store->getVal()));
+  }
+
+  return true;
+}
+
 } // namespace
 
 namespace {
@@ -374,7 +419,20 @@ ir::InstListIter genInst(nasm::Section &text, FuncSelectionContext &ctx,
   }
 
   if (auto p = ir::dyc<ir::ArithBinaryInst>(inst)) {
-    genArithBinary(text, ctx, p);
+    auto nextInst = *nextIter;
+    auto add = ir::dyc<ir::ArithBinaryInst>(nextInst);
+    if (!add) {
+      genArithBinary(text, ctx, p);
+      return nextIter;
+    }
+    auto nextNextIter = nextIter;
+    ++nextNextIter;
+    if (tryCombineMemInst(text, ctx, p, add, *nextNextIter)) {
+      ++nextIter;
+      ++nextIter;
+    } else {
+      genArithBinary(text, ctx, p);
+    }
     return nextIter;
   }
 

@@ -68,6 +68,9 @@ void removeUnusedValue(nasm::Module &module) {
       if (auto p = nasm::dyc<nasm::BinaryInst>(rInst)) {
         rDest = nasm::dyc<nasm::Register>(p->getLhs());
       }
+      if (auto p = nasm::dyc<nasm::Lea>(rInst)) {
+        rDest = nasm::dyc<nasm::Register>(p->getDest());
+      }
       if (!rDest || rDest->getIdentifier() != dest->getIdentifier())
         break;
       rInst = std::make_shared<nasm::Empty>();
