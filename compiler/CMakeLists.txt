@@ -37,7 +37,6 @@ set(HEADERS
   optim/induction_variable.h
   optim/local_value_numbering.h
   optim/loopinv.cpp
-  optim/memorization.cpp
   optim/module_simplification.h
   optim/opt_pass.h
   optim/optimizer.h
@@ -83,7 +82,6 @@ set(SOURCES
   optim/induction_variable.cpp
   optim/local_value_numbering.cpp
   optim/loopinv.cpp
-  optim/memorization.cpp
   optim/module_simplification.cpp
   optim/promote_global_variables.cpp
   optim/reassociation.cpp
